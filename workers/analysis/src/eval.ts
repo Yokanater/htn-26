@@ -73,9 +73,9 @@ function shippedSections(items: ReportItem[]): ReportSections {
   };
 }
 
-export async function evaluate(client: LlmClient, opts: { quarantineInjections?: boolean } = {}) {
+export async function evaluate(client: LlmClient, opts: { quarantineInjections?: boolean; run_id?: string } = {}) {
   const rec = new RecordingClient(client);
-  const result: AnalysisResult = await runAnalysis(coffeeProfile, coffeeEvidence, { client: rec, seeds: coffeeSeeds, run_id: "run_eval", now: FIXTURE_NOW, ...opts });
+  const result: AnalysisResult = await runAnalysis(coffeeProfile, coffeeEvidence, { client: rec, seeds: coffeeSeeds, now: FIXTURE_NOW, quarantineInjections: opts.quarantineInjections, run_id: opts.run_id ?? "run_eval" });
   const bundle = selectEvidence(coffeeProfile, coffeeEvidence, { maxItems: 40, now: FIXTURE_NOW, quarantineInjections: opts.quarantineInjections });
   const text = JSON.stringify(result.items);
   const byKind: Record<string, { low: number; total: number }> = {};
