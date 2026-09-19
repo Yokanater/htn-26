@@ -8,9 +8,14 @@ import {
   SHOPPING_DOMAINS,
 } from '@sei/core';
 import { Hono } from 'hono';
+import { type AppProviders, defaultProviders } from './providers';
+import { assetRoutes } from './routes/assets';
+import { briefRoutes } from './routes/briefs';
+import { sessionRoutes } from './routes/session';
 
 /** Pure factory: no listeners, environment reads or provider calls. */
-export function createApp(env: EnvLike = {}): Hono {
+export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): Hono {
+  const providers = { ...defaultProviders(), ...injected };
   const resolved = resolveMilestones(env.MILESTONES);
   const flags = featureFlags(env);
   const sections = resolved.milestones.flatMap((id) => {
@@ -28,8 +33,28 @@ export function createApp(env: EnvLike = {}): Hono {
     implementation: 'bootstrap',
   });
   const app = new Hono();
+  app.use('/api/*', async (c, next) => {
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method)) {
+      const origin = c.req.header('origin');
+      const requestHost = new URL(c.req.url).host;
+      const forwardedHost = c.req.header('x-forwarded-host')?.split(',')[0]?.trim();
+      if (origin && ![requestHost, forwardedHost].includes(new URL(origin).host)) {
+        return c.json(
+          { error: { code: 'ORIGIN_DENIED', message: 'Use this action from the same site.' } },
+          403,
+        );
+      }
+    }
+    c.header('Cache-Control', 'no-store');
+    await next();
+  });
   app.get('/healthz', (c) => c.json({ ok: true }));
   app.get('/api/healthz', (c) => c.json({ ok: true }));
   app.get('/api/capabilities', (c) => c.json(capabilities));
+  if (flags.FEATURE_INTENT_CAPTURE) {
+    app.route('/api', sessionRoutes(providers));
+    app.route('/api', assetRoutes(providers));
+    app.route('/api', briefRoutes(providers));
+  }
   return app;
 }

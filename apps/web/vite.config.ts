@@ -26,7 +26,17 @@ export default defineConfig(({ mode }) => {
       port: webPort,
       strictPort: true,
       proxy: {
-        '/api': { target: `http://localhost:${apiPort}`, changeOrigin: true },
+        '/api': {
+          target: `http://localhost:${apiPort}`,
+          changeOrigin: true,
+          configure(proxy) {
+            proxy.on('proxyReq', (proxyRequest, request) => {
+              if (request.headers.host) {
+                proxyRequest.setHeader('x-forwarded-host', request.headers.host);
+              }
+            });
+          },
+        },
       },
     },
   };

@@ -13,7 +13,7 @@ describe('bootstrap capability metadata', () => {
     expect(capabilities.implementation).toBe('bootstrap');
     expect(capabilities.milestoneFamily).toBe('intent');
     expect(JSON.stringify(raw)).not.toContain('do-not-expose');
-    expect((await app.request('/api/briefs', { method: 'POST' })).status).toBe(404);
+    expect((await app.request('/api/briefs', { method: 'POST' })).status).toBe(401);
   });
   it('hides disabled sections and rejects an invalid flag chain at startup', async () => {
     const response = await createApp({
