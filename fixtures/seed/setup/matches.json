@@ -12,12 +12,36 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_1"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Ships to CA"
+          },
+          {
+            "key": "dimension:width",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Width 100 cm is within the 120 cm maximum"
           }
         ]
       },
@@ -28,12 +52,28 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_2"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Ships to CA"
           }
         ]
       }
@@ -44,7 +84,7 @@
     },
     "excludesShippingAndTax": true,
     "warnings": [
-      "Synthetic fixture, not observed shopper demand"
+      "Synthetic seed offers, not live catalog results"
     ],
     "sampleOrigin": "seed"
   },
@@ -61,12 +101,36 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_1"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Ships to CA"
+          },
+          {
+            "key": "dimension:width",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Width 100 cm is within the 120 cm maximum"
           }
         ]
       },
@@ -77,12 +141,28 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_2"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Ships to CA"
           }
         ]
       }
@@ -93,7 +173,7 @@
     },
     "excludesShippingAndTax": true,
     "warnings": [
-      "Synthetic fixture, not observed shopper demand"
+      "Synthetic seed offers, not live catalog results"
     ],
     "sampleOrigin": "seed"
   },
@@ -110,12 +190,36 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_1"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Ships to CA"
+          },
+          {
+            "key": "dimension:width",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Width 100 cm is within the 120 cm maximum"
           }
         ]
       },
@@ -126,12 +230,28 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_2"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Ships to CA"
           }
         ]
       }
@@ -142,7 +262,7 @@
     },
     "excludesShippingAndTax": true,
     "warnings": [
-      "Synthetic fixture, not observed shopper demand"
+      "Synthetic seed offers, not live catalog results"
     ],
     "sampleOrigin": "seed"
   },
@@ -159,12 +279,36 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_1"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Ships to CA"
+          },
+          {
+            "key": "dimension:width",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Width 100 cm is within the 120 cm maximum"
           }
         ]
       },
@@ -175,12 +319,28 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_2"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Ships to CA"
           }
         ]
       }
@@ -191,7 +351,7 @@
     },
     "excludesShippingAndTax": true,
     "warnings": [
-      "Synthetic fixture, not observed shopper demand"
+      "Synthetic seed offers, not live catalog results"
     ],
     "sampleOrigin": "seed"
   },
@@ -208,12 +368,36 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_1"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Ships to CA"
+          },
+          {
+            "key": "dimension:width",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Width 100 cm is within the 120 cm maximum"
           }
         ]
       },
@@ -224,12 +408,28 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_2"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Ships to CA"
           }
         ]
       }
@@ -240,7 +440,7 @@
     },
     "excludesShippingAndTax": true,
     "warnings": [
-      "Synthetic fixture, not observed shopper demand"
+      "Synthetic seed offers, not live catalog results"
     ],
     "sampleOrigin": "seed"
   },
@@ -257,12 +457,36 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_1"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Ships to CA"
+          },
+          {
+            "key": "dimension:width",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Width 100 cm is within the 120 cm maximum"
           }
         ]
       },
@@ -273,12 +497,28 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_2"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Ships to CA"
           }
         ]
       }
@@ -289,7 +529,7 @@
     },
     "excludesShippingAndTax": true,
     "warnings": [
-      "Synthetic fixture, not observed shopper demand"
+      "Synthetic seed offers, not live catalog results"
     ],
     "sampleOrigin": "seed"
   },
@@ -306,12 +546,36 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_1"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Ships to CA"
+          },
+          {
+            "key": "dimension:width",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_1"
+            ],
+            "explanation": "Width 100 cm is within the 120 cm maximum"
           }
         ]
       },
@@ -322,12 +586,28 @@
         "required": true,
         "checks": [
           {
-            "key": "fixture_eligibility",
+            "key": "price",
             "status": "pass",
             "evidenceIds": [
               "ev_setup_2"
             ],
-            "explanation": "Synthetic eligible variant"
+            "explanation": "Priced in CAD, the brief currency"
+          },
+          {
+            "key": "availability",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Listed as available"
+          },
+          {
+            "key": "ships_to",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_setup_2"
+            ],
+            "explanation": "Ships to CA"
           }
         ]
       }
@@ -338,7 +618,7 @@
     },
     "excludesShippingAndTax": true,
     "warnings": [
-      "Synthetic fixture, not observed shopper demand"
+      "Synthetic seed offers, not live catalog results"
     ],
     "sampleOrigin": "seed"
   }
