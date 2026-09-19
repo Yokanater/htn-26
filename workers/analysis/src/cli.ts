@@ -11,9 +11,10 @@ import type { LlmClient } from "./llm/types.js";
 import { runAnalysis } from "./pipeline.js";
 import { planQueries } from "./workflows/planner.js";
 
-const USAGE = `Usage: npm run analyze -- (--fixture | --live) [--input file.json] [--plan] [--max-items N] [--out file]
-  --fixture   deterministic fake client, no API key needed
-  --live      OpenAI Responses API (needs OPENAI_API_KEY and OPENAI_MODEL; reads .env if present)
+const USAGE = `Usage: npm run analyze -- (--fixture [coffee] | --live) [--input file.json] [--plan] [--max-items N] [--out file]
+  --fixture   built-in coffee fixtures with the deterministic fake client, no API key needed
+  --live      OpenAI Responses API (needs OPENAI_API_KEY and OPENAI_MODEL; reads .env if present).
+              On its own it runs on the coffee fixtures; "--fixture coffee --live" is equivalent.
   --input     JSON {profile, evidence, seeds?} instead of the built-in coffee fixtures
   --plan      also run the research planner and include its plan in the output
   --out       write JSON here instead of stdout`;
@@ -23,7 +24,9 @@ export function parseArgs(argv: string[]) {
   const value = (n: string) => argv[argv.indexOf(`--${n}`) + 1];
   const fixture = flag("fixture");
   const live = flag("live");
-  if (fixture === live) throw new Error("Pass exactly one of --fixture or --live");
+  if (!fixture && !live) throw new Error("Pass --fixture (fake client) and/or --live (OpenAI)");
+  const named = fixture ? value("fixture") : undefined;
+  if (named && !named.startsWith("--") && named !== "coffee") throw new Error(`Unknown fixture "${named}" (only "coffee")`);
   const maxItems = flag("max-items") ? Number(value("max-items")) : undefined;
   if (maxItems !== undefined && !(maxItems > 0)) throw new Error("--max-items must be a positive number");
   return { live, plan: flag("plan"), input: flag("input") ? value("input") : undefined, out: flag("out") ? value("out") : undefined, maxItems };

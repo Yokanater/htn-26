@@ -81,9 +81,10 @@ describe("runAnalysis", () => {
 });
 
 describe("cli", () => {
-  it("requires exactly one of --fixture/--live", () => {
+  it("requires --fixture or --live; --fixture coffee --live means live client on the coffee fixtures", () => {
     expect(() => parseArgs([])).toThrow();
-    expect(() => parseArgs(["--fixture", "--live"])).toThrow();
+    expect(() => parseArgs(["--fixture", "nope"])).toThrow(/Unknown fixture/);
+    expect(parseArgs(["--fixture", "coffee", "--live", "--out", "o.json"])).toMatchObject({ live: true, out: "o.json" });
     expect(parseArgs(["--fixture", "--max-items", "20"])).toMatchObject({ live: false, maxItems: 20 });
   });
 
