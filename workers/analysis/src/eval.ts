@@ -6,7 +6,7 @@ import { coffeeProfile, FIXTURE_NOW } from "./fixtures/profile.js";
 import { coffeeSeeds } from "./fixtures/seeds.js";
 import { FakeLlmClient } from "./llm/fake.js";
 import { OpenAiLlmClient } from "./llm/openai.js";
-import type { LlmClient, LlmRequest } from "./llm/types.js";
+import type { LlmClient, LlmRequest, Logger } from "./llm/types.js";
 import { runAnalysis, type AnalysisResult } from "./pipeline.js";
 import { validateReport, type ReportSections } from "./validator.js";
 
@@ -73,9 +73,9 @@ function shippedSections(items: ReportItem[]): ReportSections {
   };
 }
 
-export async function evaluate(client: LlmClient, opts: { quarantineInjections?: boolean; run_id?: string } = {}) {
+export async function evaluate(client: LlmClient, opts: { quarantineInjections?: boolean; run_id?: string; logger?: Logger } = {}) {
   const rec = new RecordingClient(client);
-  const result: AnalysisResult = await runAnalysis(coffeeProfile, coffeeEvidence, { client: rec, seeds: coffeeSeeds, now: FIXTURE_NOW, quarantineInjections: opts.quarantineInjections, run_id: opts.run_id ?? "run_eval" });
+  const result: AnalysisResult = await runAnalysis(coffeeProfile, coffeeEvidence, { client: rec, logger: opts.logger, seeds: coffeeSeeds, now: FIXTURE_NOW, quarantineInjections: opts.quarantineInjections, run_id: opts.run_id ?? "run_eval" });
   const bundle = selectEvidence(coffeeProfile, coffeeEvidence, { maxItems: 40, now: FIXTURE_NOW, quarantineInjections: opts.quarantineInjections });
   const text = JSON.stringify(result.items);
   const byKind: Record<string, { low: number; total: number }> = {};

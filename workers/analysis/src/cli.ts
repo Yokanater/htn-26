@@ -7,7 +7,7 @@ import { coffeeProfile, FIXTURE_NOW } from "./fixtures/profile.js";
 import { coffeeSeeds } from "./fixtures/seeds.js";
 import { FakeLlmClient } from "./llm/fake.js";
 import { OpenAiLlmClient } from "./llm/openai.js";
-import type { LlmClient } from "./llm/types.js";
+import { stderrLogger, type LlmClient } from "./llm/types.js";
 import { runAnalysis } from "./pipeline.js";
 import { planQueries } from "./workflows/planner.js";
 
@@ -62,7 +62,7 @@ export async function cli(argv: string[]): Promise<number> {
   const run_id = args.live ? undefined : "run_fixture";
   const plan = args.plan ? await planQueries(input.profile, { client, run_id: run_id ?? "run_plan" }, input.seeds.map((s) => s.name)) : undefined;
   const result = await runAnalysis(input.profile, input.evidence, {
-    client, seeds: input.seeds, run_id, maxItems: args.maxItems, now: args.input ? undefined : FIXTURE_NOW,
+    client, logger: args.live ? stderrLogger : undefined, seeds: input.seeds, run_id, maxItems: args.maxItems, now: args.input ? undefined : FIXTURE_NOW,
   });
 
   const json = JSON.stringify({ ...result, ...(plan ? { plan } : {}) }, null, 2);

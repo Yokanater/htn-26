@@ -1,11 +1,12 @@
 import type { z } from "zod";
-import { SchemaError, type LlmClient } from "../llm/types.js";
+import { SchemaError, type LlmClient, type Logger } from "../llm/types.js";
 import { loadPrompt, type PromptName } from "../prompts.js";
 import { formatErrors, type ValidationError } from "../validator.js";
 
 export interface WorkflowCtx {
   client: LlmClient;
   run_id: string;
+  log?: Logger; // receives "workflow_retry" events with the validation errors that forced a retry
 }
 
 export class WorkflowError extends Error {
@@ -50,6 +51,7 @@ export async function runWorkflow<T>(args: {
       errors = err.issues.map((message) => ({ code: "SCHEMA_INVALID" as const, path: "(output)", message }));
       rejected = err.raw;
     }
+    if (attempt === 1) ctx.log?.({ event: "workflow_retry", run_id: ctx.run_id, task, errors: errors.map(({ code, path, message }) => ({ code, path, message })) });
     user = `${args.user}\n\n<validation_feedback>\nYour previous output was rejected by deterministic validation:\n${formatErrors(errors)}\n\nRejected output:\n${rejected}\n\nReturn a corrected, complete output that fixes every error. Do not add claims that lack evidence.\n</validation_feedback>`;
   }
   throw new WorkflowError(task, errors);

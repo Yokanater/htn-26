@@ -4,7 +4,7 @@ import {
   type CollaborationCandidate, type CompetitorProfile, type DiscourseTheme, type RecommendedAction, type SwotReport,
 } from "./contracts.js";
 import { selectEvidence, type EvidenceBundle } from "./evidence.js";
-import type { LlmClient } from "./llm/types.js";
+import type { LlmClient, Logger } from "./llm/types.js";
 import type { ValidationError } from "./validator.js";
 import { analyzeCompetitors } from "./workflows/competitors.js";
 import { scoutCollaborators } from "./workflows/collaboration.js";
@@ -16,6 +16,7 @@ export type Section = "collaboration" | "competitors_discourse" | "swot_actions"
 
 export interface AnalysisOptions {
   client: LlmClient;
+  logger?: Logger;
   seeds?: EntitySeed[]; // upstream score components; joined onto model output by entity_key
   run_id?: string;
   maxItems?: number; // evidence bundle size; default 40
@@ -42,7 +43,7 @@ export async function runAnalysis(profileIn: StoreProfile, evidenceIn: EvidenceD
   const evidence = z.array(EvidenceDocument).parse(evidenceIn);
   const seeds = z.array(EntitySeed).parse(opts.seeds ?? []);
   const run_id = opts.run_id ?? `run_${Date.now().toString(36)}`;
-  const ctx: WorkflowCtx = { client: opts.client, run_id };
+  const ctx: WorkflowCtx = { client: opts.client, run_id, log: opts.logger };
   const bundle = selectEvidence(profile, evidence, { maxItems: opts.maxItems ?? 40, now: opts.now, quarantineInjections: opts.quarantineInjections });
 
   const missing: AnalysisResult["missing_sections"] = [];

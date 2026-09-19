@@ -14,6 +14,7 @@ interface Call { task: string; attempt: number; ms: number; input: number; outpu
 async function one(i: number, quarantine: boolean) {
   const run_id = `bench${i}`;
   const calls: Call[] = [];
+  const retries: Record<string, unknown>[] = [];
   const usage = new Map<string, { input: number; output: number; reasoning: number }>();
   const inner = new OpenAiLlmClient({
     logger: (e) => {
@@ -35,9 +36,9 @@ async function one(i: number, quarantine: boolean) {
       }
     },
   };
-  const r = await evaluate(tap, { quarantineInjections: quarantine, run_id });
+  const r = await evaluate(tap, { quarantineInjections: quarantine, run_id, logger: (e) => { if (e.event === "workflow_retry") retries.push(e); } });
   console.error(`run ${i}: status=${r.result.status} gates=${gateFailures(r).join(";") || "ok"}`);
-  return { calls, r };
+  return { calls, r, retries };
 }
 
 const runs = Number(arg("runs", "5"));
@@ -71,4 +72,4 @@ console.table(rows);
 console.log(`per full report: ${tin} in + ${tout} out tokens${priced ? ` = $${((tin * pIn + tout * pOut) / 1e6).toFixed(3)}` : " (set OPENAI_PRICE_IN/OUT for $)"}`);
 console.log(`statuses: ${results.map((x) => x.r.result.status).join(", ")}; wall time/report ≈ ${(results.reduce((a, x) => a + Math.max(...x.calls.map((c) => c.ms)), 0) / runs / 1000).toFixed(0)}s (longest call)`);
 mkdirSync("runs", { recursive: true });
-writeFileSync(`runs/${label}.json`, JSON.stringify({ rows, results: results.map((x) => ({ calls: x.calls, status: x.r.result.status, missing: x.r.result.missing_sections, first_pass: x.r.first_pass, shipped: x.r.shipped, low_evidence: x.r.low_evidence, injection: x.r.injection, items: x.r.result.items })) }, null, 2));
+writeFileSync(`runs/${label}.json`, JSON.stringify({ rows, results: results.map((x) => ({ calls: x.calls, retries: x.retries, status: x.r.result.status, missing: x.r.result.missing_sections, first_pass: x.r.first_pass, shipped: x.r.shipped, low_evidence: x.r.low_evidence, injection: x.r.injection, items: x.r.result.items })) }, null, 2));
