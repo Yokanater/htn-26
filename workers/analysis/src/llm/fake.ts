@@ -1,4 +1,4 @@
-import { fakeCollaboration, fakeCompetitors, fakePlan, fakeSwotActions } from "../fixtures/outputs.js";
+import { fakeCollaboration, fakeCompetitors, fakeConsistency, fakePlan, fakeSwotActions } from "../fixtures/outputs.js";
 import { SchemaError, type LlmClient, type LlmRequest } from "./types.js";
 
 const FIXTURES: Record<string, unknown> = {
@@ -6,6 +6,7 @@ const FIXTURES: Record<string, unknown> = {
   CollaborationOutput: fakeCollaboration,
   CompetitorDiscourseOutput: fakeCompetitors,
   SwotActionsOutput: fakeSwotActions,
+  ConsistencyOutput: fakeConsistency,
 };
 
 /**

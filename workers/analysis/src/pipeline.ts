@@ -8,11 +8,15 @@ import type { LlmClient, Logger } from "./llm/types.js";
 import type { ValidationError } from "./validator.js";
 import { analyzeCompetitors } from "./workflows/competitors.js";
 import { scoutCollaborators } from "./workflows/collaboration.js";
+import { checkConsistency, type ConsistencyReport } from "./workflows/consistency.js";
 import { isLowEvidence } from "./workflows/finalize.js";
 import { WorkflowError, type WorkflowCtx } from "./workflows/run.js";
 import { synthesizeSwot } from "./workflows/swot.js";
 
-export type Section = "collaboration" | "competitors_discourse" | "swot_actions";
+export type Section = "collaboration" | "competitors_discourse" | "swot_actions" | "consistency";
+
+/** The sections that carry report content. Losing all three is a failed run; losing the consistency check is not. */
+const CONTENT_SECTIONS: Section[] = ["collaboration", "competitors_discourse", "swot_actions"];
 
 export interface AnalysisOptions {
   client: LlmClient;
@@ -29,6 +33,8 @@ export interface AnalysisResult {
   status: "completed" | "partial" | "failed";
   missing_sections: { section: Section; reason: string; errors?: ValidationError[] }[];
   items: ReportItem[];
+  /** Final cross-section check. Null when it failed or there was nothing assembled to check. */
+  consistency: ConsistencyReport | null;
   bundle: { included: string[]; excluded: EvidenceBundle["excluded"] };
 }
 
@@ -63,12 +69,29 @@ export async function runAnalysis(profileIn: StoreProfile, evidenceIn: EvidenceD
     missing.push(failure("swot_actions", err));
   }
 
-  const items = toReportItems(run_id, bundle, upstream, swot);
+  // Final cross-section check (design doc §5 Phase F). It may rewrite claim wording or lower a confidence;
+  // it can never add facts or citations, so a failure here costs commentary, not content: the report still ships.
+  let report = { ...upstream, swot };
+  let consistency: ConsistencyReport | null = null;
+  const assembled = report.collaboration.length || report.competitors.length || report.themes.length || report.swot;
+  if (assembled) {
+    try {
+      const checked = await checkConsistency(bundle, report, ctx);
+      report = checked.report;
+      consistency = checked.consistency;
+    } catch (err) {
+      missing.push(failure("consistency", err));
+    }
+  }
+
+  const contentFailures = missing.filter((m) => CONTENT_SECTIONS.includes(m.section)).length;
+  const items = toReportItems(run_id, bundle, report, report.swot);
   return {
     run_id,
-    status: missing.length === 0 ? "completed" : missing.length === 3 ? "failed" : "partial",
+    status: missing.length === 0 ? "completed" : contentFailures === CONTENT_SECTIONS.length ? "failed" : "partial",
     missing_sections: missing,
     items,
+    consistency,
     bundle: { included: bundle.documents.map((d) => d.id), excluded: bundle.excluded },
   };
 }

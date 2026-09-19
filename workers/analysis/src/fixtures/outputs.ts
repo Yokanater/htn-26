@@ -4,6 +4,7 @@ import type {
   ResearchPlan,
   SwotActionsOutput,
 } from "../contracts.js";
+import type { ConsistencyOutput } from "../workflows/consistency.js";
 
 /** Hand-written "model outputs" for the fixture evidence. The fake client returns these; they must pass validateReport. */
 
@@ -233,4 +234,39 @@ export const fakeSwotActions: SwotActionsOutput = {
       cheapest_falsifying_experiment: { experiment: "Audit the last 90 days of subscription orders for skipped boxes and support response times.", metric: "Skipped-box rate and median first reply time", falsified_if: "The audit finds skips and slow replies are rare and the reports are outliers." },
     },
   ],
+};
+
+/** Clean report: the consistency stage finds nothing. This is what the fake client returns by default. */
+export const fakeConsistency: ConsistencyOutput = {
+  findings: [],
+  summary: "The three sections agree. Collaboration candidates are complements rather than competitors, the discourse themes keep their caveats, and each action traces to a SWOT item backed by the same evidence.",
+};
+
+/** Tampered report: a collaboration partner also listed as a competitor, and an action that ignores the conflict. */
+export const fakeConsistencyFindings: ConsistencyOutput = {
+  findings: [
+    {
+      id: "cons_1",
+      kind: "ignored_conflict",
+      severity: "blocking",
+      item_ids: ["collab_2", "comp_3"],
+      description: "Kiln & Kettle is proposed as a co-marketing partner in the collaboration section and simultaneously classified as a competitor, and the recommended action treats the partnership as uncontested.",
+      resolution: "rewrite",
+      rewrite: {
+        item_id: "collab_2",
+        revised_claim: "Kiln & Kettle's variable-temperature gooseneck kettles are used during pour-over brewing, though this report also lists the brand as a competitor, so the overlap must be resolved before any partnership.",
+        lower_confidence_to: "low",
+      },
+    },
+    {
+      id: "cons_2",
+      kind: "overstated_confidence",
+      severity: "warning",
+      item_ids: ["theme_6"],
+      description: "The decaf unmet-need theme rests on a single forum comment, as its own sampling-bias note says, so it should not carry the weight it is given in the actions.",
+      resolution: "flag",
+      rewrite: null,
+    },
+  ],
+  summary: "One blocking conflict: a brand appears as both a partner and a competitor. One theme is thinner than its use elsewhere suggests.",
 };
