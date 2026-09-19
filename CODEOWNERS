@@ -1,0 +1,11 @@
+/packages/collect/    @lane1
+/packages/enrich/     @lane2
+/packages/db/         @lane2
+/ml/                  @lane2
+/packages/reason/     @lane3
+/packages/pipeline/   @lane3
+/apps/                @lane4
+/packages/telemetry/  @lane4
+/packages/contracts/  @lane1 @lane2 @lane3 @lane4
+/packages/core/       @lane1 @lane2 @lane3 @lane4
+/fixtures/seed/       @lane1 @lane2 @lane3 @lane4
