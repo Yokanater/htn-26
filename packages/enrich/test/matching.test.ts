@@ -454,6 +454,11 @@ describe('deterministic attribute normalization', () => {
     ['no_drilling', { mounting: 'Freestanding or wall mount' }, 'pass'],
     ['freestanding', { mounting: 'clamp' }, 'unknown'],
     ['no_drilling', {}, 'unknown'],
+    // "Plug-in" describes power, not placement: it must not outrank an explicit drilling need.
+    ['no_drilling', { mounting: 'Plug-in wall-mounted, requires drilling' }, 'fail'],
+    ['freestanding', { mounting: 'Plug-in wall-mounted, requires drilling' }, 'fail'],
+    ['no_drilling', { mounting: 'Plug-in' }, 'unknown'],
+    ['freestanding', { mounting: 'Plug-in' }, 'unknown'],
   ] as const)('setup mounting %s against %j is %s', (value, attributes, expected) => {
     expect(
       status('setup', attributes, 'mounting', (b) => {

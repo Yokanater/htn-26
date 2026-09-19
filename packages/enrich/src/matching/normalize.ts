@@ -132,8 +132,8 @@ function parseMaterials(value: string | number): string[] | null {
   return phrases.length > 0 ? phrases : null;
 }
 
-const FREESTANDING =
-  /\b(free[\s-]?standing|floor[\s-]?standing|table[\s-]?top|desk[\s-]?top|plug[\s-]?in)\b/;
+/** "Plug-in" is deliberately absent: it describes power, not placement (a plug-in sconce is wall-mounted). */
+const FREESTANDING = /\b(free[\s-]?standing|floor[\s-]?standing|table[\s-]?top|desk[\s-]?top)\b/;
 const NO_DRILLING =
   /\b(no[\s-]?drill(ing)?|drill[\s-]?free|renter[\s-]?friendly|clamp(s|ed)?|adhesive|tension|suction|magnetic)\b/;
 const REQUIRES_DRILLING =
