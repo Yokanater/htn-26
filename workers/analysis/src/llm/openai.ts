@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { APIConnectionError } from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { LlmError, SchemaError, stderrLogger, type LlmClient, type LlmRequest, type Logger } from "./types.js";
 
@@ -16,9 +16,10 @@ export interface OpenAiClientOptions {
 const RETRYABLE_STATUS = new Set([408, 409, 429]);
 
 function isRetryable(err: unknown): boolean {
-  const e = err as { status?: number; name?: string };
+  const e = err as { status?: number };
   if (typeof e.status === "number") return RETRYABLE_STATUS.has(e.status) || e.status >= 500;
-  return /Connection|Timeout/.test(e.name ?? ""); // APIConnectionError, APIConnectionTimeoutError
+  // SDK errors do not set `name`, so match the classes: APIConnectionError covers APIConnectionTimeoutError.
+  return err instanceof APIConnectionError;
 }
 
 export class OpenAiLlmClient implements LlmClient {

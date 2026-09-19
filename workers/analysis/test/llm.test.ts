@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import OpenAI from "openai";
 import { z } from "zod";
 import { OpenAiLlmClient } from "../src/llm/openai.js";
 import { FakeLlmClient } from "../src/llm/fake.js";
@@ -43,7 +44,7 @@ describe("OpenAiLlmClient", () => {
   });
 
   it("retries a connection timeout, but only once", async () => {
-    const timeout = Object.assign(new Error("timed out"), { name: "APIConnectionTimeoutError" });
+    const timeout = new OpenAI.APIConnectionTimeoutError(); // real SDK class: live run showed it has no distinguishing `name`
     const create = vi.fn().mockRejectedValue(timeout);
     const { client } = make(create);
     await expect(client.generate(req)).rejects.toBeInstanceOf(LlmError);
