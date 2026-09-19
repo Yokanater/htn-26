@@ -51,6 +51,16 @@ describe("OpenAiLlmClient", () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
+  it("enforces a hard deadline via AbortSignal and retries once when it fires", async () => {
+    const hang = vi.fn((_body: unknown, opts: { signal: AbortSignal }) =>
+      new Promise((_, reject) => opts.signal.addEventListener("abort", () => reject(new OpenAI.APIUserAbortError()))));
+    const logs: Record<string, unknown>[] = [];
+    const client = new OpenAiLlmClient({ model: "m", timeoutMs: 20, openai: { responses: { create: hang } } as never, logger: (e) => logs.push(e), sleep: async () => {} });
+    await expect(client.generate(req)).rejects.toMatchObject({ name: "LlmError", message: "Timed out after 20ms" });
+    expect(hang).toHaveBeenCalledTimes(2);
+    expect(logs[0]).toMatchObject({ will_retry: true });
+  });
+
   it("does not retry client errors", async () => {
     const create = vi.fn().mockRejectedValue(apiError(400));
     const { client } = make(create);

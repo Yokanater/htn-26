@@ -15,7 +15,8 @@ export interface OpenAiClientOptions {
 
 const RETRYABLE_STATUS = new Set([408, 409, 429]);
 
-function isRetryable(err: unknown): boolean {
+function isRetryable(err: unknown, timedOut: boolean): boolean {
+  if (timedOut) return true; // our hard deadline fired (surfaces as APIUserAbortError)
   const e = err as { status?: number };
   if (typeof e.status === "number") return RETRYABLE_STATUS.has(e.status) || e.status >= 500;
   // SDK errors do not set `name`, so match the classes: APIConnectionError covers APIConnectionTimeoutError.
@@ -35,7 +36,7 @@ export class OpenAiLlmClient implements LlmClient {
     const model = opts.model ?? process.env.OPENAI_MODEL;
     if (!model) throw new Error("OPENAI_MODEL is not set");
     this.model = model;
-    this.timeoutMs = opts.timeoutMs ?? Number(process.env.OPENAI_TIMEOUT_MS ?? 300_000);
+    this.timeoutMs = opts.timeoutMs ?? Number(process.env.OPENAI_TIMEOUT_MS ?? 180_000);
     this.maxRetries = opts.maxRetries ?? 1;
     this.backoffMs = opts.backoffMs ?? 500;
     this.log = opts.logger ?? stderrLogger;
@@ -48,6 +49,7 @@ export class OpenAiLlmClient implements LlmClient {
       const started = Date.now();
       const ctx = { event: "openai_call", run_id: req.run_id, task_id: req.task_id, task: req.task, prompt: req.promptVersion, model: this.model, attempt };
       let resp;
+      const deadline = AbortSignal.timeout(this.timeoutMs); // the SDK's own `timeout` proved unreliable: a live call ran 1164s
       try {
         resp = await this.openai.responses.create(
           {
@@ -57,13 +59,13 @@ export class OpenAiLlmClient implements LlmClient {
             text: { format: zodTextFormat(req.schema, req.schemaName) },
             store: false, // evidence bundles are not kept server-side
           },
-          { timeout: this.timeoutMs, maxRetries: 0 },
+          { timeout: this.timeoutMs, maxRetries: 0, signal: deadline },
         );
       } catch (err) {
         const e = err as { status?: number; requestID?: string | null; message?: string };
-        const retry = attempt < this.maxRetries && isRetryable(err);
+        const retry = attempt < this.maxRetries && isRetryable(err, deadline.aborted);
         this.log({ ...ctx, status: "error", http_status: e.status ?? null, request_id: e.requestID ?? null, latency_ms: Date.now() - started, will_retry: retry, error: e.message });
-        if (!retry) throw new LlmError(e.message ?? String(err), e.status, e.requestID);
+        if (!retry) throw new LlmError(deadline.aborted ? `Timed out after ${this.timeoutMs}ms` : (e.message ?? String(err)), e.status, e.requestID);
         await this.sleep(this.backoffMs * 2 ** attempt * (0.5 + Math.random()));
         continue;
       }
