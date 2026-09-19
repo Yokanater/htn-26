@@ -5,12 +5,16 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app';
 import { loadRootEnv, serverPort } from './env';
+import { runtimeProviders } from './providers';
 
 loadRootEnv();
 
-const server = serve({ fetch: createApp(process.env).fetch, port: serverPort() }, (info) => {
-  console.log(`[server] listening on http://localhost:${info.port}`);
-});
+const server = serve(
+  { fetch: createApp(process.env, runtimeProviders(process.env)).fetch, port: serverPort() },
+  (info) => {
+    console.log(`[server] listening on http://localhost:${info.port}`);
+  },
+);
 
 function shutdown(signal: string): void {
   console.log(`[server] ${signal} received, closing`);

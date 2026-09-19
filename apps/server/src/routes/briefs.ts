@@ -1,4 +1,5 @@
 import { IntentBriefSchema, ShoppingDomainSchema } from '@sei/contracts';
+import { IntentInterpretationError } from '@sei/reason';
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
@@ -75,14 +76,34 @@ export function briefRoutes(providers: AppProviders): Hono {
         },
         404,
       );
-    const brief = await providers.intent.createDraft({
-      domain: input.data.domain,
-      source,
-      country: input.data.country,
-      currency: input.data.currency,
-    });
-    providers.intake.saveBrief(ownerId, brief, null);
-    return c.json(brief, 201);
+    try {
+      const brief = await providers.intent.createDraft({
+        domain: input.data.domain,
+        source,
+        country: input.data.country,
+        currency: input.data.currency,
+      });
+      providers.intake.saveBrief(ownerId, brief, null);
+      return c.json(brief, 201);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'VISION_NOT_CONFIGURED')
+        return c.json(
+          {
+            error: {
+              code: 'VISION_NOT_CONFIGURED',
+              message:
+                'Object detection is not connected yet. Configure the server OpenAI key and vision model to analyze your image or description.',
+            },
+          },
+          503,
+        );
+      if (error instanceof IntentInterpretationError)
+        return c.json(
+          { error: { code: error.kind, message: error.message } },
+          error.kind === 'timeout' ? 504 : 422,
+        );
+      throw error;
+    }
   });
   routes.get('/briefs/:id', (c) => {
     const ownerId = getCookie(c, SESSION_COOKIE);

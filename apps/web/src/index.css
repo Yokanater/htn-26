@@ -1262,3 +1262,12 @@ footer small {
     animation-duration: 0.01ms;
   }
 }
+
+.detected-source {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #eef2ec;
+  margin-bottom: 24px;
+}

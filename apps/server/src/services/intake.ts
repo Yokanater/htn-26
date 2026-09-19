@@ -105,7 +105,10 @@ export class RevisionConflictError extends Error {
 
 /** Adapts L3's budgeted interpreter to the private intake API. */
 export class InterpreterIntentDraftService implements IntentDraftService {
-  constructor(private readonly interpreter: IntentInterpreter) {}
+  constructor(
+    private readonly interpreter: IntentInterpreter,
+    private readonly origin: 'seed' | 'live' = 'seed',
+  ) {}
 
   async createDraft(input: IntentDraftInput): Promise<IntentBrief> {
     let consumed = 0;
@@ -118,7 +121,7 @@ export class InterpreterIntentDraftService implements IntentDraftService {
       },
       {
         signal: new AbortController().signal,
-        sampleOrigin: 'seed',
+        sampleOrigin: this.origin,
         consume(resource, amount) {
           if (resource !== 'model_call' || consumed + amount > 2) {
             throw new Error('Intent budget exceeded');

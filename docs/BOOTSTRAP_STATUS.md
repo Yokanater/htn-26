@@ -70,3 +70,19 @@ component normalizes and previews images in the browser, but the server continue
 submission until the approved decoder is installed and injected. Catalog search, matching, consented
 demand projection, and merchant profiling are not mounted yet; the merchant card remains explicitly
 synthetic. No live provider was called during integration.
+
+
+## General object detection — 2026-09-19
+
+The runtime now uses the OpenAI vision adapter for text and image interpretation when
+OPENAI_API_KEY and OPENAI_MODEL_VISION are set. Missing configuration returns a typed 503;
+it never silently substitutes fixture answers. Tests still inject the offline interpreter.
+The setup domain now means general products, preserving existing DTO values. One to six
+actual objects are supported, including a single-object seed fixture.
+
+Local macOS uploads use the installed sips decoder with a pixel limit, deadline, resize,
+fresh PNG encoding, and metadata-chunk removal. Other deployment platforms still need an
+injected decoder. Owner sessions and assets remain in memory and expire on server restart.
+
+A user-authorized live browser check uploaded a synthetic red mug image and received one
+live item: a plain red coffee mug. Catalog matching remains a separate unfinished integration.

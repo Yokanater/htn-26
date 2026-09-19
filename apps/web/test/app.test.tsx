@@ -76,11 +76,12 @@ it('creates a private text brief and stops at the confirmation barrier', async (
   vi.stubGlobal('fetch', fetchMock);
   renderApp();
   fireEvent.click(screen.getByRole('button', { name: /Start a collection/ }));
-  fireEvent.click(screen.getByRole('button', { name: 'Room or desk' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Any products' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Text description' }));
   fireEvent.change(screen.getByRole('textbox', { name: 'Your collection idea' }), {
     target: { value: 'A compact reading corner with warm wood and soft light' },
   });
-  fireEvent.click(screen.getByRole('button', { name: /Build my draft brief/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Identify items/ }));
   expect(
     await screen.findByRole('heading', { name: /Here’s the collection we heard/ }),
   ).toBeTruthy();

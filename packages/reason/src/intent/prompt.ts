@@ -5,7 +5,7 @@
 import type { ShoppingDomain } from '@sei/contracts';
 import { SHOPPING_DOMAINS } from '@sei/core';
 
-export const INTENT_PROMPT_VERSION = 'intent.v1';
+export const INTENT_PROMPT_VERSION = 'intent.v2';
 
 /** Repair feedback is our own validator output, but it can quote model text; cap it. */
 export const MAX_REPAIR_FEEDBACK_CHARS = 2000;
@@ -18,7 +18,7 @@ const DOMAIN_RULES: Record<ShoppingDomain, string> = {
     'Describe clothing, footwear and accessories as products. Never estimate clothing size, fit or ' +
     'measurements; the shopper enters sizes.',
   setup:
-    'Describe furniture, lighting, decor and equipment as products. Never estimate room or product ' +
+    'Identify any visible shopping products: electronics, sports gear, tools, beauty products, kitchenware, books, toys, clothing, furniture or mixed collections. Do not restrict detection to rooms or furniture. Never estimate room or product ' +
     'dimensions, weight capacity or mounting; the shopper enters dimensions and mounting limits.',
 };
 
@@ -28,7 +28,7 @@ export function buildIntentSystemPrompt(domain: ShoppingDomain): string {
     `You turn a shopper's inspiration into a shopping brief for the "${config.label}" domain.`,
     '',
     'Task:',
-    '- Describe the 2 to 6 distinct products the shopper most likely wants to buy.',
+    '- Describe the 1 to 6 distinct products the shopper most likely wants to buy.',
     `- For each product give a short category (for example: ${config.exampleCategories.join(', ')}), ` +
       'a plain description, and visible attributes such as colour, material, pattern and style.',
     '- Give a confidence for each product that reflects how clearly the input shows it.',
@@ -42,7 +42,7 @@ export function buildIntentSystemPrompt(domain: ShoppingDomain): string {
     '- Describe products, never people. Do not identify anyone, and do not infer face, body, age, ' +
       'gender, ethnicity, health or any other personal or protected trait.',
     '- Do not guess brands, exact models, sellers or prices unless the shopper states them.',
-    '- Do not invent products that are not shown or described.',
+    '- Do not invent products that are not shown or described. A single object must produce one slot. If there are no identifiable products, return an empty slots array.',
     `- The shopper confirms and edits the brief afterwards: ${config.confirmationHint}`,
   ].join('\n');
 }
@@ -73,7 +73,7 @@ export function buildIntentUserText(input: {
 }): string {
   const parts = [
     input.text === null
-      ? `Describe the wanted products in the attached ${input.domain} image.`
+      ? `Identify the visible products in the attached image.`
       : `Describe the wanted products in this ${input.domain} description.`,
   ];
   if (input.text !== null) parts.push(renderShopperText(input.text));

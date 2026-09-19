@@ -94,8 +94,8 @@ function Home({ enter }: { enter: (surface: Surface) => void }) {
             Find what belongs <em>together.</em>
           </h1>
           <p className="lede">
-            Turn an outfit or room inspiration into a real collection across stores. With
-            permission, those choices help independent shops build better collaborations.
+            Turn any inspiration into a collection: tech, fashion, hobbies, everyday essentials, and
+            more. With permission, those choices help independent shops build better collaborations.
           </p>
           <div className="hero-actions">
             <button className="primary" type="button" onClick={() => enter('shopper')}>
@@ -183,7 +183,7 @@ function DomainToggle({
         <ShoppingBag aria-hidden /> Outfit
       </button>
       <button type="button" aria-pressed={value === 'setup'} onClick={() => onChange('setup')}>
-        <PackageSearch aria-hidden /> Room or desk
+        <PackageSearch aria-hidden /> Any products
       </button>
     </fieldset>
   );
@@ -208,24 +208,34 @@ function BriefReview({
       confirmationHint: 'Add sizes and anything you will not wear.',
     },
     setup: {
-      label: 'Space check',
-      exampleCategories: ['desk', 'lighting', 'storage'],
+      label: 'Product requirements',
+      exampleCategories: ['headphones', 'camera', 'backpack'],
       constraintKinds: ['dimensions', 'mounting', 'exclude material'],
-      confirmationHint: 'Add maximum dimensions and installation limits.',
+      confirmationHint:
+        'Add any relevant dimensions, material preferences, or installation limits.',
     },
   };
   return (
     <section className="brief-review" aria-live="polite">
       <div className="review-heading">
         <div>
-          <p className="eyebrow">DRAFT · REVISION {brief.revision}</p>
+          <p className="eyebrow">
+            {brief.status.toUpperCase()} · REVISION {brief.revision}
+          </p>
           <h2>Here’s the collection we heard.</h2>
-          <p>Nothing is searched until you confirm. The full editor can refine every detail.</p>
+          <p>Review the detected items and correct anything we missed before confirming.</p>
         </div>
         <span className="private-badge">
           <LockKeyhole aria-hidden /> Private to this session
         </span>
       </div>
+      {brief.input.kind === 'image' && (
+        <img
+          className="detected-source"
+          src={`/api/assets/${brief.input.assetId}`}
+          alt="Your uploaded inspiration"
+        />
+      )}
       <div className="slot-list">
         {brief.slots.map((slot, index) => (
           <article className="slot-card" key={slot.id}>
@@ -241,7 +251,7 @@ function BriefReview({
         <ShieldCheck aria-hidden />
         <p>
           <strong>One check before search:</strong> add clothing sizes or furniture dimensions in
-          the full brief editor. We never infer them from an image.
+          the editor below. We never infer them from an image.
         </p>
       </div>
       {brief.status === 'confirmed' ? (
@@ -275,7 +285,7 @@ function BriefReview({
 }
 
 function ShopperWorkspace({ back }: { back: () => void }) {
-  const [domain, setDomain] = useState<ShoppingDomain>('outfit');
+  const [domain, setDomain] = useState<ShoppingDomain>('setup');
   const [selection, setSelection] = useState<MediaSelection | null>(null);
   const [brief, setBrief] = useState<IntentBrief | null>(null);
   const create = useMutation({
@@ -320,6 +330,11 @@ function ShopperWorkspace({ back }: { back: () => void }) {
       <button className="back-button" type="button" onClick={back}>
         <ArrowLeft aria-hidden /> Back to both paths
       </button>
+      {brief && error && (
+        <p className="form-error" role="alert">
+          {error.message}
+        </p>
+      )}
       {!brief ? (
         <section className="intake-layout">
           <div className="intake-copy">
@@ -364,9 +379,9 @@ function ShopperWorkspace({ back }: { back: () => void }) {
             <DomainToggle value={domain} onChange={setDomain} />
             <div className="integrated-media-intake">
               <MediaIntake
-                label={domain === 'outfit' ? 'Outfit inspiration' : 'Room or desk inspiration'}
+                label={domain === 'outfit' ? 'Outfit inspiration' : 'Any products inspiration'}
                 textLabel="Your collection idea"
-                initialMode="text"
+                initialMode="image"
                 disabled={create.isPending}
                 onSelectionChange={setSelection}
               />
@@ -386,7 +401,7 @@ function ShopperWorkspace({ back }: { back: () => void }) {
               ) : (
                 <Sparkles aria-hidden />
               )}{' '}
-              Build my draft brief
+              {create.isPending ? 'Identifying items…' : 'Identify items'}
             </button>
             <p className="privacy-line">
               <LockKeyhole aria-hidden /> Private intake. Merchant sharing is a separate, optional

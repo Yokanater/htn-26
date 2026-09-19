@@ -296,7 +296,7 @@ export function BriefEditor({ brief, hints, onSave, onConfirm }: BriefEditorProp
               )}
             </fieldset>
             <button
-              disabled={edited.slots.length <= 2}
+              disabled={edited.slots.length <= 1}
               onClick={() =>
                 update({ ...edited, slots: edited.slots.filter((_, index) => index !== slotIndex) })
               }
