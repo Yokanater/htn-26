@@ -104,8 +104,10 @@ Live discovery is explicit, rejects seed/replay input, and has offline HTTP/DNS 
 Observed: 38 test files passed, 523 tests passed; two native macOS tests skipped on Windows.
 S1/S2 gates: 2 files / 22 tests passed. Fixtures: 3 files / 67 tests passed. All workspace and
 eval TypeScript checks passed; Biome checked 173 files with no remaining changes; web build
-transformed 2034 modules. Checks used installed binaries because pnpm attempted an unavailable
-dependency refresh in the isolated checkout. No dependency manifest or lockfile was edited.
+transformed 2034 modules. Initial isolated checks used installed binaries; after fast-forwarding
+the main checkout, the exact `pnpm typecheck`, `pnpm test`, `pnpm fixtures:check`, explicit S1/S2
+Vitest gates, `pnpm format`, `pnpm format:check` and `pnpm --filter @sei/web build` all passed.
+No dependency manifest or lockfile was edited during final integration.
 
 The user accepted the documented sanitizer limitation and authorized main integration and removal
 of fully merged branches. This is an integrated offline S1/S2 baseline with opt-in live adapters,
