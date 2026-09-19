@@ -33,16 +33,5 @@
       "supportingSessions": 6
     }
   ],
-  "gaps": [
-    {
-      "kind": "rejection",
-      "reason": "dimensions",
-      "sessions": 2
-    },
-    {
-      "kind": "unmet_requirement",
-      "reason": "monitor arm",
-      "sessions": 1
-    }
-  ]
+  "gaps": []
 }

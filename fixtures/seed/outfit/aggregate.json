@@ -33,16 +33,5 @@
       "supportingSessions": 6
     }
   ],
-  "gaps": [
-    {
-      "kind": "rejection",
-      "reason": "price",
-      "sessions": 2
-    },
-    {
-      "kind": "unmet_requirement",
-      "reason": "footwear",
-      "sessions": 1
-    }
-  ]
+  "gaps": []
 }

@@ -1,4 +1,5 @@
 /** S3-L2-1 deterministic demand projection. Design v3 §§6.1–6.2. No provider calls. */
+import { readFileSync } from 'node:fs';
 import type {
   ConsentRecord,
   DemandEvent,
@@ -283,5 +284,38 @@ describe.each(['outfit', 'setup'] as const)('%s demand projection', (domain) => 
     })[0];
 
     expect(aggregate.merchantSupport).toEqual([{ merchantId: 'mer_1', supportingSessions: 1 }]);
+  });
+});
+
+function seed(domain: ShoppingDomain, name: string) {
+  return JSON.parse(
+    readFileSync(new URL(`../../../fixtures/seed/${domain}/${name}.json`, import.meta.url), 'utf8'),
+  );
+}
+
+/**
+ * The published seed aggregate must be derivable from the seed event log — otherwise it is
+ * an invented number wearing a fixture's clothes. This is the card's hand-count check,
+ * automated for both domains.
+ */
+describe.each(['outfit', 'setup'] as const)('%s seed reconciliation', (domain) => {
+  it('derives the published seed aggregate from the seed event log', () => {
+    const expected = seed(domain, 'aggregate');
+
+    const [actual, ...rest] = createDemandAggregator().aggregate({
+      events: seed(domain, 'demand-events'),
+      briefs: seed(domain, 'briefs'),
+      consents: seed(domain, 'consents'),
+      window: { start: new Date(expected.windowStart), end: new Date(expected.windowEnd) },
+      origin: 'seed',
+      minimumSessions: 5,
+    });
+
+    expect(rest).toEqual([]);
+    expect(actual.cohort).toEqual(expected.cohort);
+    expect(actual.eligibleSessions).toBe(expected.eligibleSessions);
+    expect(actual.pairs).toEqual(expected.pairs);
+    expect(actual.merchantSupport).toEqual(expected.merchantSupport);
+    expect(actual.gaps ?? []).toEqual(expected.gaps ?? []);
   });
 });
