@@ -1,7 +1,6 @@
-export { BriefEditor, type DomainHint } from './BriefEditor';
 export {
   type ConsentActionResult,
   ConsentPanel,
   type ConsentPanelProps,
   type Result,
-} from './consent';
+} from './ConsentPanel';
