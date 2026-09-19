@@ -191,8 +191,18 @@ Follow **split §3**. The one change: card **M1-L4-0** replaces the L4 scaffold 
 
 ### Lane 4: Product & Platform
 
-#### M1-L4-0 · Scaffold, AGENTS.md, milestone presets (Step 0, first 25 min)
-- **Brief:**
+#### M1-L4-0 · Scaffold, AGENTS.md, milestone presets: ✅ DONE (branch `chore/bootstrap`)
+- **Status:** built and verified before Step 0: install, typecheck, 56 tests, format check, a fresh clone, and the package-boundary check all pass.
+- **Where it differs from the brief below:**
+  - `milestone:check` is `vitest run --project milestones --passWithNoTests`, because Vitest ignores `--dir` when projects are configured.
+  - There are no `@sei/*` tsconfig paths, because they would bypass the package boundaries.
+  - A new `@sei/evals` workspace package holds the milestone checks.
+  - Biome replaces a separate linter.
+  - zod is pinned to 4.4.3.
+  - `RunBudget` lives in `contracts/run.ts`.
+
+  See split §3.0 for teammate setup.
+- **Brief (as specified):**
   - Everything in split §3.1's L4 checklist.
   - `AGENTS.md` with the contents required by README §4.4.
   - `packages/core/src/milestones.ts` (README §3) with `resolveMilestones`.
@@ -221,7 +231,7 @@ Follow **split §3**. The one change: card **M1-L4-0** replaces the L4 scaffold 
   - Profile review (design §12.1): Shopify confidence badge with signals, editable chips, price band, positioning, `needsConfirmation` callouts, **Start research**.
   - A **UI section registry** `registerSectionView(key, { tab, title, component })`, with a generic claims renderer for unknown keys.
 - **Edit:** `apps/web/src/{app,api,hooks,sections/registry.ts}/**`, `apps/web/src/features/{intake,profile}/**`
-- **Accept:** `pnpm --filter web test` (component tests for the badge and chips); a manual flow on replay works.
+- **Accept:** `pnpm vitest run --project web` (component tests for the badge and chips); a manual flow on replay works.
 
 #### M1-L4-4 · Live run view
 - **After:** M1-L4-3

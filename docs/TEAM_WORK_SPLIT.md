@@ -56,40 +56,36 @@ flowchart LR
 
 ## 3. Step 0 — together (Sat 12:00–13:30, 90 minutes)
 
-### 3.1 Minutes 0–25: scaffold (L4) and access spikes (L1–L3), in parallel
+### 3.0 Before Step 0: bootstrap (done) and teammate setup
 
-**L4 scaffold checklist** (push to `main` at minute 25):
-- [ ] `pnpm-workspace.yaml` (`apps/*`, `packages/*`), root `package.json` (scripts below), `tsconfig.base.json` (strict, ES2022, `moduleResolution: "bundler"`, paths `@sei/*`), `vitest.config.ts`, `.gitignore` (`.env`, `.data/`, `node_modules/`, `dist/`), `.env.example` (copy design §3.6), `CODEOWNERS` (§11.2), `.github/workflows/ci.yml` (install → typecheck → test).
-- [ ] Packages with `package.json` + `src/index.ts`: `contracts`, `core`, `collect`, `enrich`, `reason`, `pipeline`, `db`, `telemetry`.
-- [ ] **Per-lane stub files** so nobody edits the same file during Step 0, each re-exported from its package's `index.ts`:
-  - `packages/contracts/src/`: `common.ts` (L4), `collect.ts` (L1), `enrich.ts` (L2), `profile.ts` · `plan.ts` · `report.ts` (L3), `run.ts` · `api.ts` (L4)
-  - `packages/core/src/`: `context.ts` · `pipeline.ts` · `reason.ts` (L3), `collect.ts` (L1), `enrich.ts` · `store.ts` (L2), `telemetry.ts` (L4)
-- [ ] `apps/server`: Hono hello on `:8787` with `/healthz`. `apps/web`: Vite React hello proxying `/api` to `:8787`. `pnpm dev` runs both.
-- [ ] `docs/CODEX_LOG.md` with the header `| Time | Lane | Task | What Codex did | Outcome |`.
+The scaffold (card M1-L4-0) is **already built** on the `chore/bootstrap` branch:
+- the pnpm 12 workspace with a version catalog and every known dependency pre-installed
+- package boundaries enforced through declared workspace dependencies
+- Biome and LF line endings
+- `AGENTS.md` + `CLAUDE.md`
+- `contracts/src/common.ts` (`newId`, `idSchema`, `Money`, `SourceType`, `SCHEMA_VERSION`) and `core/src/milestones.ts`, implemented and tested
+- all per-lane stub files, with headers naming the owner and the types to write
+- hello-world server + web apps, CI, `CODEOWNERS`, `.env.example`
 
-Root scripts (all `tsx`, no bash, so they work on Windows):
+**Read `AGENTS.md` first.** The commands live in the root `package.json`; the key ones are `pnpm test`, `pnpm typecheck`, `pnpm format`, `pnpm fixtures:check`, and `pnpm milestone:check <m>`.
 
-```json
-{
-  "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
-    "test": "vitest run",
-    "typecheck": "pnpm -r exec tsc --noEmit",
-    "fixtures:check": "vitest run packages/contracts",
-    "collect:profile": "tsx packages/collect/src/cli/profile.ts",
-    "collect:discover": "tsx packages/collect/src/cli/discover.ts",
-    "collect:run": "tsx packages/collect/src/cli/collect.ts",
-    "enrich:run": "tsx packages/enrich/src/cli/enrich.ts",
-    "enrich:resolve": "tsx packages/enrich/src/cli/resolve.ts",
-    "enrich:score": "tsx packages/enrich/src/cli/score.ts",
-    "reason:profile": "tsx packages/reason/src/cli/profile.ts",
-    "reason:plan": "tsx packages/reason/src/cli/plan.ts",
-    "reason:synth": "tsx packages/reason/src/cli/synthesize.ts",
-    "pipeline:run": "tsx packages/pipeline/src/cli/run.ts",
-    "eval": "tsx evals/run-eval.ts"
-  }
-}
-```
+**Every teammate, before Step 0:**
+- [ ] Node 24 (`.nvmrc`) and pnpm **12.4.2** (`npm i -g pnpm@12.4.2`; `corepack enable` fails without admin rights on Windows).
+- [ ] Clone to a **short path** (e.g. `C:\Code\htn-26`) and put worktrees next to it (`C:\Code\htn-<card>`). Windows' 260-character path limit breaks installs in deeply nested folders.
+- [ ] Run `git config core.autocrlf false` inside the clone.
+- [ ] `pnpm install && pnpm typecheck && pnpm test` passes.
+- [ ] Your `.env` is filled from `.env.example` (keys shared out of band).
+- [ ] You know to stop `pnpm dev` with **Ctrl+C**. Killing it any other way leaves node processes holding ports 8787/5173.
+
+**Toolchain facts agents must respect** (also in `AGENTS.md`):
+- zod is pinned to **4.4.3**, the exact version Stagehand requires. `zodTextFormat` compatibility is already proven by `packages/reason/test/zod-compat.test.ts`.
+- TypeScript is **7** (the native compiler). If a tool needs the old TypeScript JavaScript API, a human pins 5.9 in the catalog.
+- There are no `@sei/*` tsconfig paths; packages resolve through workspace links, which is what enforces the boundaries.
+- Agents never edit `package.json`, `pnpm-workspace.yaml`, or `pnpm-lock.yaml`.
+
+### 3.1 Minutes 0–25: access spikes (all lanes)
+
+L4 uses these minutes to confirm CI passed on `main` after the bootstrap merge, turn on branch protection (CI required), and replace the `@lane1`–`@lane4` placeholders in `CODEOWNERS`.
 
 **Access spikes.** Save raw responses under `fixtures/spikes/<provider>/`. Your parsers will be tested against them.
 
@@ -103,7 +99,7 @@ Root scripts (all `tsx`, no bash, so they work on Windows):
 | L2 | `GET https://inference.baseten.co/v1/models` | Candidate tagger models |
 | L2 | Tagger prompt on 10 seed texts (§3.3) against 2 models; compare JSON validity + latency | `BASETEN_TAGGER_MODEL` |
 | L2 | **Start the BEI embedding deployment now** (it's the long pole); call it once it's live | `BASETEN_EMBED_BASE_URL` / `BASETEN_EMBED_MODEL` |
-| L3 | `responses.parse` + `zodTextFormat` with a nested schema using `.nullable()` fields | Zod version compatibility (`zod` vs `zod/v3`), model IDs |
+| L3 | Live `responses.parse` + `zodTextFormat` with a nested schema using `.nullable()` fields (the Zod compatibility itself is already verified) | Live structured output works; model IDs |
 | L3 | `responses.create` with `tools: [{ type: 'web_search' }]` | Fallback search works |
 | All | Keys in your local `.env` (shared out of band, never committed); Codex set up | — |
 
@@ -117,12 +113,12 @@ Transcribe design §4 into Zod in your own contract file, then write your seed f
 | `fixtures/seed/northbound/raw-signals.json`, `discover.json`, `collect.json` | **L1** |
 | `contracts/src/enrich.ts` (`Enrichment`, `Entity`, `DiscourseCluster`, `ScoreComponent`, `CandidateScore`, `ResolveResult`, `TagInput`, `TagOutput`) · `core/src/enrich.ts` (`Embedder`, `Tagger`, `EvidenceScorer`, `Adjudicator`, `ComponentJudge`) · `core/src/store.ts` (`RunStore`, `EvidenceStore`, `VectorIndex`) | **L2** |
 | `fixtures/seed/northbound/enrich.json`, `resolve.json`, `score.json` (vectors from the hashing embedder, rounded to 4 decimals) | **L2** |
-| `contracts/src/profile.ts` (`StoreProfile`), `plan.ts` (`ResearchTask`, `ResearchPlan`), `report.ts` (`Claim`, all section types, `ReportSection`, `EvidencePreview`, `Report`, `RunStats`, `VerificationResult`, `SynthesisInput`, action types) · `core/src/context.ts` (`RunContext`, `BudgetTracker`, `RunBudget`, `FeatureFlags`, `RequestCache`, `Logger`), `pipeline.ts` (`Stage`, `StageIO`, `StageOutputs`, `PipelineRunner`), `reason.ts` (`Reasoner`, `SectionSynthesizer`, `Verifier`, `ActionProvider`) | **L3** |
+| `contracts/src/profile.ts` (`StoreProfile`), `plan.ts` (`ResearchTask`, `ResearchPlan`), `report.ts` (`Claim`, all section types, `ReportSection`, `EvidencePreview`, `Report`, `RunStats`, `VerificationResult`, `SynthesisInput`, action types) · `core/src/context.ts` (`RunContext`, `BudgetTracker` + `BudgetExceeded`, `RequestCache`, `Logger`; `FeatureFlags` comes from `featureFlags()` in `core/src/milestones.ts`), `pipeline.ts` (`Stage`, `StageIO`, `StageOutputs`, `PipelineRunner`), `reason.ts` (`Reasoner`, `SectionSynthesizer`, `Verifier`, `ActionProvider`) | **L3** |
 | `fixtures/seed/northbound/profile.json`, `plan.json`, `report.json` (sections embedded), `verify.json` · `packages/contracts/test/seed-integrity.test.ts` (every cited evidence ID / entity ID resolves across files) | **L3** |
-| `contracts/src/common.ts` (`newId`, `Money`, `SourceType`, `SCHEMA_VERSION`), `run.ts` (`ReportRun`, `RunStatus`, `StageKey`, `PipelineEvent`, `PipelineEventInput`), `api.ts` (request/response DTOs, error envelope) · `core/src/telemetry.ts` | **L4** |
+| `run.ts` (`ReportRun`, `RunStatus`, `StageKey`, `PipelineEvent`, `PipelineEventInput`, **`RunBudget`**, which lives here because `ReportRun` embeds it and contracts can't import core), `api.ts` (request/response DTOs, error envelope) · `core/src/telemetry.ts` | **L4** |
 | `fixtures/seed/northbound/run.json`, `events.jsonl` (~40 events across ~90 s using the seed IDs) | **L4** |
 
-L4 owns `common.ts`, which everyone imports. L4 pushes it by **minute 35** and others use local placeholders until then.
+`contracts/src/common.ts` and `core/src/milestones.ts` already exist from the bootstrap. Import them; never redefine IDs, `Money`, or `SourceType` locally. Any change to `common.ts` is additive and made by L4.
 
 ### 3.3 The seed world ("Northbound Coffee Co.")
 
@@ -433,6 +429,9 @@ Every stack-up is flag-gated and lives inside one lane, so they can be built in 
 - **Self-merge is fine** when CI is green and you only touched directories you own.
 - Pull `main` at least every 2 hours.
 - Never commit `.env`, `.data/`, or raw personal data.
+- One worktree per running agent, as a short sibling path (`../htn-<card-id>`); run `pnpm install` in each.
+- Dependencies are changed only by a human, in a separate small PR to `main` that touches `package.json` / `pnpm-workspace.yaml` / `pnpm-lock.yaml` and nothing else. Everyone pulls and reinstalls after it merges.
+- Run `pnpm format` before committing; CI fails on `pnpm format:check`.
 
 ### 11.2 Ownership (`CODEOWNERS`)
 

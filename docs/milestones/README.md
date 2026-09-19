@@ -96,7 +96,7 @@ Every task in the milestone files is a **card** you can paste straight into an a
 ```
 
 ### 4.2 Loop per card
-1. `git worktree add ../htn-<card-id> -b <lane>/<card-id>` (one worktree per running agent, so agents never share a working copy).
+1. `git worktree add ../htn-<card-id> -b <lane>/<card-id>` (one worktree per running agent, so agents never share a working copy), then run `pnpm install` inside it. Keep the main clone at a short path such as `C:\Code\htn-26`, so worktree paths stay under Windows' 260-character limit.
 2. Give the agent: "Read `AGENTS.md`, then do this card:" + the card text.
 3. When it claims done: run the **Accept** commands yourself, check that `git diff --stat main` touches only **Edit** paths, then do the **Human check**.
 4. Merge (split §11.1), remove the worktree, and move the card to done in the team channel.
@@ -110,8 +110,8 @@ Every task in the milestone files is a **card** you can paste straight into an a
 - Integration swaps (split §8) and recording demo runs.
 - Anything that writes to an external system (M5).
 
-### 4.4 `AGENTS.md` (created by card M1-L4-0)
-Required contents:
+### 4.4 `AGENTS.md` (created in the bootstrap; `CLAUDE.md` imports it)
+It already exists at the repo root. When a rule changes, a human updates it in its own small PR. Required contents:
 - A one-paragraph project summary with links to the design doc, split doc, and this folder.
 - The lane → directory ownership table (split §11.2).
 - Commands: `pnpm install`, `pnpm typecheck`, `pnpm test`, `pnpm fixtures:check`, `pnpm milestone:check <m>`.

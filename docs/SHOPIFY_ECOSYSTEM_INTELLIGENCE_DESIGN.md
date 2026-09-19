@@ -168,8 +168,9 @@ flowchart LR
 
 | Layer | Choice | Why | Swap path |
 | --- | --- | --- | --- |
-| Language | **TypeScript** (Node 22) everywhere; **Python** only in `ml/` | Stagehand and the Browserbase SDK are TS-first; one type system across contracts, server, and UI | — |
-| Monorepo | **pnpm workspaces** + `tsx` for scripts | Zero-config TS execution for CLIs | Turborepo later |
+| Language | **TypeScript 7** on **Node 24** (`.nvmrc`; engines ≥ 22, which Stagehand 4.1 requires); **Python** only in `ml/` | Stagehand and the Browserbase SDK are TS-first; one type system across contracts, server, and UI | Pin TypeScript 5.9 if a tool needs the old TS JavaScript API |
+| Monorepo | **pnpm 12 workspaces** with a version **catalog** (one version per shared dependency); `tsx` for scripts; source-first packages (`exports` → `src/index.ts`, no build step) | Zero-config TS execution; package boundaries enforced by declared workspace dependencies (no `@sei/*` tsconfig paths) | Turborepo later |
+| Format / lint | **Biome** (`pnpm format`, `pnpm format:check`); LF line endings via `.gitattributes` | One fast tool; no whole-file diffs from agents or Windows line endings | — |
 | Validation | **Zod** | Runtime-validates fixtures and LLM output; feeds OpenAI `zodTextFormat` | — |
 | API | **Hono** on `@hono/node-server` | Typed, tiny, built-in `streamSSE`; the same code runs on Cloudflare Workers | Workers (Cloudflare stack-up) |
 | Job execution | In-process runner + `p-limit` pools per resource; state in RunStore | No queue infra; checkpoints make it resumable | `pg-boss` → Temporal |
@@ -205,7 +206,8 @@ ml/
 fixtures/
   seed/northbound/        # Hand-written seed world (Step 0 of the split doc); run-directory layout (§10.3)
   real/<store-slug>/      # Recorded real runs (generated, committed when good)
-evals/
+evals/                    # @sei/evals workspace package (may import every @sei/* package except web)
+  milestones/             # pnpm milestone:check <m> (docs/milestones/README.md §5)
   golden-stores.json      # 3–5 stores used for sanity evaluation
   run-eval.ts
 docs/
@@ -213,7 +215,11 @@ docs/
   TEAM_WORK_SPLIT.md
   CODEX_LOG.md
   DEMO_SCRIPT.md
+AGENTS.md                 # rules for coding agents (Codex); CLAUDE.md imports it
+CLAUDE.md
 .env.example
+pnpm-workspace.yaml       # workspaces + version catalog (humans only)
+biome.json
 docker-compose.yml
 Dockerfile
 CODEOWNERS
@@ -343,13 +349,15 @@ export interface Telemetry { span<T>(name: string, attrs: Record<string, unknown
 | `GPTZERO_API_KEY`, `COMPOSIO_API_KEY` | empty | Stack-ups |
 | `FEATURE_*` | `false` | See §1.3 |
 | `RUN_BUDGET_*` | see §13.1 | Per-run limits |
+| `PORT` / `WEB_PORT` | `8787` / `5173` | Server and web dev ports (tests never bind fixed ports) |
+| `MILESTONES` | `m1` | Enabled milestone preset (`docs/milestones/README.md` §3) |
 
 ---
 
 ## 4. Data contracts (`@sei/contracts`)
 
 Rules:
-- IDs are prefixed strings: `prof_`, `run_`, `task_`, `cand_`, `src_`, `ev_`, `ent_`, `clu_`, `item_`, `act_`. Generate them with `newId(prefix)` (ULID body) from `@sei/core`.
+- IDs are prefixed strings: `prof_`, `run_`, `task_`, `cand_`, `src_`, `ev_`, `ent_`, `clu_`, `item_`, `act_`. Generate them with `newId(prefix)` (ULID body) and validate with `idSchema(prefix)`, both from `@sei/contracts` (`common.ts`).
 - Timestamps are ISO-8601 strings. Money is **minor units** (integer cents) plus an ISO currency.
 - `SCHEMA_VERSION = '1.0.0'`. Adding optional fields bumps the minor version, with a notice to the team. Renaming or removing a field is a breaking change: all-hands, then bump the major version.
 - **LLM output schemas are separate from domain schemas.** OpenAI strict Structured Outputs require every property to be present, so LLM schemas use `.nullable()` instead of `.optional()`. A mapper in `reason/` converts them to domain types.
@@ -684,6 +692,7 @@ interface ActionDraft   { id: string; runId: string; kind: ActionKind; itemId: s
 interface Approval      { approvedBy: string; approvedAt: string; editedBody?: string }
 interface ActionResult  { ok: boolean; externalId?: string; message: string }
 
+// RunBudget is embedded in ReportRun, so its schema lives in @sei/contracts (run.ts); BudgetTracker stays in @sei/core.
 interface RunBudget { tasks: number; catalogQueries: number; searches: number; fetches: number;
                       sessionsTotal: number; sessionsConcurrent: number; pagesPerDomain: number;
                       evidenceUnits: number; openaiCalls: number; bundleTokens: number; softMs: number; hardMs: number }
@@ -925,7 +934,7 @@ Implementation notes:
 
 `entity.adjudicate` and `score.judge` prompts live in `@sei/enrich` (L2) and run through the same `Reasoner`, so all OpenAI calls share timeouts, retries, and token accounting.
 
-**Zod compatibility:** confirm in the Block 0 spike which Zod major the installed `openai` package's `helpers/zod` accepts. If it only accepts v3, import from `zod/v3` in LLM-schema files (Zod 4 ships that subpath).
+**Zod compatibility (resolved in bootstrap):** the repo pins **zod 4.4.3** exactly. Stagehand 4.1 depends on that exact version, and `openai` accepts `^3.25 || ^4`, so there is a single zod instance. `packages/reason/test/zod-compat.test.ts` proves `zodTextFormat` builds a strict schema with `.nullable()` fields. Import `zod` normally; don't use `zod/v3`.
 
 **Prompt registry:** `reason/prompts/<name>.v<N>.ts` exports `{ name, version, system, buildUser(input), schema }`. The version is recorded in `ReportSection.generatedBy`. Prompt changes bump the version, so recorded fixtures stay explainable.
 
@@ -1261,7 +1270,8 @@ Stagger sleep. From Block 3 on, at least two teammates should be awake at all ti
 | OpenAI rate limits during the demo | Low | High | Cache + replay | L3 |
 | Venue network fails | Med | High | Replay mode + local recording | L4 |
 | Scope creep (stack-ups before M2) | High | High | Flags; no stack-up work before M2 is signed off | All |
-| Windows dev environment friction (Docker, paths) | Med | Med | `STORE=file` default; hosted Postgres; no bash-only scripts (use `tsx` scripts) | L4 |
+| Windows dev environment friction (Docker, paths) | Med | Med | `STORE=file` default; hosted Postgres; no bash-only scripts (use `tsx` scripts); clones and worktrees at short paths (260-character limit) | L4 |
+| TypeScript 7 (native compiler) breaks a tool that needs the old TS JavaScript API | Low | Med | A human pins `typescript` 5.9 in the pnpm catalog | L4 |
 
 ---
 
