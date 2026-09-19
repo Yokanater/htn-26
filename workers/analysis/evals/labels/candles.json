@@ -1,0 +1,172 @@
+{
+  "store_id": "candles",
+  "labeled_by": "analysis team (fixture author review)",
+  "labeled_at": "2026-09-19",
+  "collaborators": {
+    "relevant": [
+      {
+        "entity_key": "emberline.example",
+        "name": "Emberline"
+      },
+      {
+        "entity_key": "steepleaf.example",
+        "name": "Steepleaf Tea",
+        "aliases": [
+          "Steepleaf"
+        ]
+      },
+      {
+        "entity_key": "linenfold.example",
+        "name": "Linenfold Home",
+        "aliases": [
+          "Linenfold"
+        ]
+      },
+      {
+        "entity_key": "claystack.example",
+        "name": "Claystack Studio",
+        "aliases": [
+          "Claystack"
+        ]
+      }
+    ],
+    "irrelevant": [
+      {
+        "entity_key": "brightmart.example",
+        "name": "BrightMart Deals",
+        "aliases": [
+          "BrightMart"
+        ],
+        "note": "Discount marketplace, not a complementary brand; channel risk."
+      },
+      {
+        "entity_key": "glowfield.example",
+        "name": "Glowfield Candles",
+        "note": "Competitor."
+      }
+    ]
+  },
+  "competitors": {
+    "relevant": [
+      {
+        "entity_key": "glowfield.example",
+        "name": "Glowfield Candles",
+        "aliases": [
+          "Glowfield"
+        ]
+      },
+      {
+        "entity_key": "nookandflame.example",
+        "name": "Nook & Flame"
+      },
+      {
+        "entity_key": "aerowisp.example",
+        "name": "Aerowisp",
+        "note": "Substitute (flameless)."
+      },
+      {
+        "entity_key": "scentboxclub.example",
+        "name": "Scentbox Club"
+      },
+      {
+        "entity_key": "hollowreed.example",
+        "name": "Hollowreed"
+      }
+    ],
+    "irrelevant": [
+      {
+        "entity_key": "emberline.example",
+        "name": "Emberline",
+        "note": "Complement."
+      },
+      {
+        "entity_key": "claystack.example",
+        "name": "Claystack Studio",
+        "note": "Complement."
+      },
+      {
+        "entity_key": "brightmart.example",
+        "name": "BrightMart Deals",
+        "note": "Discount channel."
+      }
+    ]
+  },
+  "themes": [
+    {
+      "id": "praise_merchant_throw_refill",
+      "theme_kind": "praise",
+      "about": [
+        "Wickwell"
+      ],
+      "supporting_evidence_ids": [
+        "wick_010",
+        "wick_012",
+        "wick_021",
+        "wick_014"
+      ]
+    },
+    {
+      "id": "complaint_merchant_tunneling_damage",
+      "theme_kind": "complaint",
+      "about": [
+        "Wickwell"
+      ],
+      "supporting_evidence_ids": [
+        "wick_011",
+        "wick_013"
+      ]
+    },
+    {
+      "id": "switching_glowfield_price_wicks",
+      "theme_kind": "switching_trigger",
+      "about": [
+        "Glowfield"
+      ],
+      "supporting_evidence_ids": [
+        "wick_014"
+      ]
+    },
+    {
+      "id": "unmet_unscented",
+      "theme_kind": "unmet_need",
+      "about": [
+        "Wickwell"
+      ],
+      "supporting_evidence_ids": [
+        "wick_015"
+      ]
+    },
+    {
+      "id": "praise_flameless_safety",
+      "theme_kind": "praise",
+      "about": [
+        "Aerowisp",
+        "Hollowreed"
+      ],
+      "supporting_evidence_ids": [
+        "wick_019",
+        "wick_022"
+      ]
+    },
+    {
+      "id": "complaint_scentbox_choice",
+      "theme_kind": "complaint",
+      "about": [
+        "Scentbox"
+      ],
+      "supporting_evidence_ids": [
+        "wick_018"
+      ]
+    }
+  ],
+  "unsupported_claims": [
+    {
+      "pattern": "non-?toxic",
+      "reason": "No source makes a toxicity claim."
+    },
+    {
+      "pattern": "Wickwell[^.]{0,80}\\d+[- ]hour burn",
+      "reason": "Burn time is only stated for Glowfield."
+    }
+  ]
+}

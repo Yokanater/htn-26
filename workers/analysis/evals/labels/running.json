@@ -1,0 +1,166 @@
+{
+  "store_id": "running",
+  "labeled_by": "analysis team (fixture author review)",
+  "labeled_at": "2026-09-19",
+  "collaborators": {
+    "relevant": [
+      {
+        "entity_key": "ridgelinehydration.example",
+        "name": "Ridgeline Hydration",
+        "aliases": [
+          "Ridgeline"
+        ]
+      },
+      {
+        "entity_key": "saltstride.example",
+        "name": "Saltstride"
+      },
+      {
+        "entity_key": "loopknit.example",
+        "name": "Loopknit Socks",
+        "aliases": [
+          "Loopknit"
+        ]
+      },
+      {
+        "entity_key": "trailheadraces.example",
+        "name": "Trailhead Races"
+      },
+      {
+        "entity_key": "recoverroll.example",
+        "name": "Recover Roll"
+      }
+    ],
+    "irrelevant": [
+      {
+        "entity_key": "kitswap.example",
+        "name": "Kitswap",
+        "note": "Resale substitute."
+      },
+      {
+        "entity_key": "northpeak.example",
+        "name": "Northpeak Outfitters",
+        "note": "Retailer."
+      }
+    ]
+  },
+  "competitors": {
+    "relevant": [
+      {
+        "entity_key": "arcfell.example",
+        "name": "Arcfell"
+      },
+      {
+        "entity_key": "pacewild.example",
+        "name": "Pacewild"
+      },
+      {
+        "entity_key": "merinomile.example",
+        "name": "Merinomile"
+      },
+      {
+        "entity_key": "kitswap.example",
+        "name": "Kitswap",
+        "note": "Substitute: secondhand premium kit."
+      }
+    ],
+    "irrelevant": [
+      {
+        "entity_key": "northpeak.example",
+        "name": "Northpeak Outfitters",
+        "aliases": [
+          "Northpeak"
+        ],
+        "note": "Multi-brand retailer: a possible channel, not a competitor."
+      },
+      {
+        "entity_key": "loopknit.example",
+        "name": "Loopknit Socks",
+        "note": "Complement."
+      },
+      {
+        "entity_key": "ridgelinehydration.example",
+        "name": "Ridgeline Hydration",
+        "note": "Complement."
+      }
+    ]
+  },
+  "themes": [
+    {
+      "id": "praise_merchant_durability_warmth",
+      "theme_kind": "praise",
+      "about": [
+        "Kestrel Run"
+      ],
+      "supporting_evidence_ids": [
+        "krun_010",
+        "krun_021",
+        "krun_016",
+        "krun_014"
+      ]
+    },
+    {
+      "id": "complaint_merchant_fit_shell",
+      "theme_kind": "complaint",
+      "about": [
+        "Kestrel Run"
+      ],
+      "supporting_evidence_ids": [
+        "krun_011",
+        "krun_012",
+        "krun_015"
+      ]
+    },
+    {
+      "id": "switching_pacewild_seams",
+      "theme_kind": "switching_trigger",
+      "about": [
+        "Pacewild"
+      ],
+      "supporting_evidence_ids": [
+        "krun_014"
+      ]
+    },
+    {
+      "id": "unmet_extended_sizes",
+      "theme_kind": "unmet_need",
+      "about": [
+        "Kestrel Run"
+      ],
+      "supporting_evidence_ids": [
+        "krun_015"
+      ]
+    },
+    {
+      "id": "complaint_arcfell_price",
+      "theme_kind": "complaint",
+      "about": [
+        "Arcfell"
+      ],
+      "supporting_evidence_ids": [
+        "krun_013"
+      ]
+    },
+    {
+      "id": "praise_arcfell_shell",
+      "theme_kind": "praise",
+      "about": [
+        "Arcfell"
+      ],
+      "supporting_evidence_ids": [
+        "krun_012",
+        "krun_013"
+      ]
+    }
+  ],
+  "unsupported_claims": [
+    {
+      "pattern": "waterproof(?:ing)? guarantee",
+      "reason": "No source mentions a waterproofing guarantee."
+    },
+    {
+      "pattern": "lifetime (?:free )?repairs?",
+      "reason": "Repairs are free for two years, not lifetime."
+    }
+  ]
+}
