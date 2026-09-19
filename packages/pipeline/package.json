@@ -1,0 +1,25 @@
+{
+  "name": "@sei/pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@sei/collect": "workspace:*",
+    "@sei/contracts": "workspace:*",
+    "@sei/core": "workspace:*",
+    "@sei/enrich": "workspace:*",
+    "@sei/reason": "workspace:*",
+    "p-limit": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

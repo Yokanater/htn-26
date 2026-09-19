@@ -1,0 +1,26 @@
+{
+  "name": "@sei/collect",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@browserbasehq/sdk": "^2.20.0",
+    "@browserbasehq/stagehand": "^4.1.0",
+    "@sei/contracts": "workspace:*",
+    "@sei/core": "workspace:*",
+    "p-limit": "catalog:",
+    "robots-parser": "^3.0.1",
+    "tldts": "^7.4.13",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

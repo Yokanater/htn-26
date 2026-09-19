@@ -1,0 +1,39 @@
+{
+  "name": "sei",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "test": "vitest run",
+    "typecheck": "pnpm -r exec tsc --noEmit",
+    "fixtures:check": "vitest run packages/contracts",
+    "milestone:check": "vitest run --project milestones --passWithNoTests",
+    "format": "biome check --write .",
+    "format:check": "biome check .",
+    "collect:profile": "tsx packages/collect/src/cli/profile.ts",
+    "collect:discover": "tsx packages/collect/src/cli/discover.ts",
+    "collect:run": "tsx packages/collect/src/cli/collect.ts",
+    "enrich:run": "tsx packages/enrich/src/cli/enrich.ts",
+    "enrich:resolve": "tsx packages/enrich/src/cli/resolve.ts",
+    "enrich:score": "tsx packages/enrich/src/cli/score.ts",
+    "reason:profile": "tsx packages/reason/src/cli/profile.ts",
+    "reason:plan": "tsx packages/reason/src/cli/plan.ts",
+    "reason:synth": "tsx packages/reason/src/cli/synthesize.ts",
+    "pipeline:run": "tsx packages/pipeline/src/cli/run.ts",
+    "eval": "tsx evals/run-eval.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "catalog:",
+    "jsdom": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# secrets (the only env file we commit is .env.example)
+.env
+.env.*
+!.env.example
+
+# run data, build output, coverage
+.data/
+dist/
+coverage/
+*.tsbuildinfo
+
+# logs and OS noise
+*.log
+.DS_Store
+Thumbs.db

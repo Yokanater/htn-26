@@ -1,0 +1,33 @@
+# Humans only: agents never edit this file, any package.json, or pnpm-lock.yaml.
+packages:
+  - apps/*
+  - packages/*
+  - evals
+
+# Dependencies allowed to run install scripts (pnpm blocks all others).
+allowBuilds:
+  esbuild: true
+
+# Force transitive @types/node (from @browserbasehq/sdk, @types/pg) onto the catalog
+# version so every TypeScript program sees one set of Node 24 globals.
+overrides:
+  '@types/node': 'catalog:'
+
+# One version of each shared dependency for the whole repo.
+# Workspace package.json files reference these as "catalog:".
+# Range floors are the newest versions older than pnpm's default 1-day minimumReleaseAge.
+catalog:
+  # zod is pinned EXACTLY to the version @browserbasehq/stagehand depends on,
+  # so pnpm dedupes to a single zod instance (see AGENTS.md "Zod decision").
+  zod: 4.4.3
+  openai: ^7.18.0
+  typescript: ^7.0.2
+  vitest: ^5.0.1
+  vite: ^8.3.0
+  jsdom: ^30.1.0
+  tsx: ^4.23.13
+  '@types/node': ^24.13.0
+  p-limit: ^7.3.2
+  ulid: ^3.0.2
+  '@sentry/node': ^10.75.0
+  '@sentry/react': ^10.75.0
