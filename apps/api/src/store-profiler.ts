@@ -10,6 +10,7 @@ type PageExtraction = {
   url: string;
   title: string;
   description: string;
+  imageUrl: string;
   siteName: string;
   headings: string[];
   text: string;
@@ -106,6 +107,10 @@ async function extract(
       url: location.href,
       title: document.title,
       description: meta('meta[name="description"]') || meta('meta[property="og:description"]'),
+      imageUrl: (() => {
+        const value = meta('meta[property="og:image:secure_url"]') || meta('meta[property="og:image"]') || meta('meta[name="twitter:image"]');
+        try { return value ? new URL(value, location.href).href : ''; } catch { return ''; }
+      })(),
       siteName: meta('meta[property="og:site_name"]') || meta('meta[name="application-name"]'),
       headings: Array.from(document.querySelectorAll("h1, h2"))
         .map((node) => node.textContent?.replace(/\\s+/g, " ").trim() ?? "")
@@ -210,17 +215,30 @@ export async function profileStorefront(input: ProfileFields) {
         ),
       );
       const fetchedAt = new Date().toISOString();
-      const sources = pages.map((item) => ({
-        url: item.url,
-        title: clean(item.title, 160) || new URL(item.url).hostname,
-        span: clean(
-          item.description || item.headings.join(" · ") || item.text,
-          400,
-        ),
-        sourceType: item === home ? "storefront" : "storefront page",
-        fetchedAt,
-        contentHash: createHash("sha256").update(item.text).digest("hex"),
-      }));
+      const sources = await Promise.all(
+        pages.map(async (item) => {
+          let imageUrl: string | undefined;
+          if (item.imageUrl) {
+            try {
+              imageUrl = (await assertPublicUrl(item.imageUrl)).href;
+            } catch {
+              // A page image is optional; unsafe or malformed URLs are omitted.
+            }
+          }
+          return {
+            url: item.url,
+            title: clean(item.title, 160) || new URL(item.url).hostname,
+            span: clean(
+              item.description || item.headings.join(" · ") || item.text,
+              400,
+            ),
+            ...(imageUrl ? { imageUrl } : {}),
+            sourceType: item === home ? "storefront" : "storefront page",
+            fetchedAt,
+            contentHash: createHash("sha256").update(item.text).digest("hex"),
+          };
+        }),
+      );
       const products = unique(
         pages.flatMap((item) => item.jsonLd.flatMap(productNames)),
       ).slice(0, 12);

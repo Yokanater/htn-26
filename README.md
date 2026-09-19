@@ -61,8 +61,14 @@ store domain, visits a small homepage/About/collection/product sample, and recor
 source excerpts and content hashes. Store profiles are live; the downstream market
 report research also runs live in Browserbase mode. Candidate brands are accepted
 only after their public storefront is captured; evidence links point to those
-pages. Results become partial instead of falling back to fictional brands when
-too few supported candidates are available. Demo mode remains deterministic.
+pages. Available Open Graph or product imagery is validated and shown directly
+on result cards with its source domain. Live market research has a hard five-minute
+limit; it closes active browser sessions and preserves supported partial results
+when the limit is reached. For footwear merchants, footwear assortments are
+excluded from collaborators. Narrow care/accessory specialists such as socks,
+insoles, laces, and shoe-care brands remain eligible. Results become partial
+instead of falling back to fictional brands when too few supported candidates
+are available. Demo mode remains deterministic.
 
 `npm start` serves the production web build and API together at **http://127.0.0.1:3001**. Run it after stopping the dev API, or choose another `PORT`.
 

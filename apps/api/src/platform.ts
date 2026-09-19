@@ -23,6 +23,42 @@ import {
 import { profileStorefront } from "./store-profiler";
 import { researchMarket } from "./market-research";
 
+export const LIVE_RESEARCH_LIMIT_MS = 5 * 60 * 1000;
+
+export async function runWithResearchDeadline<T>(
+  run: (signal: AbortSignal) => Promise<T>,
+  timeoutMs = LIVE_RESEARCH_LIMIT_MS,
+  controller = new AbortController(),
+) {
+  const deadline = setTimeout(
+    () =>
+      controller.abort(
+        new Error("Browserbase research reached the five-minute limit."),
+      ),
+    timeoutMs,
+  );
+  try {
+    return await Promise.race([
+      run(controller.signal),
+      new Promise<never>((_, reject) =>
+        controller.signal.addEventListener(
+          "abort",
+          () =>
+            reject(
+              controller.signal.reason ??
+                new Error(
+                  "Browserbase research reached the five-minute limit.",
+                ),
+            ),
+          { once: true },
+        ),
+      ),
+    ]);
+  } finally {
+    clearTimeout(deadline);
+  }
+}
+
 type Row = {
   id: string;
   workspace_id: string;
@@ -37,12 +73,14 @@ export function createPlatform({
   providerMode = "demo",
   profiler = profileStorefront,
   marketResearch = researchMarket,
+  researchTimeoutMs = LIVE_RESEARCH_LIMIT_MS,
 }: {
   databasePath?: string;
   phaseMs?: number;
   providerMode?: "demo" | "browserbase";
   profiler?: typeof profileStorefront;
   marketResearch?: typeof researchMarket;
+  researchTimeoutMs?: number;
 } = {}) {
   if (databasePath !== ":memory:")
     mkdirSync(dirname(databasePath), { recursive: true });
@@ -113,6 +151,10 @@ export function createPlatform({
     db
       .prepare("UPDATE reports SET payload=? WHERE id=?")
       .run(JSON.stringify(report), report.id);
+  const liveJobs = new Map<
+    string,
+    { promise: Promise<void>; controller: AbortController }
+  >();
   // Repair reports created before category-aware fixtures were introduced.
   for (const row of db
     .prepare("SELECT * FROM reports")
@@ -383,6 +425,9 @@ export function createPlatform({
     if (!row) return res.status(404).json({ error: "Report not found." });
     const report: Report = JSON.parse(row.payload);
     if (!terminal(report.status)) {
+      liveJobs
+        .get(report.id)
+        ?.controller.abort(new Error("Live research was cancelled."));
       report.status = "cancelled";
       report.updatedAt = new Date().toISOString();
       saveReport(report);
@@ -475,14 +520,18 @@ export function createPlatform({
     },
   );
   // A restart resumes persisted jobs. One process owns the demo queue; production uses leased Postgres jobs.
-  const liveJobs = new Map<string, Promise<void>>();
   const startLiveResearch = (report: Report) => {
     if (liveJobs.has(report.id)) return;
     report.status = "collecting";
     report.phase = "collecting";
     report.updatedAt = new Date().toISOString();
     saveReport(report);
-    const job = marketResearch(report.profile)
+    const controller = new AbortController();
+    const job = runWithResearchDeadline(
+      (signal) => marketResearch(report.profile, { signal }),
+      researchTimeoutMs,
+      controller,
+    )
       .then((result) => {
         const currentRow = db
           .prepare("SELECT payload FROM reports WHERE id=?")
@@ -519,8 +568,10 @@ export function createPlatform({
         current.updatedAt = new Date().toISOString();
         saveReport(current);
       })
-      .finally(() => liveJobs.delete(report.id));
-    liveJobs.set(report.id, job);
+      .finally(() => {
+        liveJobs.delete(report.id);
+      });
+    liveJobs.set(report.id, { promise: job, controller });
   };
   const tick = () => {
     const rows = db.prepare("SELECT * FROM reports").all() as unknown as Row[];
@@ -568,6 +619,8 @@ export function createPlatform({
     tick,
     close: () => {
       clearInterval(worker);
+      for (const { controller } of liveJobs.values())
+        controller.abort(new Error("Platform is shutting down."));
       db.close();
     },
   };

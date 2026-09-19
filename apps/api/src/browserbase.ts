@@ -13,6 +13,7 @@ export type BrowseOptions = {
   url: string;
   timeoutMs?: number;
   maxTextLength?: number;
+  signal?: AbortSignal;
 };
 
 export type BrowserbaseSession = {
@@ -35,13 +36,14 @@ export async function browseWithBrowserbase({
   url,
   timeoutMs = 30_000,
   maxTextLength = 20_000,
+  signal,
 }: BrowseOptions): Promise<BrowserbasePage> {
   const target = new URL(url);
   if (!["http:", "https:"].includes(target.protocol))
     throw new Error("Browserbase only accepts HTTP or HTTPS URLs.");
 
   return withBrowserbaseSession(
-    { allowedDomains: [target.hostname], timeoutMs },
+    { allowedDomains: [target.hostname], timeoutMs, signal },
     async ({ page, sessionId }) => {
       await page.goto(target.href, {
         waitUntil: "domcontentloaded",
@@ -66,9 +68,16 @@ export async function withBrowserbaseSession<T>(
   {
     allowedDomains,
     timeoutMs = 30_000,
-  }: { allowedDomains: string[]; timeoutMs?: number },
+    signal,
+  }: {
+    allowedDomains: string[];
+    timeoutMs?: number;
+    signal?: AbortSignal;
+  },
   run: (session: BrowserbaseSession) => Promise<T>,
 ) {
+  if (signal?.aborted)
+    throw signal.reason ?? new Error("Browserbase research was cancelled.");
   const apiKey = requiredEnvironment("BROWSERBASE_API_KEY");
   const projectId = process.env.BROWSERBASE_PROJECT_ID?.trim();
   const browserbase = new Browserbase({ apiKey, timeout: timeoutMs });
@@ -80,14 +89,31 @@ export async function withBrowserbaseSession<T>(
     userMetadata: { service: "grove", purpose: "storefront-research" },
   });
   let browser: Browser | undefined;
+  const closeOnAbort = () => void browser?.close().catch(() => undefined);
+  signal?.addEventListener("abort", closeOnAbort, { once: true });
   try {
     browser = await chromium.connectOverCDP(session.connectUrl, {
       timeout: timeoutMs,
     });
     const context = browser.contexts()[0] ?? (await browser.newContext());
     const page = context.pages()[0] ?? (await context.newPage());
-    return await run({ sessionId: session.id, page });
+    if (signal?.aborted)
+      throw signal.reason ?? new Error("Browserbase research was cancelled.");
+    return await Promise.race([
+      run({ sessionId: session.id, page }),
+      new Promise<never>((_, reject) =>
+        signal?.addEventListener(
+          "abort",
+          () =>
+            reject(
+              signal.reason ?? new Error("Browserbase research was cancelled."),
+            ),
+          { once: true },
+        ),
+      ),
+    ]);
   } finally {
+    signal?.removeEventListener("abort", closeOnAbort);
     if (browser)
       await Promise.race([
         browser.close().catch(() => undefined),

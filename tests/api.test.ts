@@ -3,11 +3,18 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPlatform } from "../apps/api/src/platform";
+import {
+  createPlatform,
+  LIVE_RESEARCH_LIMIT_MS,
+  runWithResearchDeadline,
+} from "../apps/api/src/platform";
 import { type Report } from "../packages/contracts/src/index";
 import { demoProfile, fixtureReport } from "../packages/contracts/src/fixtures";
 import { assertPublicUrl } from "../apps/api/src/url-safety";
-import { hasStorefrontCommerceEvidence } from "../apps/api/src/market-research";
+import {
+  hasStorefrontCommerceEvidence,
+  isValidFootwearCollaborator,
+} from "../apps/api/src/market-research";
 
 const platform = createPlatform({ phaseMs: 10 });
 const server = platform.app.listen(0, "127.0.0.1");
@@ -338,6 +345,53 @@ test("editorial brand lists cannot pass as candidate storefronts", () => {
     }),
     true,
   );
+});
+test("footwear collaborators exclude other footwear assortments", () => {
+  assert.equal(
+    isValidFootwearCollaborator(
+      "Shop our women's leather shoes, boots, sandals, and new arrivals.",
+    ),
+    false,
+  );
+  assert.equal(
+    isValidFootwearCollaborator(
+      "Independent sneaker brand designing responsible footwear.",
+    ),
+    false,
+  );
+  assert.equal(
+    isValidFootwearCollaborator(
+      "Plant-based shoe care, cleaning kits, laces, and protective insoles.",
+    ),
+    true,
+  );
+  assert.equal(
+    isValidFootwearCollaborator("Recycled bags for commuting and travel."),
+    true,
+  );
+});
+test("live Browserbase research is capped at five minutes", async () => {
+  assert.equal(LIVE_RESEARCH_LIMIT_MS, 300_000);
+  let observedAbort = false;
+  await assert.rejects(
+    () =>
+      runWithResearchDeadline(
+        (signal) =>
+          new Promise<never>((_, reject) =>
+            signal.addEventListener(
+              "abort",
+              () => {
+                observedAbort = true;
+                reject(signal.reason);
+              },
+              { once: true },
+            ),
+          ),
+        10,
+      ),
+    /five-minute limit/,
+  );
+  assert.equal(observedAbort, true);
 });
 test("browserbase reports use live research instead of fixture progression", async () => {
   const live = createPlatform({

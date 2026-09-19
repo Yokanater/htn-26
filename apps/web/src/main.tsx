@@ -274,6 +274,34 @@ function BrandArt({
   );
 }
 
+function CandidateMedia({ candidate }: { candidate: Candidate }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [candidate.imageUrl]);
+  if (candidate.imageUrl && !imageFailed)
+    return (
+      <>
+        <img
+          className="website-image"
+          src={candidate.imageUrl}
+          alt={candidate.imageAlt ?? `${candidate.name} storefront visual`}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setImageFailed(true)}
+        />
+        <span className="website-image-label">
+          <Globe2 size={12} /> From {candidate.domain}
+        </span>
+      </>
+    );
+  return (
+    <div className="brand-fallback">
+      <BrandArt kind={candidate.mark} />
+      <div className={`art-wordmark ${candidate.id}`}>{candidate.name}</div>
+      <span className="art-tagline">{candidate.tagline}</span>
+    </div>
+  );
+}
+
 function EcosystemArt() {
   return (
     <svg
@@ -288,8 +316,8 @@ function EcosystemArt() {
         strokeWidth="1.5"
         strokeDasharray="4 5"
       />
-      <circle cx="191" cy="115" r="41" fill="#f1eee2" />
-      <circle cx="191" cy="115" r="48" stroke="#739681" strokeOpacity=".4" />
+      <circle cx="191" cy="115" r="41" fill="#ffffff" />
+      <circle cx="191" cy="115" r="48" stroke="#a8c2b5" strokeOpacity=".65" />
       <path
         d="M190 139v-40m0 21c-26 0-28-25-28-25s30-3 28 25m0-9c23 0 27-24 27-24s-28 0-27 24"
         stroke="#315d46"
@@ -303,12 +331,12 @@ function EcosystemArt() {
         width="69"
         height="69"
         rx="20"
-        fill="#d4c9e4"
+        fill="#dcebe3"
         transform="rotate(-12 76 51)"
       />
       <path
         d="M60 41h26v20c0 13-26 13-26 0zm26 3h5c13 0 13 17 0 17h-5"
-        stroke="#665773"
+        stroke="#315c4b"
         strokeWidth="3"
         strokeLinejoin="round"
       />
@@ -318,12 +346,12 @@ function EcosystemArt() {
         width="62"
         height="62"
         rx="19"
-        fill="#e4b78f"
+        fill="#c9dfd3"
         transform="rotate(13 300 53)"
       />
       <path
         d="M287 59l25-8m-22 16 25-8m-31-6 25-8m-8-10-17 17 8 24 25-21-8-19z"
-        stroke="#836346"
+        stroke="#315c4b"
         strokeWidth="2.5"
         strokeLinejoin="round"
       />
@@ -333,12 +361,12 @@ function EcosystemArt() {
         width="55"
         height="55"
         rx="18"
-        fill="#c4d1ae"
+        fill="#e8f1ec"
         transform="rotate(7 72 172)"
       />
       <path
         d="M66 158h14l6 25H60zm0 0v-4h14v4m-11 10h9"
-        stroke="#5e7450"
+        stroke="#315c4b"
         strokeWidth="2.5"
         strokeLinejoin="round"
       />
@@ -348,22 +376,22 @@ function EcosystemArt() {
         width="64"
         height="64"
         rx="20"
-        fill="#e7d594"
+        fill="#d6e7de"
         transform="rotate(-9 318 166)"
       />
       <path
         d="M303 156l15-4 15 4v23l-15-4-15 4zm15-4v23"
-        stroke="#8b7951"
+        stroke="#315c4b"
         strokeWidth="2.5"
         strokeLinejoin="round"
       />
       <path
         d="M242 27v12m-6-6h12M120 149v10m-5-5h10"
-        stroke="#d3d8b6"
+        stroke="#c4dbcf"
         strokeWidth="2"
         strokeLinecap="round"
       />
-      <circle cx="229" cy="185" r="3" fill="#c0cdb3" />
+      <circle cx="229" cy="185" r="3" fill="#c4dbcf" />
     </svg>
   );
 }
@@ -927,8 +955,9 @@ function App() {
                       </div>
                       <div className="progress-foot">
                         <span>
-                          Step {phases.indexOf(report.phase) + 1} of{" "}
-                          {phases.length} · simulated pipeline
+                          {report.profile.mode === "browserbase"
+                            ? "Live storefront research · five-minute maximum"
+                            : `Step ${phases.indexOf(report.phase) + 1} of ${phases.length} · simulated pipeline`}
                         </span>
                         <button
                           onClick={async () => {
@@ -1223,7 +1252,9 @@ function App() {
                       <div className="brand-grid">
                         {filtered.map((c) => (
                           <article className="brand-card" key={c.id}>
-                            <div className={`brand-visual ${c.tone}`}>
+                            <div
+                              className={`brand-visual ${c.imageUrl ? "has-website-image" : "fallback-visual"}`}
+                            >
                               <span className="category-pill">
                                 {c.category}
                               </span>
@@ -1242,11 +1273,7 @@ function App() {
                                   }
                                 />
                               </button>
-                              <BrandArt kind={c.mark} />
-                              <div className={`art-wordmark ${c.id}`}>
-                                {c.name}
-                              </div>
-                              <span className="art-tagline">{c.tagline}</span>
+                              <CandidateMedia candidate={c} />
                             </div>
                             <div className="brand-content">
                               <div className="brand-title-row">
@@ -1411,8 +1438,10 @@ function App() {
             </span>
             {drawer.candidate && (
               <>
-                <div className={`drawer-art ${drawer.candidate.tone}`}>
-                  <BrandArt kind={drawer.candidate.mark} />
+                <div
+                  className={`drawer-art ${drawer.candidate.imageUrl ? "has-website-image" : "fallback-visual"}`}
+                >
+                  <CandidateMedia candidate={drawer.candidate} />
                 </div>
                 <div className="drawer-section">
                   <span className="eyebrow">WHY THIS CONNECTION</span>
@@ -1536,7 +1565,11 @@ function App() {
                   <span>Workspace</span>
                   <strong>Sunday studio</strong>
                   <span>Research mode</span>
-                  <strong>Deterministic demo</strong>
+                  <strong>
+                    {health.providerMode === "browserbase"
+                      ? "Live Browserbase"
+                      : "Deterministic demo"}
+                  </strong>
                   <span>Storage</span>
                   <strong>Local SQLite</strong>
                   <span>API status</span>
@@ -1549,8 +1582,8 @@ function App() {
                   </strong>
                 </div>
                 <p className="muted">
-                  Team sign-in, production Postgres, and live research providers
-                  are integration work still to come.
+                  Team sign-in, production Postgres, customer discourse, and
+                  deployment are integration work still to come.
                 </p>
               </>
             ) : utility === "workspace" ? (
@@ -1569,23 +1602,42 @@ function App() {
                 </p>
               </>
             ) : utility === "demo" ? (
-              <>
-                <p>
-                  All brands, scores, comments, and source excerpts in this
-                  preview are fictional. They demonstrate how a real
-                  evidence-backed report will work.
-                </p>
-                <p>
-                  New reports use the same specialty-coffee fixture, even if you
-                  enter another category. Your store URL is saved as context; it
-                  is not fetched or analyzed.
-                </p>
-                <p>
-                  Sample sources deliberately have no external links. Live
-                  research will supply captured source URLs, dates, and exact
-                  excerpts.
-                </p>
-              </>
+              report?.profile.mode === "browserbase" ? (
+                <>
+                  <p>
+                    This report uses public storefront pages captured through
+                    Browserbase. Product imagery is loaded from the source
+                    websites and labeled with its domain.
+                  </p>
+                  <p>
+                    Live research stops after five minutes and keeps supported
+                    partial results. A footwear store will not receive another
+                    footwear assortment as a collaborator; care and accessory
+                    specialists are the limited exception.
+                  </p>
+                  <p>
+                    Fit scores prioritize leads for review. They do not confirm
+                    a partnership, audience match, or competitive relationship.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    All brands, scores, comments, and source excerpts in this
+                    preview are fictional. They demonstrate how a real
+                    evidence-backed report will work.
+                  </p>
+                  <p>
+                    New demo reports use category-aware fixtures. Your store URL
+                    is saved as context; it is not fetched or analyzed.
+                  </p>
+                  <p>
+                    Sample sources deliberately have no external links. Live
+                    research supplies captured source URLs, dates, exact
+                    excerpts, and available storefront imagery.
+                  </p>
+                </>
+              )
             ) : (
               <>
                 <p>
@@ -1607,10 +1659,15 @@ function App() {
                   </li>
                 </ol>
                 <div className="caveat">
-                  <FlaskConical size={22} />
+                  {report?.profile.mode === "browserbase" ? (
+                    <Globe2 size={22} />
+                  ) : (
+                    <FlaskConical size={22} />
+                  )}
                   <p>
-                    You’re exploring a working demo. Live research services are
-                    not connected yet.
+                    {report?.profile.mode === "browserbase"
+                      ? "Live storefront research is connected. Customer discourse and production identity still need integration."
+                      : "You’re exploring the deterministic demo. Switch PROVIDER_MODE to browserbase to research public storefronts."}
                   </p>
                 </div>
               </>
@@ -1741,7 +1798,7 @@ function NewReport({
         <p>
           {step === 0
             ? "A little context opens up a whole world of possibilities."
-            : "Review your brand context before the demo research begins. You can edit every field below."}
+            : "Review your brand context before research begins. You can edit every field below."}
         </p>
         <div className="form-demo-note">
           {profile?.mode === "browserbase" ? (

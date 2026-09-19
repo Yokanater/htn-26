@@ -15,6 +15,7 @@ type CapturedBrand = {
   title: string;
   description: string;
   text: string;
+  imageUrl?: string;
 };
 export type StorefrontSignals = {
   title: string;
@@ -37,9 +38,50 @@ export function hasStorefrontCommerceEvidence(signals: StorefrontSignals) {
 
 const sessionQueue: (() => void)[] = [];
 let activeSessions = 0;
-async function withResearchSlot<T>(run: () => Promise<T>) {
-  if (activeSessions >= 3)
-    await new Promise<void>((resolve) => sessionQueue.push(resolve));
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted)
+    throw signal.reason ?? new Error("Browserbase research reached its limit.");
+}
+
+async function abortableDelay(ms: number, signal?: AbortSignal) {
+  throwIfAborted(signal);
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(
+          signal.reason ?? new Error("Browserbase research reached its limit."),
+        );
+      },
+      { once: true },
+    );
+  });
+}
+
+async function withResearchSlot<T>(
+  run: () => Promise<T>,
+  signal?: AbortSignal,
+) {
+  throwIfAborted(signal);
+  if (activeSessions >= 3) {
+    await Promise.race([
+      new Promise<void>((resolve) => sessionQueue.push(resolve)),
+      new Promise<never>((_, reject) =>
+        signal?.addEventListener(
+          "abort",
+          () =>
+            reject(
+              signal.reason ??
+                new Error("Browserbase research reached its limit."),
+            ),
+          { once: true },
+        ),
+      ),
+    ]);
+  }
+  throwIfAborted(signal);
   activeSessions += 1;
   try {
     return await run();
@@ -49,15 +91,19 @@ async function withResearchSlot<T>(run: () => Promise<T>) {
   }
 }
 
-async function withBrowserbaseCapacity<T>(run: () => Promise<T>) {
+async function withBrowserbaseCapacity<T>(
+  run: () => Promise<T>,
+  signal?: AbortSignal,
+) {
   for (let attempt = 0; attempt < 3; attempt++) {
+    throwIfAborted(signal);
     try {
-      return await withResearchSlot(run);
+      return await withResearchSlot(run, signal);
     } catch (error) {
       const rateLimited =
         error instanceof Error && /429|burst rate limit/i.test(error.message);
       if (!rateLimited || attempt === 2) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 61_000));
+      await abortableDelay(61_000, signal);
     }
   }
   throw new Error("Browserbase capacity retry failed.");
@@ -116,22 +162,27 @@ function unwrapDuckDuckGo(url: string) {
   return destination ? decodeURIComponent(destination) : url;
 }
 
-async function search(query: string): Promise<SearchResult[]> {
-  return withBrowserbaseCapacity(() =>
-    withBrowserbaseSession(
-      { allowedDomains: ["duckduckgo.com"], timeoutMs: 30_000 },
-      async ({ page }) => {
-        await page.goto(
-          `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-          { waitUntil: "domcontentloaded", timeout: 20_000 },
-        );
-        return (await page.evaluate(`(() => Array.from(document.querySelectorAll('.result')).slice(0, 12).map((result) => ({
+async function search(
+  query: string,
+  signal?: AbortSignal,
+): Promise<SearchResult[]> {
+  return withBrowserbaseCapacity(
+    () =>
+      withBrowserbaseSession(
+        { allowedDomains: ["duckduckgo.com"], timeoutMs: 30_000, signal },
+        async ({ page }) => {
+          await page.goto(
+            `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+            { waitUntil: "domcontentloaded", timeout: 20_000 },
+          );
+          return (await page.evaluate(`(() => Array.from(document.querySelectorAll('.result')).slice(0, 12).map((result) => ({
         title: result.querySelector('.result__a')?.textContent?.replace(/\\s+/g, ' ').trim() ?? '',
         url: result.querySelector('.result__a')?.href ?? '',
         snippet: result.querySelector('.result__snippet')?.textContent?.replace(/\\s+/g, ' ').trim() ?? ''
       })).filter((item) => item.title && item.url))()`)) as SearchResult[];
-      },
-    ),
+        },
+      ),
+    signal,
   );
 }
 
@@ -217,9 +268,25 @@ function usable(result: SearchResult, ownHost: string) {
   }
 }
 
+const footwearTerms =
+  /\b(shoes?|footwear|sneakers?|boots?|sandals?|loafers?|heels?|flats?)\b/i;
+const footwearAccessoryTerms =
+  /\b(shoe care|foot care|orthotics?|insoles?|shoe laces?|shoelaces?|socks?)\b/i;
+const footwearCommerceTerms =
+  /(?:\b(?:shop|buy|collection|our|women'?s|men'?s|kids?|leather)\b.{0,45}\b(?:shoes?|footwear|sneakers?|boots?|sandals?|loafers?|heels?|flats?)\b)|(?:\b(?:shoes?|footwear|sneakers?|boots?|sandals?|loafers?|heels?|flats?)\b.{0,45}\b(?:shop|collection|sale|new arrivals?|made|designed)\b)/i;
+
+/** A footwear merchant may partner with care/accessory specialists, never a
+ * second footwear assortment disguised as a collaborator. */
+export function isValidFootwearCollaborator(text: string) {
+  if (!footwearTerms.test(text)) return true;
+  return footwearAccessoryTerms.test(text) && !footwearCommerceTerms.test(text);
+}
+
 async function captureBrands(
   results: SearchResult[],
+  signal?: AbortSignal,
 ): Promise<CapturedBrand[]> {
+  throwIfAborted(signal);
   const targets = (
     await Promise.allSettled(
       results.map(async (result) => {
@@ -241,82 +308,101 @@ async function captureBrands(
       ]),
     ),
   ];
-  return withBrowserbaseCapacity(() =>
-    withBrowserbaseSession(
-      { allowedDomains, timeoutMs: 30_000 },
-      async ({ page }) => {
-        const captured: CapturedBrand[] = [];
-        for (const { result, requested, rootHost } of targets) {
-          try {
-            await page.goto(requested.href, {
-              waitUntil: "domcontentloaded",
-              timeout: 15_000,
-            });
-            const finalUrl = await assertPublicUrl(page.url());
-            if (
-              finalUrl.hostname !== rootHost &&
-              !finalUrl.hostname.endsWith(`.${rootHost}`)
-            )
-              throw new Error("Candidate redirected outside its domain.");
-            const extracted = (await page.evaluate(`(() => {
+  return withBrowserbaseCapacity(
+    () =>
+      withBrowserbaseSession(
+        { allowedDomains, timeoutMs: 30_000, signal },
+        async ({ page }) => {
+          const captured: CapturedBrand[] = [];
+          for (const { result, requested, rootHost } of targets) {
+            throwIfAborted(signal);
+            try {
+              await page.goto(requested.href, {
+                waitUntil: "domcontentloaded",
+                timeout: 15_000,
+              });
+              const finalUrl = await assertPublicUrl(page.url());
+              if (
+                finalUrl.hostname !== rootHost &&
+                !finalUrl.hostname.endsWith(`.${rootHost}`)
+              )
+                throw new Error("Candidate redirected outside its domain.");
+              const extracted = (await page.evaluate(`(() => {
         const meta = (selector) => document.querySelector(selector)?.content?.trim() ?? '';
         const jsonLd = Array.from(document.querySelectorAll('script[type="application/ld+json"]')).map((script) => script.textContent ?? '').join(' ');
         return {
           title: document.title,
           name: meta('meta[property="og:site_name"]') || meta('meta[name="application-name"]') || document.title.split(/[|–—]/)[0],
           description: meta('meta[name="description"]') || meta('meta[property="og:description"]'),
+          imageUrl: (() => {
+            const value = meta('meta[property="og:image:secure_url"]') || meta('meta[property="og:image"]') || meta('meta[name="twitter:image"]') || document.querySelector('main img[src], a[href*="/products/"] img[src], a[href*="/product/"] img[src]')?.src || '';
+            try { return value ? new URL(value, location.href).href : ''; } catch { return ''; }
+          })(),
           text: (document.body?.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 10000),
           productLinks: document.querySelectorAll('a[href*="/products/"], a[href*="/product/"]').length,
           productSchema: /"@type"\\s*:\\s*"Product"/i.test(jsonLd),
           addToCart: Boolean(document.querySelector('button[name="add"], [data-add-to-cart], form[action*="/cart/add"]'))
         };
       })()`)) as Omit<CapturedBrand, "url"> & {
-              productLinks: number;
-              productSchema: boolean;
-              addToCart: boolean;
-            };
-            const description = clean(
-              extracted.description || result.snippet || extracted.text,
-            );
-            if (!description)
-              throw new Error("Candidate has no usable evidence.");
-            if (
-              /security checkpoint|access denied|verify you are human/i.test(
-                extracted.title,
-              )
-            )
-              throw new Error(
-                "Candidate storefront was blocked by a challenge.",
+                productLinks: number;
+                productSchema: boolean;
+                addToCart: boolean;
+              };
+              const description = clean(
+                extracted.description || result.snippet || extracted.text,
               );
-            if (
-              !hasStorefrontCommerceEvidence({
-                title: extracted.title,
+              if (!description)
+                throw new Error("Candidate has no usable evidence.");
+              if (
+                /security checkpoint|access denied|verify you are human/i.test(
+                  extracted.title,
+                )
+              )
+                throw new Error(
+                  "Candidate storefront was blocked by a challenge.",
+                );
+              if (
+                !hasStorefrontCommerceEvidence({
+                  title: extracted.title,
+                  description,
+                  productLinks: extracted.productLinks,
+                  productSchema: extracted.productSchema,
+                  addToCart: extracted.addToCart,
+                })
+              )
+                throw new Error("Candidate page is not a brand storefront.");
+              const extractedName = clean(extracted.name, 80);
+              const genericName =
+                /^(about(?: us)?|home|shop|official site)$/i.test(
+                  extractedName,
+                );
+              let imageUrl: string | undefined;
+              if (extracted.imageUrl) {
+                try {
+                  imageUrl = (await assertPublicUrl(extracted.imageUrl)).href;
+                } catch {
+                  // Keep the candidate even when its social image is unsafe.
+                }
+              }
+              captured.push({
+                url: finalUrl.href,
+                name: genericName
+                  ? clean(result.title || finalUrl.hostname, 80)
+                  : extractedName ||
+                    clean(result.title || finalUrl.hostname, 80),
+                title: clean(extracted.title || result.title, 160),
                 description,
-                productLinks: extracted.productLinks,
-                productSchema: extracted.productSchema,
-                addToCart: extracted.addToCart,
-              })
-            )
-              throw new Error("Candidate page is not a brand storefront.");
-            const extractedName = clean(extracted.name, 80);
-            const genericName =
-              /^(about(?: us)?|home|shop|official site)$/i.test(extractedName);
-            captured.push({
-              url: finalUrl.href,
-              name: genericName
-                ? clean(result.title || finalUrl.hostname, 80)
-                : extractedName || clean(result.title || finalUrl.hostname, 80),
-              title: clean(extracted.title || result.title, 160),
-              description,
-              text: clean(extracted.text, 10_000),
-            });
-          } catch {
-            // Keep supported captures and continue to the next candidate.
+                text: clean(extracted.text, 10_000),
+                ...(imageUrl ? { imageUrl } : {}),
+              });
+            } catch {
+              // Keep supported captures and continue to the next candidate.
+            }
           }
-        }
-        return captured;
-      },
-    ),
+          return captured;
+        },
+      ),
+    signal,
   );
 }
 
@@ -344,6 +430,12 @@ function candidateFrom(
       category,
       tagline: brand.description,
       description: brand.description,
+      ...(brand.imageUrl
+        ? {
+            imageUrl: brand.imageUrl,
+            imageAlt: `${brand.name} storefront product photography`,
+          }
+        : {}),
       score,
       confidence: "Medium",
       tone: ["sage", "peach", "lilac", "blue", "yellow"][index % 5],
@@ -385,6 +477,8 @@ async function discover(
   ownHost: string,
   kind: "collaborator" | "competitor",
   limit: number,
+  profile: Profile,
+  signal?: AbortSignal,
 ) {
   const seen = new Set<string>();
   const captured: CapturedBrand[] = [];
@@ -398,7 +492,19 @@ async function discover(
         return true;
       });
   const capture = async (results: SearchResult[]) => {
-    captured.push(...(await captureBrands(results)).slice(0, limit));
+    const next = await captureBrands(results, signal);
+    captured.push(
+      ...next
+        .filter(
+          (brand) =>
+            kind !== "collaborator" ||
+            !/footwear|shoes?|sneakers?/i.test(profile.category) ||
+            isValidFootwearCollaborator(
+              `${brand.name} ${brand.title} ${brand.description} ${brand.text}`,
+            ),
+        )
+        .slice(0, limit),
+    );
   };
   await capture(
     newResults(
@@ -412,8 +518,9 @@ async function discover(
   if (captured.length < limit) {
     const fallback: SearchResult[] = [];
     for (const query of queries) {
+      throwIfAborted(signal);
       try {
-        fallback.push(...(await search(query)));
+        fallback.push(...(await search(query, signal)));
       } catch {
         // Continue with other queries and return a partial report if needed.
       }
@@ -432,7 +539,9 @@ export type LiveMarketResearch = Pick<
 
 export async function researchMarket(
   profile: Profile,
+  { signal }: { signal?: AbortSignal } = {},
 ): Promise<LiveMarketResearch> {
+  throwIfAborted(signal);
   const plan = queryPlan(profile);
   const ownHost = hostKey(profile.url);
   const [collaborators, competitors] = await Promise.all([
@@ -442,8 +551,18 @@ export async function researchMarket(
       ownHost,
       "collaborator",
       4,
+      profile,
+      signal,
     ),
-    discover(plan.competitors, plan.competitorSeeds, ownHost, "competitor", 4),
+    discover(
+      plan.competitors,
+      plan.competitorSeeds,
+      ownHost,
+      "competitor",
+      4,
+      profile,
+      signal,
+    ),
   ]);
   const evidence = [
     ...collaborators.map((item) => item.evidence),

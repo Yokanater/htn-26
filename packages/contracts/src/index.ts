@@ -49,6 +49,7 @@ export type ProfileResearch = {
     url: string;
     title: string;
     span: string;
+    imageUrl?: string;
     sourceType: string;
     fetchedAt: string;
     contentHash: string;
@@ -77,6 +78,8 @@ export type Candidate = {
   category: string;
   tagline: string;
   description: string;
+  imageUrl?: string;
+  imageAlt?: string;
   score: number;
   confidence: "High" | "Medium" | "Low";
   tone: string;
