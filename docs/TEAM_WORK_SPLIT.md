@@ -1,494 +1,159 @@
-# Team Work Split — Four Independent Lanes
+# Team split v3 — two surfaces, one demand loop
 
-| Field | Value |
-| --- | --- |
-| Companion to | [`SHOPIFY_ECOSYSTEM_INTELLIGENCE_DESIGN.md`](./SHOPIFY_ECOSYSTEM_INTELLIGENCE_DESIGN.md) (section numbers like "design §5.4" point there) |
-| Deadline | Devpost submission **Sun 2026-09-20 08:00 EDT**; we submit by **07:30** |
-| Rule | Nobody waits on anybody. If you are waiting, you are using the wrong fixture. See §12 |
-| Milestones | [`milestones/`](./milestones/README.md) slice this work into five shippable products with agent-ready cards |
+This replaces the old report-first lane schedule. Read [design](SHOPIFY_ECOSYSTEM_INTELLIGENCE_DESIGN.md)
+and [active milestone cards](milestones/README.md). Four humans own four lanes. Coding agents may
+implement cards in isolated worktrees; people own product judgment, real API spikes and integration.
 
-> **Which doc wins:** the lane task tables in §4–§7 and the Block timeline describe the full core (= milestones M1 + M2). The milestone files re-cut that work into shippable increments. For **what to build next and in what order**, the milestone files win. For **ownership, Step 0, integration swaps, and working agreements**, this doc stays the source of truth.
+## 1. Outcomes and workload
 
----
-
-## 0. The model in one paragraph
-
-The pipeline is cut into four **lanes**. Each lane owns a slice of stages and the directories behind them. Lanes talk to each other only through:
-1. the shared types in `@sei/contracts`
-2. JSON files in the **run-directory format** (design §10.3)
-
-In Step 0 we hand-write one small, coherent **seed world** (§3.3), with a fixture file for every stage. After that, every lane builds and tests against the seed files. When a lane's live output is ready, it **publishes a real run directory** and the downstream lanes switch to it. Final integration swaps one fixture stage for one live stage at a time (§8), and any swap can be undone with a flag.
-
----
-
-## 1. Lanes at a glance
-
-| | **Lane 1 — Collection** | **Lane 2 — Intelligence** | **Lane 3 — Reasoning & Pipeline** | **Lane 4 — Product & Platform** |
-| --- | --- | --- | --- | --- |
-| Sponsor tech | Browserbase, Shopify Catalog | Baseten (+ GPTZero) | OpenAI (+ Codex log) | Sentry, deploy, domain |
-| Owns | `packages/collect` | `packages/enrich`, `packages/db`, `ml/baseten` | `packages/reason`, `packages/pipeline` | `apps/server`, `apps/web`, `packages/telemetry`, root config |
-| Stages | profile (raw signals), `discover`, `collect` | `enrich`, `resolve`, `score`, bundle selection | profile (normalize), `plan`, `synthesize`, `verify`, `assemble`, LiveRunner | API, SSE, ReplayRunner, UI, deploy |
-| Reads | `profile.json`, `plan.json` | `profile.json`, `discover.json`, `collect.json` | everything upstream | `report.json`, `events.jsonl` |
-| Writes | `raw-signals.json`, `discover.json`, `collect.json` | `enrich.json`, `resolve.json`, `score.json` | `profile.json`, `plan.json`, `sections/*.json`, `verify.json`, `report.json` | `run.json`, `events.jsonl` (seed); server wiring |
-| Prizes you carry | Browserbase, Shopify (with L4) | Baseten, GPTZero, MLH Tiger Data | OpenAI, Rox, Composio | Sentry, finalist polish, MLH GoDaddy/Vultr |
-| Demo role | Narrates live browsing + Shopify Catalog | Baseten numbers + how scoring works | Citations, messy-data handling, actions, Codex story | Drives the laptop, owns the backup video |
-
----
-
-## 2. Dependency picture
-
-```mermaid
-flowchart LR
-    S["Step 0 (together, 90 min)<br/>contracts · core interfaces · seed world"]
-    S --> L1[Lane 1<br/>Collection]
-    S --> L2[Lane 2<br/>Intelligence]
-    S --> L3[Lane 3<br/>Reasoning & Pipeline]
-    S --> L4[Lane 4<br/>Product & Platform]
-    L1 -. "real collect.json (upgrade)" .-> L2
-    L2 -. "real enrich/resolve/score.json (upgrade)" .-> L3
-    L3 -. "real report.json + events (upgrade)" .-> L4
-    L3 -. "LiveRunner (Block 2)" .-> L4
-```
-
-**Solid edges are the only hard dependencies**, and they are all satisfied at the end of Step 0. Dotted edges are upgrades: until one arrives, you keep working on seed or earlier real fixtures.
-
----
-
-## 3. Step 0 — together (Sat 12:00–13:30, 90 minutes)
-
-### 3.0 Before Step 0: bootstrap (done) and teammate setup
-
-The scaffold (card M1-L4-0) is **already built** on the `chore/bootstrap` branch:
-- the pnpm 12 workspace with a version catalog and every known dependency pre-installed
-- package boundaries enforced through declared workspace dependencies
-- Biome and LF line endings
-- `AGENTS.md` + `CLAUDE.md`
-- `contracts/src/common.ts` (`newId`, `idSchema`, `Money`, `SourceType`, `SCHEMA_VERSION`) and `core/src/milestones.ts`, implemented and tested
-- all per-lane stub files, with headers naming the owner and the types to write
-- hello-world server + web apps, CI, `CODEOWNERS`, `.env.example`
-
-**Read `AGENTS.md` first.** The commands live in the root `package.json`; the key ones are `pnpm test`, `pnpm typecheck`, `pnpm format`, `pnpm fixtures:check`, and `pnpm milestone:check <m>`.
-
-**Every teammate, before Step 0:**
-- [ ] Node 24 (`.nvmrc`) and pnpm **12.4.2** (`npm i -g pnpm@12.4.2`; `corepack enable` fails without admin rights on Windows).
-- [ ] Clone to a **short path** (e.g. `C:\Code\htn-26`) and put worktrees next to it (`C:\Code\htn-<card>`). Windows' 260-character path limit breaks installs in deeply nested folders.
-- [ ] Run `git config core.autocrlf false` inside the clone.
-- [ ] `pnpm install && pnpm typecheck && pnpm test` passes.
-- [ ] Your `.env` is filled from `.env.example` (keys shared out of band).
-- [ ] You know to stop `pnpm dev` with **Ctrl+C**. Killing it any other way leaves node processes holding ports 8787/5173.
-
-**Toolchain facts agents must respect** (also in `AGENTS.md`):
-- zod is pinned to **4.4.3**, the exact version Stagehand requires. `zodTextFormat` compatibility is already proven by `packages/reason/test/zod-compat.test.ts`.
-- TypeScript is **7** (the native compiler). If a tool needs the old TypeScript JavaScript API, a human pins 5.9 in the catalog.
-- There are no `@sei/*` tsconfig paths; packages resolve through workspace links, which is what enforces the boundaries.
-- Agents never edit `package.json`, `pnpm-workspace.yaml`, or `pnpm-lock.yaml`.
-
-### 3.1 Minutes 0–25: access spikes (all lanes)
-
-L4 uses these minutes to confirm CI passed on `main` after the bootstrap merge, turn on branch protection (CI required), and replace the `@lane1`–`@lane4` placeholders in `CODEOWNERS`.
-
-**Access spikes.** Save raw responses under `fixtures/spikes/<provider>/`. Your parsers will be tested against them.
-
-| Lane | Spike | Decision it unlocks |
-| --- | --- | --- |
-| L1 | `bb.search.web({ query, numResults: 5 })` | Search response shape |
-| L1 | `bb.fetchAPI.create` on a real Shopify store: `/products.json` (`raw`) + homepage (`markdown`) | Fetch shape; fingerprint inputs |
-| L1 | One Stagehand session on a product page with a reviews widget: `extract` reviews, read the session ID and live-view URL | Stagehand v4 return shapes; live view works |
-| L1 | Global Catalog `search_catalog` JSON-RPC with Shopify's example agent profile URL | **Does it work without registration?** Exact `result` shape. If blocked → discovery falls back to BB Search (design §5.4) |
-| L1 | Read `robots.txt` + terms for 2 candidate forum domains | Open decision #2 (approved forum) |
-| L2 | `GET https://inference.baseten.co/v1/models` | Candidate tagger models |
-| L2 | Tagger prompt on 10 seed texts (§3.3) against 2 models; compare JSON validity + latency | `BASETEN_TAGGER_MODEL` |
-| L2 | **Start the BEI embedding deployment now** (it's the long pole); call it once it's live | `BASETEN_EMBED_BASE_URL` / `BASETEN_EMBED_MODEL` |
-| L3 | Live `responses.parse` + `zodTextFormat` with a nested schema using `.nullable()` fields (the Zod compatibility itself is already verified) | Live structured output works; model IDs |
-| L3 | `responses.create` with `tools: [{ type: 'web_search' }]` | Fallback search works |
-| All | Keys in your local `.env` (shared out of band, never committed); Codex set up | — |
-
-### 3.2 Minutes 25–70: contracts and seed fixtures (each lane edits only its own files)
-
-Transcribe design §4 into Zod in your own contract file, then write your seed fixture files. **Use Codex for the transcription and log it**; that's a legitimate, concrete Codex contribution.
-
-| Output | Owner |
-| --- | --- |
-| `contracts/src/collect.ts` (`ShopifySignals`, `ProductSummary`, `RawStoreSignals`, `CatalogProduct`, `SearchHit`, `Candidate`, `DiscoveryResult`, `Capture`, `Source`, `Evidence`, `CollectionBatch`) · `core/src/collect.ts` (`CatalogProvider`, `SearchProvider`, `PageFetcher`, `BrowserRunner`, `SourceAdapter`, `CollectTarget`, `CollectTools`, `PolicyChecker`, `FetchedPage`, `BrowserSession`, `CatalogQuery`) | **L1** |
-| `fixtures/seed/northbound/raw-signals.json`, `discover.json`, `collect.json` | **L1** |
-| `contracts/src/enrich.ts` (`Enrichment`, `Entity`, `DiscourseCluster`, `ScoreComponent`, `CandidateScore`, `ResolveResult`, `TagInput`, `TagOutput`) · `core/src/enrich.ts` (`Embedder`, `Tagger`, `EvidenceScorer`, `Adjudicator`, `ComponentJudge`) · `core/src/store.ts` (`RunStore`, `EvidenceStore`, `VectorIndex`) | **L2** |
-| `fixtures/seed/northbound/enrich.json`, `resolve.json`, `score.json` (vectors from the hashing embedder, rounded to 4 decimals) | **L2** |
-| `contracts/src/profile.ts` (`StoreProfile`), `plan.ts` (`ResearchTask`, `ResearchPlan`), `report.ts` (`Claim`, all section types, `ReportSection`, `EvidencePreview`, `Report`, `RunStats`, `VerificationResult`, `SynthesisInput`, action types) · `core/src/context.ts` (`RunContext`, `BudgetTracker` + `BudgetExceeded`, `RequestCache`, `Logger`; `FeatureFlags` comes from `featureFlags()` in `core/src/milestones.ts`), `pipeline.ts` (`Stage`, `StageIO`, `StageOutputs`, `PipelineRunner`), `reason.ts` (`Reasoner`, `SectionSynthesizer`, `Verifier`, `ActionProvider`) | **L3** |
-| `fixtures/seed/northbound/profile.json`, `plan.json`, `report.json` (sections embedded), `verify.json` · `packages/contracts/test/seed-integrity.test.ts` (every cited evidence ID / entity ID resolves across files) | **L3** |
-| `run.ts` (`ReportRun`, `RunStatus`, `StageKey`, `PipelineEvent`, `PipelineEventInput`, **`RunBudget`**, which lives here because `ReportRun` embeds it and contracts can't import core), `api.ts` (request/response DTOs, error envelope) · `core/src/telemetry.ts` | **L4** |
-| `fixtures/seed/northbound/run.json`, `events.jsonl` (~40 events across ~90 s using the seed IDs) | **L4** |
-
-`contracts/src/common.ts` and `core/src/milestones.ts` already exist from the bootstrap. Import them; never redefine IDs, `Money`, or `SourceType` locally. Any change to `common.ts` is additive and made by L4.
-
-### 3.3 The seed world ("Northbound Coffee Co.")
-
-Everyone writes fixtures against **these exact IDs and texts** so the files agree without coordination. All domains use the reserved `.example` TLD, so the data is clearly fictional.
-
-**Merchant:** Northbound Coffee Co. · `northbound-coffee.example` · `prof_seed` v2 (confirmed) · specialty whole-bean coffee roasted to order in Toronto · price band $18–$32 per 340 g bag (median $24) · geography CA, US · Shopify confidence 0.95 · run `run_seed`.
-
-**Entities and candidates:**
-
-| Entity | Candidate | Name | Domain | Role in seed | What it demonstrates |
-| --- | --- | --- | --- | --- | --- |
-| `ent_self` | — | Northbound Coffee Co. | `northbound-coffee.example` | self | — |
-| `ent_kettle` | `cand_kettle` | Kettle & Pour | `kettleandpour.example` | collaborator #1 | Gooseneck kettles $65–$140; bundle "Brew Starter Kit" |
-| `ent_clay` | `cand_clay` | Claywork Studio | `clayworkstudio.example` | collaborator #2 | Handmade mugs $28–$48; gift-with-purchase |
-| `ent_oat` | `cand_oat` | Oat Harbor | `oatharbor.example` | collaborator #3 | Barista oat milk; co-marketing latte content; `low_evidence` (1 source) |
-| `ent_summit` | `cand_summit` | Summit Roast | `summitroast.example` | competitor, direct | Complaints + praise (contradiction) |
-| *(merged)* | `cand_summit_shop` | Summit Roast Shop | `shop.summitroast.example` | merges into `ent_summit` | Merge rule "same registrable domain" |
-| `ent_summitgear` | `cand_summitgear` | Summit Gear Co. | `summitgear.example` | neither (camping gear) | **Refused merge** with Summit Roast (name similarity only) |
-| `ent_pods` | `cand_pods` | Daily Grind Pods | `dailygrindpods.example` | competitor, substitute | Switching trigger |
-| `ent_beanbox` | `cand_beanbox` | BeanBox Club | `beanboxclub.example` | competitor, adjacent | Unmet need |
-
-**Sources:**
-
-| Source | URL | Type | Capture |
+| Lane | Owns the outcome | Core work | UI work |
 | --- | --- | --- | --- |
-| `src_seed_01` | `https://northbound-coffee.example/products.json` | storefront | fetch |
-| `src_seed_02` | `https://northbound-coffee.example/pages/about` | storefront | fetch |
-| `src_seed_03` | `https://kettleandpour.example/products/gooseneck-kettle-1l` | shopify_catalog | catalog_mcp |
-| `src_seed_04` | `https://brewguide.example/best-pour-over-kettles` | editorial | fetch |
-| `src_seed_05` | `https://clayworkstudio.example/products/stoneware-mug` | shopify_catalog | catalog_mcp |
-| `src_seed_06` | `https://oatharbor.example/products/barista-6-pack` | shopify_catalog | catalog_mcp |
-| `src_seed_07` | `https://summitroast.example/products/signature-blend` | product_reviews | stagehand (`browserbaseSessionId: "seed-session-1"`) |
-| `src_seed_08` | `https://coffeeforum.example/t/pods-vs-beans` | forum | browser |
-| `src_seed_09` | `https://brewguide.example/pods-vs-whole-bean` | editorial | fetch |
-| `src_seed_10` | `https://beanboxclub.example/pages/reviews` | product_reviews | stagehand (`"seed-session-2"`) |
-
-**Evidence** (exact texts; `authorHash` values are arbitrary strings):
-
-| ID | Source | Kind | About | Text |
-| --- | --- | --- | --- | --- |
-| `ev_seed_01` | 01 | product_record (first-party) | self | "Northbound House Espresso — whole bean, 340 g, $24.00. Roasted to order." |
-| `ev_seed_02` | 02 | about (first-party) | self | "We roast every Monday in small batches in Toronto and ship within 48 hours of roasting." |
-| `ev_seed_03` | 03 | product_record | kettle | "Kettle & Pour Gooseneck Kettle 1L — $89.00. Rating 4.7/5 from 1,204 ratings. Ships to CA, US." |
-| `ev_seed_04` | 04 | article_paragraph | kettle | "The Kettle & Pour gooseneck is our top pick for beginners: steady flow and a built-in thermometer." |
-| `ev_seed_05` | 05 | product_record | clay | "Claywork Studio Handmade Stoneware Mug — $36.00. Rating 4.9/5 from 318 ratings. Ships to CA." |
-| `ev_seed_06` | 06 | product_record | oat | "Oat Harbor Barista Oat Milk 6-pack — $29.00. Rating 4.5/5 from 842 ratings. Ships to CA, US." |
-| `ev_seed_07` | 07 | review (2/5) | summit | "Bags arrived with a roast date six weeks old. Tasted flat." |
-| `ev_seed_08` | 07 | review (5/5) | summit | "Love that I can skip or pause my Summit subscription anytime." |
-| `ev_seed_09` | 07 | review (2/5) | summit | "Second order in a row with an old roast date. Switching to a local roaster." |
-| `ev_seed_10` | 08 | comment | pods | "I switched from pods to whole beans because the pods all taste the same and the waste bugged me." |
-| `ev_seed_11` | 08 | comment | category | "Specialty beans are great but shipping costs almost as much as the bag." |
-| `ev_seed_12` | 09 | article_paragraph | pods | "Daily Grind Pods are convenient, but a bag of fresh whole beans costs about half as much per cup." |
-| `ev_seed_13` | 10 | review (3/5) | beanbox | "I wish BeanBox told me the roast date for each coffee before it ships." |
-| `ev_seed_14` | 10 | review (4/5) | beanbox | "Great variety, but I never know which roaster or roast date I'm getting." |
-| `ev_seed_15` | 08 | comment | summit | "Summit Roast's subscription is the most flexible one I've found." |
-| `ev_seed_16` | 04 | article_paragraph | summitgear | "Summit Gear's camp kettle is sturdy, but it isn't built for pour-over." |
-
-**Clusters** (L2's `resolve.json`):
-
-| Cluster | Entity | Type | Evidence | Label |
-| --- | --- | --- | --- | --- |
-| `clu_stale` | summit | complaint | 07, 09 | roast date freshness |
-| `clu_flex` | summit | praise | 08, 15 | subscription flexibility |
-| `clu_pods_switch` | pods | switching_trigger | 10, 12 | taste and cost vs pods |
-| `clu_roast_transparency` | beanbox | unmet_need | 13, 14 | roast date transparency |
-| `clu_shipping` | category | complaint | 11 | shipping cost (weak signal, singleton) |
-
-**Report highlights** (L3's `report.json`; L4 designs the UI around these):
-- **Collaborators:** Kettle & Pour → *bundle* "Brew Starter Kit" (cites 03, 04, 01); Claywork Studio → *gift-with-purchase* mug on orders over $60 (cites 05, 01); Oat Harbor → *content* "Northbound latte guide" (cites 06; `low_evidence`).
-- **Competitors:** Summit Roast (direct; strength: flexible subscription 08, 15; weakness: stale roast dates 07, 09); Daily Grind Pods (substitute; 10, 12); BeanBox Club (adjacent; 13, 14).
-- **SWOT:**
-  - Strength: roast-to-order within 48 h (02, 01), which answers competitors' stale-date complaints (07, 09).
-  - Weakness: no subscription evidence (`inference`, reasoning given).
-  - Opportunities: roast-date transparency (13, 14); pod switchers (10, 12).
-  - Threats: shipping cost sensitivity (11); Summit's flexible subscription (08, 15).
-- **Actions:**
-  1. Print roast date plus "ships within 48 h" on product pages (falsification test: A/B the product page for 2 weeks).
-  2. Pilot the Brew Starter Kit with Kettle & Pour.
-  3. Test a free-shipping threshold at $45.
-- **Warnings:** one `insufficientEvidence` entry (`"weaknesses: pricing vs competitors"`), and the refused merge `ent_summitgear` is visible in `resolve.json`.
-
-### 3.4 Minutes 70–90: review and freeze
-
-- [ ] `pnpm typecheck && pnpm test` green: every seed file validates, and `seed-integrity.test.ts` passes.
-- [ ] 3-minute walkthrough per lane: "here is the file I produce, here is the one field you're most likely to misread".
-- [ ] Tag `contracts-v1.0.0`. **M0 reached.** From here, contract changes follow §11.3.
-
----
-
-## 4. Lane 1 — Collection (Browserbase + Shopify)
-
-**Mission:** turn a URL and a research plan into Shopify-verified candidates and clean, quotable, provenance-rich evidence.
-**You own:** `packages/collect`.
-**You consume:** `profile.json`, `plan.json` (seed now; for live testing, hand-write `fixtures/dev/<store>/profile.json` and `plan.json` for one real store, taking 6–8 real catalog queries from design §5.3).
-**You produce:** `collectStoreSignals(url, ctx)`; stages `discover` and `collect`; `createCollectStages(env)` for the composition root; fakes `FixtureCatalogProvider`, `FixtureSearchProvider`, `FixturePageFetcher`, `FixtureBrowserRunner` (read `fixtures/spikes/`) for your own tests.
-
-### Block 1 (13:30–20:00)
-
-| # | Pri | Task | Est | Done when |
-| --- | --- | --- | --- | --- |
-| 1 | P0 | `url-safety.ts`: canonicalize, strip tracking params, reject unsafe hosts (design §5.0); registrable domain via `tldts` | 45m | Table test of 12 URLs passes |
-| 2 | P0 | `browserbase.ts`: `search`, `fetch` (cache-wrapped), `withSession` (Stagehand `env: 'BROWSERBASE'`, session ID, live-view URL, emits `browser.session` / `browser.session.closed`, `close()` in `finally`); `policy.ts` robots via `robots-parser` + `policy.json` allow/deny | 90m | Spike calls go through the wrapper; a killed session still emits `closed` |
-| 3 | P0 | `shopify/fingerprint.ts` + `shopify/storefront.ts` → `collectStoreSignals`; CLI `pnpm collect:profile <url> --out <dir>` | 75m | Real store → valid `raw-signals.json`, confidence ≥ 0.9; a non-Shopify site → < 0.3 |
-| 4 | P0 | `shopify/catalog.ts` (UCP JSON-RPC client → `CatalogProduct[]`); `discover/aggregate.ts` (group by `seller.domain` → `Candidate`); `discover/stage.ts` (catalog + BB Search + qualify, design §5.4); CLI `pnpm collect:discover --run-dir <dir>` | 90m | ≥ 10 candidates with seller domains for the real dev store; merchant's own domain excluded |
-| 5 | P0 | Adapters: `storefront`, `editorial` (Fetch markdown → paragraphs mentioning the subject), `reviews-widget` (Stagehand `observe` → `act` "load more" ≤ 3 → `extract` a Zod `ReviewList`) | 120m | Each adapter has a replay test on spike data; reviews-widget works on 2 real widget vendors |
-| 6 | P0 | `collect/stage.ts`: targets from candidates + hits, escalation ladder, `p-limit` pools, per-domain budget, circuit breaker, `contentHash` dedupe; CLI `pnpm collect:run --run-dir <dir>` | 60m | Valid `collect.json` with ≥ 80 evidence units, ≥ 1 `stagehand` capture, in < 120 s |
-| 7 | P0 | **Publish real data:** copy the dev run to `fixtures/real/<store>/` (`profile`, `plan`, `discover`, `collect`) after `pnpm fixtures:check` | 15m | Committed **by 18:00**, so L2 has real text |
-
-**M1 exit check (20:00):** `pnpm collect:discover` and `pnpm collect:run` against `fixtures/dev/<store>` succeed live; `fixtures/real/<store>/collect.json` is on `main`.
-
-### Block 2 (20:00–23:30)
-- Drive swaps **I1** (raw signals) and **I2** (discover + collect inside the LiveRunner) in §8.
-- Tune budgets so discover + collect take ≤ 90 s on the demo stores. Turn on the cache.
-
-### Block 3 stack-ups (priority order, only after M2)
-1. Capture metadata polish: `replayUrl` for every session-captured evidence item; screenshot artifact for the drawer (Browserbase prize).
-2. `FEATURE_POLICIES`: extract competitor shipping and returns thresholds (Stagehand on `/policies/shipping-policy`), feeding SWOT threats.
-3. Forum adapter for the approved domain (only if decision #2 approved one).
-4. Build `evals/golden-stores.json` with 3–4 stores that run cleanly live.
-
-### Block 4
-Own the live-run segment: know which store to run for each judge. Keep the fallback store name ready.
-
-### Do not
-Bypass blocks, CAPTCHAs, or logins · summarize with an LLM during collection (Stagehand `extract` only pulls structured fields) · write any file other than yours in a run directory · store author names or handles.
-
----
-
-## 5. Lane 2 — Intelligence (Baseten + data)
-
-**Mission:** turn raw evidence into tagged, embedded, deduplicated entities, discourse clusters, and explainable scores, cheaply and at volume.
-**You own:** `packages/enrich`, `packages/db`, `ml/baseten`.
-**You consume:** `profile.json`, `discover.json`, `collect.json` (seed now; `fixtures/real/<store>/` from L1 by ~18:00).
-**You produce:** stages `enrich`, `resolve`, `score`; `selectBundle(...)` (used by L3); `Adjudicator` + `ComponentJudge` implementations (your prompts, run through the `Reasoner` interface); `createEnrichStages(env)`; Pg stores (later).
-
-### Block 1 (13:30–20:00)
-
-| # | Pri | Task | Est | Done when |
-| --- | --- | --- | --- | --- |
-| 1 | P0 | `baseten/tagger.ts` `BasetenTagger`: OpenAI SDK with `baseURL = BASETEN_MODEL_API_BASE_URL`, 10 units per call, `json_schema` or `json_object` + Zod, one repair retry, split batch on timeout. Fake: `RuleTagger` (keyword rules) | 90m | 50 real units tagged with ≥ 95% schema-valid; the fake reproduces the seed labels |
-| 2 | P0 | `baseten/embedder.ts` `BeiEmbedder` (OpenAI-compatible `/v1/embeddings` on the BEI URL). Fake: `HashingEmbedder` (unigram+bigram feature hashing → 512 dims, L2-normalized: deterministic, and similar text gives similar vectors) | 30m | Cosine of two paraphrases > cosine of two unrelated texts, for both implementations |
-| 3 | P0 | `enrich/stage.ts`: filters, tag, **quote substring validation**, embed, >50%-failure fallback to OpenAI (design §5.6); CLI `pnpm enrich:run --run-dir <dir> [--fake]` | 60m | Valid `enrich.json`; records model IDs; first-party units skipped for sentiment |
-| 4 | P0 | `resolve/entities.ts` (merge rules in order, evidence attachment, `mergeLog`, `refusedMerges`), `resolve/cluster.ts` (agglomerative, cosine, average linkage, threshold 0.78), `resolve/stage.ts`; CLI | 120m | On seed: Summit Roast Shop merges into Summit Roast; Summit Gear is **refused**; the 5 seed clusters come out |
-| 5 | P0 | `score/*.ts`: computed components exactly as design §7, penalties, evidence strength; `ComponentJudge` hook; CLI `pnpm enrich:score` | 75m | Seed ranking: Kettle > Clay > Oat, Summit > Pods > BeanBox; every component has a rationale |
-| 6 | P0 | `prompts/adjudicate.v1.ts`, `prompts/judge.v1.ts` + `ReasonerAdjudicator`, `ReasonerComponentJudge`. Test with an inline fake `Reasoner`; switch to L3's `OpenAIReasoner` once it's on `main` | 45m | Unit tests pass with the fake |
-| 7 | P1 | `bundle/select.ts`: MMR (λ 0.7) with the diversity constraints and token cap in design §9.2 | 45m | L3 can call `selectBundle('collaborators', …)` and gets ≤ cap tokens, ≥ 25% non-first-party |
-
-**M1 exit check (20:00):** `pnpm enrich:run --run-dir fixtures/seed/northbound --fake` (then resolve, score) reproduces the seed semantics. `pnpm enrich:run --run-dir fixtures/real/<store>` with live Baseten has ≥ 90% `status: ok`.
-
-### Block 2 (20:00–23:30)
-- Drive swap **I3** (enrich → resolve → score live inside the LiveRunner).
-- Publish `fixtures/real/<store>/{enrich,resolve,score}.json` as soon as they're good, for L3.
-- Start `packages/db` (Drizzle schema per design §10.1, migrations, `PgRunStore`, `PgEvidenceStore`, `PgVectorIndex`). **Not needed for M2**, because `STORE=file` works.
-
-### Block 3 stack-ups (priority order)
-1. **Baseten distillation** (`FEATURE_DISTILLED_TAGGER`, design §6.2): gold labels from L3's `Reasoner` (reasoning model) → fine-tune on an H100 workstation → BEI classification deploy → `DistilledTagger` → comparison table. This is the Baseten prize story.
-2. **GPTZero** (`FEATURE_GPTZERO`): an `EvidenceScorer` that writes `scores.ai_generated` (down-weights, never deletes) and a `Verifier` that checks report claims and citations. Confirm endpoints at the booth.
-3. BEI reranker inside `selectBundle`.
-4. Finish the Pg stores; with a hosted DB, switch deploy to `STORE=pg`.
-5. `FEATURE_TRENDS`: a Tiger Data hypertable of dated discourse mentions → one trend series per competitor for L4.
-
-### Block 4
-Produce the Baseten numbers from `RunStats` (units tagged, p50 latency per batch, $/1k units vs the OpenAI estimate) for the Devpost and demo.
-
-### Do not
-Modify `Evidence.text` · merge entities on name similarity alone · drop a vector's model ID · make product claims (that's L3).
-
----
-
-## 6. Lane 3 — Reasoning & Pipeline (OpenAI)
-
-**Mission:** plan the research, write the cited report, guarantee every claim resolves to evidence, and own the runner that ties all stages together.
-**You own:** `packages/reason`, `packages/pipeline`, and the curation of `docs/CODEX_LOG.md`.
-**You consume:** `raw-signals.json` (L1), `enrich/resolve/score.json` (L2), and `selectBundle` from L2 (until it lands, use a naive top-K by `relevance`).
-**You produce:** `normalizeProfile`; stages `plan`, `synthesize`, `verify`, `assemble`; `OpenAIReasoner`; `LiveRunner`; `FileRunStore`; `FixtureStage`; `createReasonStages(env)`; `pnpm pipeline:run`.
-
-### Block 1 (13:30–20:00)
-
-| # | Pri | Task | Est | Done when |
-| --- | --- | --- | --- | --- |
-| 1 | P0 | `openai/reasoner.ts` `OpenAIReasoner`: `responses.parse` + `zodTextFormat`, timeouts (90 s / 30 s), 2 retries on 429/5xx, request-ID logging, token accounting. `FixtureReasoner` returns canned outputs by call name | 60m | Merged to `main` early; L2 switches to it |
-| 2 | P0 | Prompt registry (design §6.3) + `profile.normalize` (price band computed in code, `needsConfirmation` rules) + CLI `pnpm reason:profile --raw <file> --out <dir>` | 45m | L1's real `raw-signals.json` → sensible `profile.json` |
-| 3 | P0 | `plan.research` + `plan/stage.ts` + CLI `pnpm reason:plan --run-dir <dir>` | 45m | Real profile → ≤ 40 tasks with product-language catalog queries; no brand names in catalog queries |
-| 4 | P0 | `synth/collaborators.ts`, `synth/competitors.ts`, `synth/discourse.ts`: LLM schemas (`.nullable()`, never `.optional()`), mappers to domain types, `registerSection()` registry; the evidence bundle rendered as `<evidence>` blocks (design §9.2) | 120m | On seed data, the output matches the seed report's highlights |
-| 5 | P0 | `verify/citations.ts` (IDs must be in **that call's** bundle; inference needs reasoning; >30% dropped → one retry with errors) + `assemble/stage.ts` (`evidenceIndex`, entities map, `RunStats`, run status rules) | 75m | Property test: an injected fake evidence ID is always dropped; `citationCoverage` = 1.0 on seed |
-| 6 | P0 | `packages/pipeline`: stage registry, `LiveRunner` (topological order, checkpoint per stage, `--from/--until`, events, budget, `AbortSignal`, soft/hard deadlines), `FileRunStore` (design §10.3 layout + `EventEmitter` for `subscribe`), `FixtureStage` (serves `<stage>.json` from any run directory); CLI `pnpm pipeline:run --run-dir <dir> [--from s] [--until s] [--fake plan,discover,...]` | 120m | Fully faked run reproduces the seed `report.json`; rerun with `--from synthesize` skips upstream work |
-| 7 | P1 | `synth/swot.ts`, `synth/actions.ts` | 45m | Seed SWOT/actions match §3.3 |
-| 8 | P1 | `verify/consistency.ts` | 30m | Flags an entity that appears as both collaborator and direct competitor |
-
-**M1 exit check (20:00):** `pnpm pipeline:run --run-dir <copy of seed> --fake plan,discover,collect,enrich,resolve,score` runs **live OpenAI synthesis** on seed data, producing a valid `report.json` with `citationCoverage = 1.0`.
-
-### Block 2 (20:00–23:30): integration captain
-- Call the order of swaps in §8 and keep the "what's live" table in the team channel current.
-- Drive **I1** (with L1: raw → normalize) and **I4** (synthesize → verify → assemble live).
-- Hand the `LiveRunner` to L4 for **I5** by 22:30 at the latest.
-
-### Block 3 stack-ups (priority order)
-1. **Actions** (`FEATURE_ACTIONS`): `action.draft` prompt, `clipboard` provider, `POST /api/runs/:id/actions` handler logic (L4 wires the route and the button). Rox's "take meaningful action" criterion.
-2. **Composio** `ActionProvider` (`FEATURE_COMPOSIO`): creates a Gmail **draft** from an approved outreach.
-3. **Ask the evidence** (`FEATURE_ASK`): retrieval via L2's `selectBundle` with the question as the query → `ask.answer` with cited claims.
-4. Prompt quality pass on 2 real stores; bump prompt versions.
-
-### Block 4
-Curate `docs/CODEX_LOG.md` into the Devpost "How Codex helped" section, with one concrete story for the OpenAI judges.
-
-### Do not
-Let the model name final candidates (only discovery does) · let the model compute scores or price bands · accept a citation that wasn't in that call's bundle · put evidence in prompts without `<evidence>` delimiters.
-
----
-
-## 7. Lane 4 — Product & Platform
-
-**Mission:** make the pipeline visible, trustworthy, and demo-proof: API, live progress, report UI, evidence drawer, deploy, observability.
-**You own:** `apps/server`, `apps/web`, `packages/telemetry`, root config, `docs/DEMO_SCRIPT.md`.
-**You consume:** `report.json` + `events.jsonl` (seed now, `fixtures/real/*` later); the `PipelineRunner` interface (ReplayRunner now, L3's LiveRunner in Block 2).
-**You produce:** everything a judge sees.
-
-### Block 1 (13:30–20:00)
-
-| # | Pri | Task | Est | Done when |
-| --- | --- | --- | --- | --- |
-| 1 | P0 | `apps/server`: routes from design §11, `providers.ts` composition root (env switches; calls each lane's `create*Stages(env)` once they exist), `MemoryRunStore` (yours, until L3's `FileRunStore` lands), error envelope. Fake profile path: `POST /api/profiles` returns the seed profile after 2 s | 60m | `curl` walkthrough of every route against the seed |
-| 2 | P0 | `ReplayRunner` (implements `PipelineRunner`): reads a run directory, re-emits `events.jsonl` with original delays × `REPLAY_SPEED` into the RunStore, and makes sections visible on `section.ready` | 45m | Replay of the seed takes ~90 s at speed 1 and ~9 s at speed 10 |
-| 3 | P0 | SSE `GET /api/runs/:id/events`: `listEvents(afterSeq)` then `subscribe`, `Last-Event-ID` resume, 15 s heartbeat | 45m | Refreshing mid-run resumes without duplicates |
-| 4 | P0 | Web shell: routes (design §12.1), API client, TanStack Query, `useRunEvents` reducer, Tailwind + shadcn setup, a Polaris-like visual language | 45m | Navigation works end to end on replay |
-| 5 | P0 | Intake + Profile review (Shopify confidence badge listing signals; editable chips; `needsConfirmation` callouts) | 75m | Edits create a new profile version (via API) |
-| 6 | P0 | Live run: `StageTimeline`, `LiveBrowserPanel` (iframe of `liveViewUrl` when present, animated placeholder otherwise), `DiscoveryFeed` (candidates, evidence counts, merges, warnings) | 90m | The seed replay looks alive |
-| 7 | P0 | Report: header stats, three tabs, `CandidateCard`, `ScoreBar` (hover shows component rationale + method), `ClaimText` + citation chips, `EvidenceDrawer` (quote highlighted in context, capture method, **Watch capture**), `ThemeList` with sample labels, `SwotGrid`, `ActionCard`; generic renderer for unknown section keys | 150m | Every chip on the seed report opens the right evidence; `low_evidence` and inference claims look different |
-| 8 | P1 | Dockerfile (multi-stage: build web into `apps/server/public`) + `docker-compose.yml` (server + optional Postgres + Caddy); **deploy the replay-only build** so a public URL exists early | 60m | Public HTTPS URL serves the seed replay |
-
-**M1 exit check (20:00):** with `RUNNER=replay pnpm dev`, paste any URL → seed profile → confirm → the replay streams → all three tabs render → every citation opens its evidence.
-
-### Block 2 (20:00–23:30)
-- Drive **I5**: `providers.ts` switches to the live profile path (L1 + L3) and the `LiveRunner` (L3) with `STORE=file`. The UI runs a real store end to end.
-- Drive **I6**: record the first good real run into `fixtures/real/<store>/`, and make it selectable as a "demo store" chip.
-
-### Block 3 stack-ups (priority order)
-1. **Sentry** (first, it's cheap): `@sentry/node` ≥ 10.28 (tracing, `openAIIntegration()`, logs, spans per stage/provider via `packages/telemetry`) + `@sentry/react` (tracing, Session Replay). Keep `recordInputs/recordOutputs` off outside dev. Write down one real thing Sentry revealed, for the demo.
-2. Domain (GoDaddy Registry) + HTTPS + serve `/ucp/agent-profile.json`, then give L1 the URL for `SHOPIFY_UCP_AGENT_PROFILE_URL`.
-3. Actions UI (Draft → edit → approve → copy / send-to-Composio) once L3's handler exists.
-4. `FEATURE_EXPLORER`: evidence table with filters + Markdown export of the report.
-5. Visual polish pass: empty states, loading skeletons, mobile width.
-
-### Block 4
-Own `docs/DEMO_SCRIPT.md`, the demo laptop, and the backup MP4 (recorded from a replay). Assemble the Devpost page (screenshots, architecture image, sponsor sections written by each lane).
-
-### Do not
-Call vendor APIs from the browser · put secrets in `VITE_*` (except the Sentry DSN) · block any UI work on live data (replay exists for this).
-
----
-
-## 8. Block 2 — integration sequence (20:00–23:30)
-
-Each swap replaces **one** fixture stage with its live stage. If a swap fails, flip its flag back (`--fake <stage>` or the provider env var) and keep going. Nobody else stalls.
-
-| Swap | Driver (+ support) | Command | Pass criteria | If it fails |
-| --- | --- | --- | --- | --- |
-| **I1** Profile live | L1 (+ L3) | `pnpm collect:profile <url> --out .data/dev/<slug>` then `pnpm reason:profile --raw .data/dev/<slug>/raw-signals.json --out .data/dev/<slug>` | Valid profile in < 30 s; badge and categories look right | Hand-edit `profile.json`; continue |
-| **I2** Plan → discover → collect live | L1 (+ L3) | `pnpm pipeline:run --run-dir .data/dev/<slug> --until collect` | ≥ 10 candidates, ≥ 80 evidence, ≥ 1 session, < 150 s | `--fake discover` with the L1 real fixture |
-| **I3** Enrich → resolve → score live | L2 | `pnpm pipeline:run --run-dir .data/dev/<slug> --from enrich --until score` | ≥ 90% enrichment ok; ≥ 3 theme clusters; every candidate scored | `ENRICH_PROVIDER=openai` or `--fake enrich` |
-| **I4** Synthesize → verify → assemble live | L3 | `pnpm pipeline:run --run-dir .data/dev/<slug> --from synthesize` | Every section `ready`/`partial`; `citationCoverage = 1.0` | Retry per section; ship `partial` |
-| **I5** Server on the live runner | L4 (+ L3) | `RUNNER=live STORE=file pnpm dev` → UI flow on a real store | Browser shows live view, sections arrive, report renders | `RUNNER=replay` for the demo |
-| **I6** Record | L4 (+ L1) | Copy `.data/runs/<runId>` → `fixtures/real/<slug>/`; `pnpm fixtures:check` | Replays identically; chip added in UI | Keep the seed as the demo fallback |
-
-**M2 (23:30):** I1–I6 pass for at least one real store. Only then does anyone start a stack-up.
-
----
-
-## 9. Block 3 — stack-up menu (choose at M2, 23:30–04:00)
-
-Every stack-up is flag-gated and lives inside one lane, so they can be built in parallel and dropped independently.
-
-| Stack-up | Lane | Est | Prize | Needs |
-| --- | --- | --- | --- | --- |
-| Sentry tracing + AI monitoring + logs + replay | L4 | 1 h | Sentry | — |
-| Actions: drafts + approval UI | L3 + L4 | 2 h | Rox, Shopify | M2 |
-| Composio Gmail draft | L3 | 1 h | Composio, Rox | Actions |
-| Baseten distillation | L2 | 3 h | Baseten | Real enrich data, L3 `Reasoner` |
-| GPTZero authenticity + report check | L2 | 1.5 h | GPTZero | GPTZero key |
-| Capture replay/screenshot polish | L1 | 1 h | Browserbase | M2 |
-| Competitor policies extraction | L1 | 1.5 h | Shopify, Browserbase | M2 |
-| Ask the evidence | L3 (+ L4 panel) | 2 h | Rox, OpenAI | `selectBundle` |
-| Evidence explorer + Markdown export | L4 | 1.5 h | Polish | — |
-| Domain + HTTPS + UCP agent profile | L4 | 45 m | MLH GoDaddy, Shopify | Deploy |
-| Pg stores + hosted DB | L2 | 2 h | MLH Tiger Data (with trends) | — |
-
-**Recommended picks:** Sentry, Actions, Baseten distillation, capture polish, domain. Add GPTZero and Ask if time remains.
-
----
-
-## 10. Block 4 — freeze duties (04:00–08:00)
-
-| Time | Everyone | L1 | L2 | L3 | L4 |
-| --- | --- | --- | --- | --- | --- |
-| 04:00 **feature freeze** | Bug fixes only; flags for anything unfinished → `false` | Pick the live-demo store + fallback | Baseten numbers | Prompt versions frozen | Record 3 demo runs (coffee, skincare, outdoor) |
-| 05:00 | Full rehearsal ×2 against `DEMO_SCRIPT.md` | Narrate live browsing | Narrate Baseten | Narrate citations + Codex | Drive |
-| 06:00 **code freeze** | Tag `demo-final`; deploy | — | — | — | Deploy + smoke test the public URL |
-| 06:00–07:00 | Write your sponsor section in the Devpost draft | Browserbase + Shopify | Baseten (+ GPTZero) | OpenAI + Rox | Backup MP4, screenshots, architecture image |
-| 07:30 | **Submit** | | | | |
-
----
-
-## 11. Working agreements
-
-### 11.1 Git
-- `main` is always green (CI: typecheck + tests + fixture validation).
-- Branches: `l1/<topic>`, `l2/<topic>`, `l3/<topic>`, `l4/<topic>`. Aim for PRs under 300 lines; squash-merge.
-- **Self-merge is fine** when CI is green and you only touched directories you own.
-- Pull `main` at least every 2 hours.
-- Never commit `.env`, `.data/`, or raw personal data.
-- One worktree per running agent, as a short sibling path (`../htn-<card-id>`); run `pnpm install` in each.
-- Dependencies are changed only by a human, in a separate small PR to `main` that touches `package.json` / `pnpm-workspace.yaml` / `pnpm-lock.yaml` and nothing else. Everyone pulls and reinstalls after it merges.
-- Run `pnpm format` before committing; CI fails on `pnpm format:check`.
-
-### 11.2 Ownership (`CODEOWNERS`)
-
-```text
-/packages/collect/    @lane1
-/packages/enrich/     @lane2
-/packages/db/         @lane2
-/ml/                  @lane2
-/packages/reason/     @lane3
-/packages/pipeline/   @lane3
-/apps/                @lane4
-/packages/telemetry/  @lane4
-/packages/contracts/  @lane1 @lane2 @lane3 @lane4
-/packages/core/       @lane1 @lane2 @lane3 @lane4
-/fixtures/seed/       @lane1 @lane2 @lane3 @lane4
-```
-
-Replace the `@laneN` placeholders with GitHub handles.
-
-### 11.3 Contract changes (after M0)
-- **Additive** (new optional field, new enum value that consumers can ignore): one PR that updates the schema **and** your seed fixture. Post `CONTRACT +<Type>.<field>` in the team channel. Bump `SCHEMA_VERSION` minor. Merge after one ack or 10 minutes of silence.
-- **Breaking** (rename, remove, type change): stop, have a 5-minute huddle, then one PR that updates the contract, every fixture, and every consumer, and bumps major. **Avoid after M1.**
-- LLM output schemas inside `packages/reason` and `packages/enrich/prompts` are **internal**, not contracts.
-
-### 11.4 Fixtures
-- `fixtures/seed/` is hand-maintained; `fixtures/real/` holds recorded runs, committed only after `pnpm fixtures:check`.
-- Round embedding vectors to 4 decimals; keep any single fixture file under ~5 MB.
-- No secrets and no raw author names or handles in fixtures.
-
-### 11.5 Codex log (OpenAI prize)
-After any meaningful Codex assist, add one row to `docs/CODEX_LOG.md`: time, lane, task, what Codex did, outcome (including when it was wrong and how you caught it). L3 curates it in Block 4.
-
-### 11.6 Status messages
-Post in the team channel when your state changes, in this format:
-`L2 ✅ enrich live on fixtures/real/lune-coffee · ⏭ resolve clustering · ⛔ none`
-
----
-
-## 12. When you're blocked
-
-| Situation | Do this |
+| L1 Catalog & Evidence | Every suggested item is a real, correctly identified offer | Shopify/Browserbase adapters, variant facts, evidence, merchant catalog | shopper media intake and product tiles |
+| L2 Matching & Demand | Collections obey constraints; counts represent actual consented choices | match engine, attribute normalization, ledger projections, cohort aggregation, supply mapping | none; provides typed fixtures to both UIs |
+| L3 Intent & Experience | Both domains yield an understandable shopper experience | vision/text intent, query plans, orchestration, explanation and proposal prompts | shopper brief editor and collection workspace |
+| L4 Platform & Merchant | A reliable two-sided application with private data boundaries | sessions, uploads, routes, persistence adapters, wiring, deployment | shell, merchant opportunities and proposal editor |
+
+L4 no longer builds every screen. L1 owns reusable media/product components; L3 owns the shopper
+workspace; L4 owns the merchant workspace. L2 starts on fixture-driven matching immediately and
+does not wait for vision or catalog. L1's merchant profiler reuses the catalog normalizer. L3's
+proposal prompt reuses evidence rendering; no new generic report engine. If overloaded, move an
+entire unstarted card with its Edit paths and tests to a named helper; never have two agents edit it.
+
+## 2. Exact path ownership
+
+| Owner | Paths |
 | --- | --- |
-| You need another lane's output and it isn't ready | Use the seed or latest `fixtures/real/` file. If a case you need is missing, **add it to the seed fixture yourself** (additive) and tell the owner |
-| A provider key or limit fails | Switch that provider to `fake`, post the error, and have the lane owner go to the sponsor booth |
-| The contract doesn't fit your need | Additive change per §11.3; never fork types locally |
-| An integration swap fails | Flip that stage back to fixture; others stay live; the driver fixes it on a branch |
-| Stuck on a bug for > 30 minutes | Ask a teammate, Codex (log it), or a sponsor mentor. Don't sink an hour alone |
-| Two lanes both need a change in `core/` | The lane that owns that `core/src/<file>.ts` makes it within 15 minutes |
+| L1 | `packages/collect/**`; `apps/web/src/features/shopper/media/**`; `apps/web/src/features/shopper/products/**`; matching tests colocated there |
+| L2 | `packages/enrich/**`; `packages/db/**`; `ml/**` (optional only) |
+| L3 | `packages/reason/**`; `packages/pipeline/**`; `apps/web/src/features/shopper/brief/**`; `apps/web/src/features/shopper/collection/**`; `docs/CODEX_LOG.md` |
+| L4 | remaining `apps/**`; `packages/telemetry/**`; root configuration; `evals/**` |
 
----
+Shared files have one editor: contracts/intent.ts L3; shopping.ts L1 with L2 review; demand.ts L2;
+opportunity.ts L3; api.ts and common.ts L4. Core shopping.ts L3 (interface coordinator), categories.ts
+L3, demand.ts L2, milestones.ts L4. Each lane owns its fixture files; contract PR coordinator
+registers fixture schemas once. CODEOWNERS orders UI exceptions after broad apps ownership.
 
-## 13. Check-ins (15 minutes max each)
+## 3. S0 foundation and provider spikes (first 60–90 minutes)
 
-| When | Agenda |
+The bootstrap revision supplies the initial schemas, category registry, interfaces, synthetic
+fixtures and presets. Review those together before dispatching cards; do not retranscribe v2.
+
+| Human pair | Spike | Recorded output and stop condition |
+| --- | --- | --- |
+| L1 + L3 | Global Catalog: one query per domain, variants/sellers/media/filter shapes | redacted outfit/setup responses; stop guessing fields if unavailable; use verified storefront fallback |
+| L3 | Vision + strict JSON on one permitted image per domain | model ID, latency, valid/invalid outputs; correction UX remains required |
+| L2 | Baseten normalization on both shortlists | selected model slug and responses; deterministic fallback if quality/access fails |
+| L1 + L4 | Static fetch vs browser evidence and account quota | one factual capture; no dependency on many live browser tiles |
+| L4 + L1 | Upload decoding/normalization with installed libraries | prove malformed-image rejection and metadata removal; missing library is a human dependency change |
+| L4 | Session + file-store deployment and demo domain | owner access boundary; no open private asset routes |
+
+No coding agent makes a live provider call. Save only permitted, redacted examples. No API keys,
+personal uploads, or real shopper event dumps in fixtures. Check the actual submission time and
+prize rules with the event guide; old deadline/prize claims are not authoritative.
+
+## 4. Parallel schedule and handoffs
+
+| Relative block | L1 | L2 | L3 | L4 |
+| --- | --- | --- | --- | --- |
+| 0–1.5 h | catalog/media spike | matcher fixtures, normalize spike | intent spike, contract review | session/upload spike, contract review |
+| 1.5–4 h | S1 media component; S2 provider | S2 matcher against fixtures | S1 intent/editor; S2 query plan | S1 private assets/routes/shell |
+| 4–7 h | S2 product evidence + tiles | S2 finish; S3 projection | S2 orchestration/workspace | S2 integration + decision/consent route skeleton |
+| 7–10 h | S4 merchant catalog | S3 aggregates + S4 supply mapping | S3 feedback UX; S4 proposal prompt | S3 privacy/deletion + merchant UI using fixtures |
+| 10–13 h | both-domain quality fixes | aggregate adversarial checks | S4 full journey and explanations | S4 integration/deploy |
+| remaining protected time | verify products | verify counts | rehearse storyline | backup recording/submission |
+
+These are planning estimates, not promises. Reserve at least the final three hours for live checks,
+rehearsal and submission. S5 only if S1–S4 are green with >=3 hours before feature freeze and its
+Admin API spike has already passed. If time is shorter, cut S5, elaborate reranking, visual graph,
+and image regions. Do not cut one domain or label synthetic cohorts as real to claim completion.
+
+## 5. Work agreements
+
+- One worktree per running agent; no automatic commits or PRs required by this plan. Use the
+  repository branch convention, and explicit card ID in any commit message.
+- Only card Edit paths. The user-authorized `REVAMP-0` is a one-time cross-lane docs/bootstrap
+  migration, scoped in BOOTSTRAP_STATUS.md; it does not authorize provider calls/dependency edits.
+- Shared schema changes are additive and land with fixtures before dependent cards. One brief
+  joint review, not a promised 15-minute turnaround during every milestone.
+- Public exports go through package index.ts; siblings use injected core interfaces. Preserve
+  existing package imports/dependencies. No model/provider types leak into browser contracts.
+- Use bounded card agents as useful, but human attention—not agent count—limits concurrency.
+  Different files are insufficient isolation if the cards disagree on an evolving contract.
+- Notify the integration captain (L4) on schema or API changes. L3 coordinates shared interfaces.
+- Each handoff includes input/output fixture paths, exported function/type names, failure cases,
+  Accept output, and the next human check. “Tests pass” without this does not close a card.
+
+## 6. Integration sequence
+
+1. L4 mounts fake-backed route and UI slices; L1/L3 wire components against the same DTO fixtures.
+2. Human verifies intent for **both** domains, then swaps vision only.
+3. Human verifies seller/variant mapping for both, then swaps catalog only.
+4. Human checks constraint outcomes, then enables matching/explanations.
+5. Enable decision ledger; exercise duplicates, revision conflicts, opt-out, withdrawal and deletion.
+6. Enable merchant aggregates and opportunities on labeled synthetic data, then eligible real data.
+7. New merchant mapping must say inferred when there is no observed pair support.
+8. Record both domains, switch all providers to replay and verify replay cannot enter live counts.
+
+## 7. Quality ownership and acceptance
+
+L1 checks factual validity and variant identity. L2 checks constraints/counts/deduplication. L3
+checks visual interpretation and factual support in copy. L4 checks private-data boundaries and
+both UI journeys. Each person reviews another lane's primary output once before release.
+
+Every card: targeted tests + `pnpm typecheck` + `pnpm format` + `pnpm format:check`. Milestone
+integration: `pnpm fixtures:check`, `pnpm test`, and the explicit milestone suite once implemented.
+The root `milestone:check` script currently permits missing tests; use `pnpm exec vitest run
+--project milestones --passWithNoTests=false <suite-path>` as the required non-vacuous gate.
+S0 is bootstrap only; passing presets is not passing S1–S5. Human live checks are separately recorded.
+
+## 8. Scope boundaries
+
+The original competitor/discourse/SWOT, browser-grid, distillation, database and sponsor-add-on
+cards are archived. They are not spare work for an idle lane. An idle lane first improves the
+other lane's fixtures, checks both domains, or helps integration through an explicitly reassigned
+card. Keep consent, provenance, revision validity and unknown constraints in the minimum product.
+
+## 9. Runtime failure decisions
+
+| Failure | Decision |
 | --- | --- |
-| **M0** Sat 13:30 | Contracts frozen? Spike outcomes: Global Catalog access, Stagehand shapes, tagger model, BEI status, OpenAI models. Adjust fallbacks |
-| **M1** Sat 20:00 | Each lane runs its M1 exit command live. Confirm the swap order and drivers for Block 2 |
-| **M2** Sat 23:30 | End-to-end demo on a real store. Pick stack-ups (§9). Set sleep rotation (≥ 2 awake at all times) |
-| **Pre-freeze** Sun 03:45 | What's in, what's flagged off, which stores we demo |
-| **Code freeze** Sun 06:00 | Final deploy verified; Devpost sections assigned |
+| Vision unavailable | user writes/edits brief; clearly label image analysis unavailable |
+| Catalog access fails | verified public storefront discovery fallback; never pretend seed is live |
+| No complete collection | partial result with exact missing slots/constraints |
+| Baseten unavailable | deterministic matching/normalization path; no custom deployment detour |
+| Fewer than threshold consented sessions | insufficient evidence; separate synthetic demonstration |
+| Withdrawal/deletion | immediately invalidate impacted aggregate reads; recompute before serving |
+| S4 behind schedule | swarm the two-sided loop, not optional Shopify write-back |
+
+## 10. Documentation and demo ownership
+
+L3 curates the actual coding-assist log. L4 keeps DEMO_SCRIPT.md and BOOTSTRAP_STATUS.md accurate.
+Log measured outcomes, including failures. Do not claim a sponsor award requirement or eligibility
+without confirming current rules. Demonstrate the consumer-to-merchant connection equally for both
+categories; explain which data is synthetic and which observations are real.
+
+## 11. Compatibility
+
+### 11.1 Integration captain
+
+L4 owns composition root and integration, L3 owns interface coordination. Each lane merges only
+reviewed cards. Revert a failed adapter to fake in demo configuration, not by silently mixing data.
+
+### 11.2 Ownership
+
+See §2 and CODEOWNERS. Subdirectory exceptions are intentional and supersede broad apps ownership.
+
+### 11.3 Contract evolution
+
+Preserve common exports and legacy `m1`–`m5` definitions. New `s1`–`s5` identify this plan without
+silently changing private `.env` meanings. Do not mix families. New schemas are additive; future
+changes preserve stored fixture compatibility or include an explicit versioned migration.
+
+### 11.4 Human-only actions
+
+Provider credentials, initial live calls, deployment secrets, semantic quality judgments, real user
+research, final writes to external stores and final submission remain human tasks.
+
+### 11.5 Log
+
+Record meaningful work in `docs/CODEX_LOG.md`: time, lane, card, assistance, measured outcome.

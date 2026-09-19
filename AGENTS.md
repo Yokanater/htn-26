@@ -1,11 +1,11 @@
 # AGENTS.md
 
-**Shopify Ecosystem Intelligence** (`@sei/*`): a merchant pastes a Shopify store URL; the pipeline
-discovers complementary Shopify brands (Shopify Global Catalog + Browserbase), collects quotable
-evidence, tags and scores it (Baseten), and writes a report where every claim cites captured
-evidence (OpenAI). Specs: [design doc](docs/SHOPIFY_ECOSYSTEM_INTELLIGENCE_DESIGN.md) ("design §N"),
-[team split](docs/TEAM_WORK_SPLIT.md) ("split §N"), [milestones + cards](docs/milestones/README.md).
-Read the design sections your card cites before writing code.
+**Shopify Intent Studio** (`@sei/*`): shoppers upload outfit or room/setup inspiration, confirm
+their requirements, and match real products across Shopify stores. With explicit consent, their
+choices produce aggregate demand evidence for current and newly arriving merchants' collaboration
+proposals. Both domains are equally required. Specs: [design v3](docs/SHOPIFY_ECOSYSTEM_INTELLIGENCE_DESIGN.md),
+[team split](docs/TEAM_WORK_SPLIT.md), [active S1–S5 cards](docs/milestones/README.md).
+Archived M1–M5 cards are historical only. Read your card's cited design sections before coding.
 
 ## Commands (run from the repo root)
 
@@ -16,7 +16,7 @@ Read the design sections your card cites before writing code.
 | `pnpm test` | All tests: `node`, `milestones`, `web` (jsdom) Vitest projects |
 | `pnpm vitest run <path>` | One test file, e.g. `pnpm vitest run packages/collect/test/policy.test.ts` |
 | `pnpm fixtures:check` | Validate every `fixtures/**/*.json` against `@sei/contracts` |
-| `pnpm milestone:check <m>` | Milestone check, e.g. `pnpm milestone:check m1` (`evals/milestones/<m>.test.ts`) |
+| `pnpm milestone:check <m>` | Milestone check, active suites `evals/milestones/s<N>.test.ts`; see non-vacuous gate below |
 | `pnpm format` | Biome: format, organize imports, safe lint fixes. **Run before every commit** |
 | `pnpm format:check` | What CI runs (format + lint) |
 | `pnpm dev` | Server on `PORT` (8787) + web on `WEB_PORT` (5173, proxies `/api`). Humans only |
@@ -26,6 +26,7 @@ CI (`.github/workflows/ci.yml`) runs `install --frozen-lockfile`, `typecheck`, `
 ## Rules
 
 - **Edit only the paths listed on your card** (its `Edit:` line). Anything else is read-only.
+  The user-authorized REVAMP-0 docs/bootstrap migration is scoped in `docs/BOOTSTRAP_STATUS.md`.
 - **Never make live API calls.** No Browserbase, OpenAI, Baseten, Shopify, Sentry, or GPTZero calls
   from tests, scripts, or "quick checks". Tests use fakes plus recorded responses in
   `fixtures/spikes/`. Only humans run live smoke commands: Browserbase session limits and API
@@ -47,18 +48,19 @@ CI (`.github/workflows/ci.yml`) runs `install --frozen-lockfile`, `typecheck`, `
 **Definition of done:** Accept passes · `pnpm typecheck` passes · `git diff --stat main` touches
 only your card's Edit paths · new behavior is behind the milestone's flag · `pnpm format` was run.
 
-## Lane ownership (split §11.2, `CODEOWNERS`)
+## Lane ownership (team split §2, CODEOWNERS)
 
 | Lane | Owns |
 | --- | --- |
-| L1 Collection | `packages/collect/` |
-| L2 Intelligence | `packages/enrich/`, `packages/db/`, `ml/` |
-| L3 Reasoning & Pipeline | `packages/reason/`, `packages/pipeline/`, curates `docs/CODEX_LOG.md` |
-| L4 Product & Platform | `apps/`, `packages/telemetry/`, root config, `evals/milestones/` |
-| Shared (all lanes) | `packages/contracts/`, `packages/core/`, `fixtures/seed/` |
+| L1 Catalog & Evidence | `packages/collect/`; web `features/shopper/media/` and `products/` |
+| L2 Matching & Demand | `packages/enrich/`, `packages/db/`, `ml/` |
+| L3 Intent & Experience | `packages/reason/`, `packages/pipeline/`; web `features/shopper/brief/` and `collection/`; `docs/CODEX_LOG.md` |
+| L4 Platform & Merchant | remaining `apps/`, `packages/telemetry/`, root config, `evals/` |
+| Shared | `packages/contracts/`, `packages/core/`, `fixtures/seed/`; one editor per file as named in its header |
 
-Inside the shared packages each file has one owner, named in its header comment
-(e.g. `contracts/src/collect.ts` is L1's, `core/src/store.ts` is L2's).
+Merchant DTOs never expose raw shopper uploads, text, session IDs or event records. Consent is
+separate from matching. Model suggestions, seeds and replay never count as live observed demand.
+All milestones require both outfit and setup cases. Presets/tests are not implementation evidence.
 
 ## Package boundaries (enforced)
 
@@ -113,7 +115,7 @@ Packages may import only the workspace packages declared in their `package.json`
 
 - Server: `PORT` (default 8787). Web dev: `WEB_PORT` (default 5173), proxies `/api` →
   `http://localhost:${PORT}`. Health: `GET /healthz` and `GET /api/healthz` → `{ ok: true }`.
-- Env lives in the repo-root `.env` (copy `.env.example`). `MILESTONES=m1,m2` picks a preset;
+- Env lives in the repo-root `.env` (copy `.env.example`). `MILESTONES=s1,s2` picks a preset;
   `FEATURE_X=true|false` overrides it; empty follows the preset.
 - Running several worktrees? Give each its own `PORT` / `WEB_PORT`.
 
@@ -129,3 +131,10 @@ Packages may import only the workspace packages declared in their `package.json`
 One git worktree per running agent: `git worktree add ../htn-<card-id> -b <lane>/<card-id>`.
 Log meaningful Codex assists in `docs/CODEX_LOG.md` (`| Time | Lane | Card | What Codex did |
 Outcome |`).
+
+## Active milestone acceptance
+
+The root milestone script allows no tests. Until a human changes that script, use
+`pnpm exec vitest run --project milestones --passWithNoTests=false evals/milestones/s<N>.test.ts`
+for a feature milestone. Bootstrap uses `evals/milestones/bootstrap.test.ts` and does not claim S1–S5.
+Legacy m-presets retain their old meaning; never mix them with s-presets. No private `.env` is edited.

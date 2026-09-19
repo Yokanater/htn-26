@@ -6,6 +6,21 @@
 /packages/pipeline/   @lane3
 /apps/                @lane4
 /packages/telemetry/  @lane4
+/evals/               @lane4
 /packages/contracts/  @lane1 @lane2 @lane3 @lane4
-/packages/core/       @lane1 @lane2 @lane3 @lane4
+/packages/core/        @lane1 @lane2 @lane3 @lane4
 /fixtures/seed/       @lane1 @lane2 @lane3 @lane4
+# Last matching pattern wins: split the two frontends across three lanes.
+/apps/web/src/features/shopper/media/       @lane1
+/apps/web/src/features/shopper/products/    @lane1
+/apps/web/src/features/shopper/brief/       @lane3
+/apps/web/src/features/shopper/collection/  @lane3
+/packages/contracts/src/intent.ts          @lane3
+/packages/contracts/src/shopping.ts        @lane1
+/packages/contracts/src/demand.ts          @lane2
+/packages/contracts/src/opportunity.ts     @lane3
+/packages/contracts/src/api.ts             @lane4
+/packages/core/src/shopping.ts             @lane3
+/packages/core/src/demand.ts               @lane2
+/packages/core/src/categories.ts           @lane3
+/packages/core/src/milestones.ts           @lane4
