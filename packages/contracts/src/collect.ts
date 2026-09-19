@@ -1,12 +1,6 @@
-/**
- * @sei/contracts: collection contracts. Owner: L1 (Collection).
- *
- * Transcribe into Zod schemas + inferred types in Step 0 (split §3.2), mirroring design exactly:
- * - §4.1: ShopifySignal, ShopifySignals, ProductSummary, RawStoreSignals
- * - §4.2: CatalogProduct, SearchHit, Candidate, DiscoveryResult
- * - §4.3: Capture, Source, EvidenceKind, Evidence, CollectionBatch
- *
- * Convention: export `FooSchema` (Zod) and `type Foo = z.infer<typeof FooSchema>`.
- * Money and SourceType come from ./common. Additive-only after M0 (split §11.3).
+/** Reserved collect module from the v2 bootstrap; no runtime implementation yet.
+ * Follow design v3 and active S1–S5 cards. Shared intent-loop contracts/ports are in
+ * intent/shopping/demand/opportunity (contracts) and shopping/demand (core).
+ * Do not transcribe the archived report-first specification into this placeholder.
  */
 export {};

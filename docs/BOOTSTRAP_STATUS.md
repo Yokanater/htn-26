@@ -33,5 +33,23 @@ matching quality require human spikes in both domains. No live API call is perfo
 
 ## Validation
 
-Pending the bootstrap implementation. Replace this paragraph with measured commands/results;
-do not infer feature completion from presets or schema tests.
+Completed offline on 2026-09-19. No live providers were called.
+
+| Command | Observed output |
+| --- | --- |
+| `pnpm typecheck` | `pnpm -r exec tsc --noEmit` — exit 0 |
+| `pnpm test` | `Test Files 10 passed (10); Tests 108 passed (108)` |
+| `pnpm fixtures:check` | `Test Files 3 passed (3); Tests 66 passed (66)` |
+| `pnpm exec vitest run --project milestones --passWithNoTests=false evals/milestones/bootstrap.test.ts` | `Test Files 1 passed (1); Tests 3 passed (3)` |
+| `pnpm format` / `pnpm format:check` | `Checked 78 files. No fixes applied.` on final pass |
+| `pnpm --filter @sei/web build` | `2019 modules transformed; built in 3.25s` |
+| `git diff --check` | exit 0, no whitespace errors |
+
+Initial typecheck caught two unparsed `response.json()` assertions; fixed using CapabilitiesSchema.
+Vitest initially could not write its config cache under the filesystem sandbox; the authorized
+rerun passed. These results validate the foundation only, not image matching or live market demand.
+
+Implemented exports: intent/offer/match/consent/event/aggregate/opportunity schemas, shopping/demand
+provider and store interfaces, equal-domain configuration, s-presets and capability metadata.
+Sixteen required JSON fixtures (eight per domain) validate without skips; the integration suite checks
+references, fictional provenance and the withdrawn-session fixture story. Actual projection is S3.

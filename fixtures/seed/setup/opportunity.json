@@ -1,0 +1,50 @@
+{
+  "id": "opp_setup_1",
+  "merchants": [
+    {
+      "id": "mer_setup_1",
+      "name": "Synthetic setup brand 1",
+      "domain": "setup-brand-1.example"
+    },
+    {
+      "id": "mer_setup_2",
+      "name": "Synthetic setup brand 2",
+      "domain": "setup-brand-2.example"
+    }
+  ],
+  "basis": "observed_pair",
+  "demand": {
+    "aggregateId": "agg_setup_1",
+    "aggregateVersion": 1,
+    "cohort": {
+      "domain": "setup",
+      "country": "CA",
+      "currency": "CAD",
+      "categories": [
+        "desk",
+        "lighting"
+      ]
+    },
+    "windowStart": "2026-08-20T12:00:00Z",
+    "windowEnd": "2026-09-19T12:15:00Z",
+    "sampleOrigin": "seed",
+    "status": "available",
+    "minimumSessions": 5,
+    "eligibleSessions": {
+      "min": 5,
+      "max": 9
+    }
+  },
+  "observedPairSupport": {
+    "min": 5,
+    "max": 9
+  },
+  "productEvidenceIds": [
+    "ev_setup_1",
+    "ev_setup_2"
+  ],
+  "proposedExperiment": "Test an opt-in co-curated collection with participating merchants",
+  "uncertainties": [
+    "Synthetic cohort; no actual market demand or merchant agreement demonstrated"
+  ]
+}

@@ -1,8 +1,4 @@
-/**
- * @sei/db: public entry point. Owner: L2 (Intelligence).
- *
- * Drizzle schema + migrations, PgRunStore / PgEvidenceStore / PgVectorIndex, selected with
- * STORE=pg (the file store stays the default). Design §10.1; slot IS-PG.
- * Allowed workspace imports: @sei/contracts, @sei/core.
+/** @sei/db. Owner: L2. Design v3: optional transactional stores; file storage ships first.
+ * Bootstrap placeholder. Implement active S1–S5 cards against @sei/core interfaces.
  */
 export {};

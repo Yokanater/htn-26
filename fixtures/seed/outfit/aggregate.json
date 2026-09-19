@@ -1,0 +1,26 @@
+{
+  "id": "agg_outfit_1",
+  "version": 1,
+  "cohort": {
+    "domain": "outfit",
+    "country": "CA",
+    "currency": "CAD",
+    "categories": [
+      "bag",
+      "top"
+    ]
+  },
+  "windowStart": "2026-08-20T12:00:00Z",
+  "windowEnd": "2026-09-19T12:15:00Z",
+  "sampleOrigin": "seed",
+  "eligibleSessions": 6,
+  "pairs": [
+    {
+      "merchantIds": [
+        "mer_outfit_1",
+        "mer_outfit_2"
+      ],
+      "supportingSessions": 6
+    }
+  ]
+}

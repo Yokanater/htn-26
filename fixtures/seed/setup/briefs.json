@@ -1,0 +1,324 @@
+[
+  {
+    "id": "brief_setup_1",
+    "domain": "setup",
+    "revision": 1,
+    "status": "confirmed",
+    "input": {
+      "kind": "text",
+      "text": "Synthetic setup inspiration: neutral coordinated items"
+    },
+    "slots": [
+      {
+        "id": "slot_setup_1",
+        "category": "desk",
+        "description": "desk matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": [
+          {
+            "kind": "dimension",
+            "axis": "width",
+            "maxCm": 120
+          }
+        ]
+      },
+      {
+        "id": "slot_setup_2",
+        "category": "lighting",
+        "description": "lighting matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": []
+      }
+    ],
+    "country": "CA",
+    "currency": "CAD",
+    "itemBudget": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "sampleOrigin": "seed",
+    "createdAt": "2026-09-19T12:00:00Z"
+  },
+  {
+    "id": "brief_setup_2",
+    "domain": "setup",
+    "revision": 1,
+    "status": "confirmed",
+    "input": {
+      "kind": "text",
+      "text": "Synthetic setup inspiration: neutral coordinated items"
+    },
+    "slots": [
+      {
+        "id": "slot_setup_1",
+        "category": "desk",
+        "description": "desk matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": [
+          {
+            "kind": "dimension",
+            "axis": "width",
+            "maxCm": 120
+          }
+        ]
+      },
+      {
+        "id": "slot_setup_2",
+        "category": "lighting",
+        "description": "lighting matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": []
+      }
+    ],
+    "country": "CA",
+    "currency": "CAD",
+    "itemBudget": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "sampleOrigin": "seed",
+    "createdAt": "2026-09-19T12:00:00Z"
+  },
+  {
+    "id": "brief_setup_3",
+    "domain": "setup",
+    "revision": 1,
+    "status": "confirmed",
+    "input": {
+      "kind": "text",
+      "text": "Synthetic setup inspiration: neutral coordinated items"
+    },
+    "slots": [
+      {
+        "id": "slot_setup_1",
+        "category": "desk",
+        "description": "desk matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": [
+          {
+            "kind": "dimension",
+            "axis": "width",
+            "maxCm": 120
+          }
+        ]
+      },
+      {
+        "id": "slot_setup_2",
+        "category": "lighting",
+        "description": "lighting matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": []
+      }
+    ],
+    "country": "CA",
+    "currency": "CAD",
+    "itemBudget": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "sampleOrigin": "seed",
+    "createdAt": "2026-09-19T12:00:00Z"
+  },
+  {
+    "id": "brief_setup_4",
+    "domain": "setup",
+    "revision": 1,
+    "status": "confirmed",
+    "input": {
+      "kind": "text",
+      "text": "Synthetic setup inspiration: neutral coordinated items"
+    },
+    "slots": [
+      {
+        "id": "slot_setup_1",
+        "category": "desk",
+        "description": "desk matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": [
+          {
+            "kind": "dimension",
+            "axis": "width",
+            "maxCm": 120
+          }
+        ]
+      },
+      {
+        "id": "slot_setup_2",
+        "category": "lighting",
+        "description": "lighting matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": []
+      }
+    ],
+    "country": "CA",
+    "currency": "CAD",
+    "itemBudget": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "sampleOrigin": "seed",
+    "createdAt": "2026-09-19T12:00:00Z"
+  },
+  {
+    "id": "brief_setup_5",
+    "domain": "setup",
+    "revision": 1,
+    "status": "confirmed",
+    "input": {
+      "kind": "text",
+      "text": "Synthetic setup inspiration: neutral coordinated items"
+    },
+    "slots": [
+      {
+        "id": "slot_setup_1",
+        "category": "desk",
+        "description": "desk matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": [
+          {
+            "kind": "dimension",
+            "axis": "width",
+            "maxCm": 120
+          }
+        ]
+      },
+      {
+        "id": "slot_setup_2",
+        "category": "lighting",
+        "description": "lighting matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": []
+      }
+    ],
+    "country": "CA",
+    "currency": "CAD",
+    "itemBudget": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "sampleOrigin": "seed",
+    "createdAt": "2026-09-19T12:00:00Z"
+  },
+  {
+    "id": "brief_setup_6",
+    "domain": "setup",
+    "revision": 1,
+    "status": "confirmed",
+    "input": {
+      "kind": "text",
+      "text": "Synthetic setup inspiration: neutral coordinated items"
+    },
+    "slots": [
+      {
+        "id": "slot_setup_1",
+        "category": "desk",
+        "description": "desk matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": [
+          {
+            "kind": "dimension",
+            "axis": "width",
+            "maxCm": 120
+          }
+        ]
+      },
+      {
+        "id": "slot_setup_2",
+        "category": "lighting",
+        "description": "lighting matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": []
+      }
+    ],
+    "country": "CA",
+    "currency": "CAD",
+    "itemBudget": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "sampleOrigin": "seed",
+    "createdAt": "2026-09-19T12:00:00Z"
+  },
+  {
+    "id": "brief_setup_7",
+    "domain": "setup",
+    "revision": 1,
+    "status": "confirmed",
+    "input": {
+      "kind": "text",
+      "text": "Synthetic setup inspiration: neutral coordinated items"
+    },
+    "slots": [
+      {
+        "id": "slot_setup_1",
+        "category": "desk",
+        "description": "desk matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": [
+          {
+            "kind": "dimension",
+            "axis": "width",
+            "maxCm": 120
+          }
+        ]
+      },
+      {
+        "id": "slot_setup_2",
+        "category": "lighting",
+        "description": "lighting matching the confirmed inspiration",
+        "required": true,
+        "visualAttributes": [
+          "neutral"
+        ],
+        "constraints": []
+      }
+    ],
+    "country": "CA",
+    "currency": "CAD",
+    "itemBudget": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "sampleOrigin": "seed",
+    "createdAt": "2026-09-19T12:00:00Z"
+  }
+]

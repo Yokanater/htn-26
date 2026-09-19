@@ -1,15 +1,6 @@
-/**
- * @sei/contracts: report contracts. Owner: L3 (Reasoning & Pipeline).
- *
- * Transcribe into Zod schemas + inferred types in Step 0 (split §3.2), mirroring design exactly:
- * - §4.5: Claim, CollaborationCandidate, CompetitorProfile, DiscourseTheme, SwotItem, SwotReport,
- *         RecommendedAction, SectionKey (open string union), ReportSection, EvidencePreview,
- *         Report, RunStats
- * - §4.7: VerificationResult, SynthesisInput, ActionKind, ActionRequest, ActionDraft, Approval,
- *         ActionResult
- *
- * Convention: export `FooSchema` (Zod) and `type Foo = z.infer<typeof FooSchema>`.
- * These are DOMAIN schemas; LLM output schemas (`.nullable()`, never `.optional()`) live in
- * packages/reason and packages/enrich/prompts. Additive-only after M0 (split §11.3).
+/** Reserved report module from the v2 bootstrap; no runtime implementation yet.
+ * Follow design v3 and active S1–S5 cards. Shared intent-loop contracts/ports are in
+ * intent/shopping/demand/opportunity (contracts) and shopping/demand (core).
+ * Do not transcribe the archived report-first specification into this placeholder.
  */
 export {};

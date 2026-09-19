@@ -1,0 +1,44 @@
+[
+  {
+    "sessionId": "sess_setup_1",
+    "version": 1,
+    "state": "granted",
+    "updatedAt": "2026-09-19T11:59:00Z"
+  },
+  {
+    "sessionId": "sess_setup_2",
+    "version": 1,
+    "state": "granted",
+    "updatedAt": "2026-09-19T11:59:00Z"
+  },
+  {
+    "sessionId": "sess_setup_3",
+    "version": 1,
+    "state": "granted",
+    "updatedAt": "2026-09-19T11:59:00Z"
+  },
+  {
+    "sessionId": "sess_setup_4",
+    "version": 1,
+    "state": "granted",
+    "updatedAt": "2026-09-19T11:59:00Z"
+  },
+  {
+    "sessionId": "sess_setup_5",
+    "version": 1,
+    "state": "granted",
+    "updatedAt": "2026-09-19T11:59:00Z"
+  },
+  {
+    "sessionId": "sess_setup_6",
+    "version": 1,
+    "state": "granted",
+    "updatedAt": "2026-09-19T11:59:00Z"
+  },
+  {
+    "sessionId": "sess_setup_7",
+    "version": 2,
+    "state": "withdrawn",
+    "updatedAt": "2026-09-19T12:10:00Z"
+  }
+]

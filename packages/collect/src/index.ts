@@ -1,9 +1,4 @@
-/**
- * @sei/collect: public entry point. Owner: L1 (Collection).
- *
- * URL safety + robots policy, Browserbase clients (Search / Fetch / Sessions + Stagehand),
- * Shopify profiler + fingerprint, Global Catalog client, source adapters, the `discover` and
- * `collect` stages, `createCollectStages(env)`, fakes that read fixtures/spikes/, CLIs.
- * Design §3.4, §5.0–§5.5, §6.1, §6.4. Allowed workspace imports: @sei/contracts, @sei/core.
+/** @sei/collect. Owner: L1. Design v3: catalog, public product evidence and merchant profiles.
+ * Bootstrap placeholder. Implement active S1–S5 cards against @sei/core interfaces.
  */
 export {};

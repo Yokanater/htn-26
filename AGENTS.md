@@ -33,14 +33,14 @@ CI (`.github/workflows/ci.yml`) runs `install --frozen-lockfile`, `typecheck`, `
   quotas are shared by the whole team.
 - **Never edit `package.json`, `pnpm-lock.yaml`, or `pnpm-workspace.yaml`.** Every known dependency
   is pre-installed. Need another one? Stop and ask your human; they add it in a separate PR to main.
-- **Contracts change only additively after M0** (new optional field or ignorable enum value), with
+- **Contracts change only additively after the bootstrap** (new optional field or ignorable enum value), with
   the seed fixture updated in the same commit. Never rename, remove, or retype (split §11.3).
 - **LLM output schemas use `.nullable()`, never `.optional()`** (OpenAI strict Structured Outputs).
   They are internal to `packages/reason` / `packages/enrich`; mappers convert them to contracts.
 - **No fixed ports in tests.** Test HTTP with `createApp().request('/path')` (Hono) or listen on
   port `0`. Never start `pnpm dev` from a test.
 - **Never commit secrets, `.env`, or `.data/`.** Only `.env.example` is committed.
-- **Commit messages start with the card ID**: `M1-L1-3: storefront profiler`.
+- **Commit messages start with the card ID**: `S2-L1-1: catalog and product evidence`.
 - New behavior sits behind its milestone's flag (`featureFlags(env)` from `@sei/core`).
 - **Before saying "done"**, run your card's Accept commands plus `pnpm typecheck` and paste the
   output.
@@ -79,7 +79,7 @@ Packages may import only the workspace packages declared in their `package.json`
 | `@sei/evals` (evals/) | everything above except web |
 
 - `reason` never imports `enrich` or `collect` (nor the reverse). Cross-lane calls such as
-  `selectBundle` or `createDraftBundleProduct` are passed in through `@sei/core` interfaces and
+  collection matching or merchant supply mapping are passed in through `@sei/core` interfaces and
   wired by `pipeline` or the server's composition root.
 - Always import by package name (`import { newId } from '@sei/contracts'`), **never** by relative
   path into another package (`../../core/src/...`); that bypasses the boundary check.
@@ -90,8 +90,8 @@ Packages may import only the workspace packages declared in their `package.json`
 
 - `@sei/contracts`: Zod schemas + inferred types (`FooSchema` + `type Foo`). `common.ts` has
   `SCHEMA_VERSION`, `ID_PREFIXES`, `newId(prefix)`, `idSchema(prefix)`, `MoneySchema`,
-  `SourceTypeSchema`. (Design §4 says `newId` comes from core; it lives in contracts.)
-- `@sei/core`: interfaces (design §3.5, §4.7) and `milestones.ts`: `MILESTONE_PRESETS`,
+  `SourceTypeSchema`. Active domain contracts: `intent.ts`, `shopping.ts`, `demand.ts`, `opportunity.ts`.
+- `@sei/core`: interfaces (design v3 §§3–6) and `milestones.ts`: `MILESTONE_PRESETS`,
   `resolveMilestones(env.MILESTONES)` → `{ milestones, sections, flags }`, `featureFlags(env)`.
 - Fixture validation registry: `packages/contracts/test/fixtures.test.ts` (`SCHEMAS` map; register
   your file names there when your schema lands).
@@ -128,7 +128,8 @@ Packages may import only the workspace packages declared in their `package.json`
 
 ## Working loop (milestones README §4.2)
 
-One git worktree per running agent: `git worktree add ../htn-<card-id> -b <lane>/<card-id>`.
+One git worktree per running agent: `git worktree add ../htn-<card-id> -b codex/<card-id>`.
+Use an explicitly assigned branch name when the human provides one.
 Log meaningful Codex assists in `docs/CODEX_LOG.md` (`| Time | Lane | Card | What Codex did |
 Outcome |`).
 

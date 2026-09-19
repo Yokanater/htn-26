@@ -1,9 +1,6 @@
-/**
- * @sei/core: telemetry interface. Owner: L4 (Product & Platform).
- *
- * Interface to write in Step 0 (split §3.2), mirroring design exactly:
- * - §3.5: Telemetry { span<T>(name, attrs, fn): Promise<T> }
- *
- * Interface only; noop / console / Sentry implementations live in @sei/telemetry (design §15).
+/** Reserved telemetry module from the v2 bootstrap; no runtime implementation yet.
+ * Follow design v3 and active S1–S5 cards. Shared intent-loop contracts/ports are in
+ * intent/shopping/demand/opportunity (contracts) and shopping/demand (core).
+ * Do not transcribe the archived report-first specification into this placeholder.
  */
 export {};

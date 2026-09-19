@@ -1,0 +1,26 @@
+{
+  "id": "agg_setup_1",
+  "version": 1,
+  "cohort": {
+    "domain": "setup",
+    "country": "CA",
+    "currency": "CAD",
+    "categories": [
+      "desk",
+      "lighting"
+    ]
+  },
+  "windowStart": "2026-08-20T12:00:00Z",
+  "windowEnd": "2026-09-19T12:15:00Z",
+  "sampleOrigin": "seed",
+  "eligibleSessions": 6,
+  "pairs": [
+    {
+      "merchantIds": [
+        "mer_setup_1",
+        "mer_setup_2"
+      ],
+      "supportingSessions": 6
+    }
+  ]
+}

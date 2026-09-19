@@ -1,16 +1,9 @@
-/**
- * @sei/core: milestone presets and feature flags. Owner: L4 (card M1-L4-0).
- *
- * Spec: docs/milestones/README.md §2 rule 3 and §3.
- * - `MILESTONES=m1,m2,m4` enables the union of those milestones' report sections and flags.
- * - An explicit `FEATURE_*=true|false` env var overrides the preset.
- * A new milestone or flag is an additive edit to MILESTONE_PRESETS; never change an existing entry.
- */
+/** Active S1–S5 presets (design v3); legacy M1–M5 meanings are preserved. Owner: L4. */
 
-export type MilestoneId = 'm1' | 'm2' | 'm3' | 'm4' | 'm5';
+export type MilestoneId = 'm1' | 'm2' | 'm3' | 'm4' | 'm5' | 's1' | 's2' | 's3' | 's4' | 's5';
 
 export interface MilestonePreset {
-  /** Report section keys this milestone adds (SectionKey values, design §4.5). */
+  /** Surface section keys this milestone configures; effective flags gate availability. */
   sections: string[];
   /** FEATURE_* flags this milestone turns on. */
   flags: string[];
@@ -32,14 +25,19 @@ export const MILESTONE_PRESETS: Record<MilestoneId, MilestonePreset> = {
   },
   m4: { sections: [], flags: ['FEATURE_ACTIONS', 'FEATURE_BUNDLE_STUDIO'], requires: ['m1'] },
   m5: { sections: [], flags: ['FEATURE_SHOPIFY_WRITEBACK'], requires: ['m4'] },
+  s1: { sections: ['intent'], flags: ['FEATURE_INTENT_CAPTURE'], requires: [] },
+  s2: { sections: ['collections'], flags: ['FEATURE_COLLECTION_MATCHING'], requires: ['s1'] },
+  s3: { sections: ['demand'], flags: ['FEATURE_DEMAND_LEDGER'], requires: ['s2'] },
+  s4: { sections: ['opportunities'], flags: ['FEATURE_MERCHANT_OPPORTUNITIES'], requires: ['s3'] },
+  s5: { sections: [], flags: ['FEATURE_DRAFT_ACTIVATION'], requires: ['s4'] },
 };
 
-export const DEFAULT_MILESTONES = 'm1';
+export const DEFAULT_MILESTONES = 's1';
 
 const MILESTONE_ORDER = Object.keys(MILESTONE_PRESETS) as MilestoneId[];
 
 export interface ResolvedMilestones {
-  /** Enabled milestones in canonical order (m1 → m5). */
+  /** Enabled milestones in canonical order within one plan family. */
   milestones: MilestoneId[];
   /** Union of enabled report sections, in preset order, deduplicated. */
   sections: string[];
@@ -53,7 +51,7 @@ function isMilestoneId(value: string): value is MilestoneId {
 
 /**
  * Parses a MILESTONES value such as `"m1,m2,m4"` (case- and whitespace-insensitive).
- * Empty or missing → `m1`. Throws on an unknown ID or a missing required milestone.
+ * Empty or missing → `s1`. Throws on an unknown ID or a missing required milestone.
  */
 export function resolveMilestones(
   value: string | undefined = DEFAULT_MILESTONES,
@@ -71,6 +69,10 @@ export function resolveMilestones(
     );
   }
 
+  if (requested.length === 0) throw new Error('MILESTONES must contain at least one milestone');
+  if (requested.some((id) => id.startsWith('m')) && requested.some((id) => id.startsWith('s'))) {
+    throw new Error('MILESTONES cannot mix legacy m-presets with active s-presets');
+  }
   const enabled = new Set(requested as MilestoneId[]);
   const missing = [...enabled].flatMap((id) =>
     MILESTONE_PRESETS[id].requires
@@ -110,6 +112,19 @@ export function featureFlags(env: EnvLike): Record<string, boolean> {
     if (value === 'true' || value === '1') flags[key] = true;
     else if (value === 'false' || value === '0') flags[key] = false;
     else throw new Error(`${key}="${rawValue}": expected true, false, 1, 0, or empty`);
+  }
+  const dependencies: Record<string, string | undefined> = {
+    FEATURE_INTENT_CAPTURE: undefined,
+    FEATURE_COLLECTION_MATCHING: 'FEATURE_INTENT_CAPTURE',
+    FEATURE_DEMAND_LEDGER: 'FEATURE_COLLECTION_MATCHING',
+    FEATURE_MERCHANT_OPPORTUNITIES: 'FEATURE_DEMAND_LEDGER',
+    FEATURE_DRAFT_ACTIVATION: 'FEATURE_MERCHANT_OPPORTUNITIES',
+  };
+  const isIntentPlan = resolveMilestones(env.MILESTONES).milestones[0]?.startsWith('s');
+  for (const [flag, required] of Object.entries(dependencies)) {
+    if (!flags[flag]) continue;
+    if (!isIntentPlan) throw new Error(`${flag} requires an active s-preset`);
+    if (required && !flags[required]) throw new Error(`${flag} requires ${required}`);
   }
   return flags;
 }

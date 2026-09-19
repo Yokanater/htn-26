@@ -1,11 +1,6 @@
-/**
- * @sei/core: reasoning interfaces. Owner: L3 (Reasoning & Pipeline).
- *
- * Interfaces to write in Step 0 (split §3.2), mirroring design exactly:
- * - §3.5: Reasoner (parse<T> with a Zod schema), SectionSynthesizer<T>, Verifier,
- *         ActionProvider (drafts are always human-approved)
- *
- * Interfaces only; implementations live in @sei/reason (and are injected elsewhere, so
- * @sei/enrich prompts run through Reasoner without importing @sei/reason).
+/** Reserved reason module from the v2 bootstrap; no runtime implementation yet.
+ * Follow design v3 and active S1–S5 cards. Shared intent-loop contracts/ports are in
+ * intent/shopping/demand/opportunity (contracts) and shopping/demand (core).
+ * Do not transcribe the archived report-first specification into this placeholder.
  */
 export {};

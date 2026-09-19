@@ -1,0 +1,345 @@
+[
+  {
+    "id": "match_outfit_1",
+    "briefId": "brief_outfit_1",
+    "briefRevision": 1,
+    "status": "ready",
+    "slots": [
+      {
+        "slotId": "slot_outfit_1",
+        "selectedOfferId": "offer_outfit_1",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_1"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "selectedOfferId": "offer_outfit_2",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_2"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      }
+    ],
+    "itemSubtotal": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "excludesShippingAndTax": true,
+    "warnings": [
+      "Synthetic fixture, not observed shopper demand"
+    ],
+    "sampleOrigin": "seed"
+  },
+  {
+    "id": "match_outfit_2",
+    "briefId": "brief_outfit_2",
+    "briefRevision": 1,
+    "status": "ready",
+    "slots": [
+      {
+        "slotId": "slot_outfit_1",
+        "selectedOfferId": "offer_outfit_1",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_1"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "selectedOfferId": "offer_outfit_2",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_2"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      }
+    ],
+    "itemSubtotal": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "excludesShippingAndTax": true,
+    "warnings": [
+      "Synthetic fixture, not observed shopper demand"
+    ],
+    "sampleOrigin": "seed"
+  },
+  {
+    "id": "match_outfit_3",
+    "briefId": "brief_outfit_3",
+    "briefRevision": 1,
+    "status": "ready",
+    "slots": [
+      {
+        "slotId": "slot_outfit_1",
+        "selectedOfferId": "offer_outfit_1",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_1"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "selectedOfferId": "offer_outfit_2",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_2"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      }
+    ],
+    "itemSubtotal": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "excludesShippingAndTax": true,
+    "warnings": [
+      "Synthetic fixture, not observed shopper demand"
+    ],
+    "sampleOrigin": "seed"
+  },
+  {
+    "id": "match_outfit_4",
+    "briefId": "brief_outfit_4",
+    "briefRevision": 1,
+    "status": "ready",
+    "slots": [
+      {
+        "slotId": "slot_outfit_1",
+        "selectedOfferId": "offer_outfit_1",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_1"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "selectedOfferId": "offer_outfit_2",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_2"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      }
+    ],
+    "itemSubtotal": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "excludesShippingAndTax": true,
+    "warnings": [
+      "Synthetic fixture, not observed shopper demand"
+    ],
+    "sampleOrigin": "seed"
+  },
+  {
+    "id": "match_outfit_5",
+    "briefId": "brief_outfit_5",
+    "briefRevision": 1,
+    "status": "ready",
+    "slots": [
+      {
+        "slotId": "slot_outfit_1",
+        "selectedOfferId": "offer_outfit_1",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_1"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "selectedOfferId": "offer_outfit_2",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_2"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      }
+    ],
+    "itemSubtotal": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "excludesShippingAndTax": true,
+    "warnings": [
+      "Synthetic fixture, not observed shopper demand"
+    ],
+    "sampleOrigin": "seed"
+  },
+  {
+    "id": "match_outfit_6",
+    "briefId": "brief_outfit_6",
+    "briefRevision": 1,
+    "status": "ready",
+    "slots": [
+      {
+        "slotId": "slot_outfit_1",
+        "selectedOfferId": "offer_outfit_1",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_1"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "selectedOfferId": "offer_outfit_2",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_2"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      }
+    ],
+    "itemSubtotal": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "excludesShippingAndTax": true,
+    "warnings": [
+      "Synthetic fixture, not observed shopper demand"
+    ],
+    "sampleOrigin": "seed"
+  },
+  {
+    "id": "match_outfit_7",
+    "briefId": "brief_outfit_7",
+    "briefRevision": 1,
+    "status": "ready",
+    "slots": [
+      {
+        "slotId": "slot_outfit_1",
+        "selectedOfferId": "offer_outfit_1",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_1"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "selectedOfferId": "offer_outfit_2",
+        "alternativeOfferIds": [],
+        "required": true,
+        "checks": [
+          {
+            "key": "fixture_eligibility",
+            "status": "pass",
+            "evidenceIds": [
+              "ev_outfit_2"
+            ],
+            "explanation": "Synthetic eligible variant"
+          }
+        ]
+      }
+    ],
+    "itemSubtotal": {
+      "amount": 30000,
+      "currency": "CAD"
+    },
+    "excludesShippingAndTax": true,
+    "warnings": [
+      "Synthetic fixture, not observed shopper demand"
+    ],
+    "sampleOrigin": "seed"
+  }
+]

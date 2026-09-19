@@ -1,14 +1,6 @@
-/**
- * @sei/contracts: runs and pipeline events. Owner: L4 (Product & Platform).
- *
- * Transcribe into Zod schemas + inferred types in Step 0 (split §3.2), mirroring design exactly:
- * - §4.6: StageKey, RunStatus, ReportRun, PipelineEvent (discriminated union on `type`),
- *         PipelineEventInput
- * - §4.7: RunBudget. Note: split §3.2 lists RunBudget under core/context.ts, but ReportRun
- *         (a contract) embeds it and @sei/contracts cannot import @sei/core, so the data shape
- *         lives here and core re-exports / uses it.
- *
- * Convention: export `FooSchema` (Zod) and `type Foo = z.infer<typeof FooSchema>`.
- * Additive-only after M0 (split §11.3).
+/** Reserved run module from the v2 bootstrap; no runtime implementation yet.
+ * Follow design v3 and active S1–S5 cards. Shared intent-loop contracts/ports are in
+ * intent/shopping/demand/opportunity (contracts) and shopping/demand (core).
+ * Do not transcribe the archived report-first specification into this placeholder.
  */
 export {};

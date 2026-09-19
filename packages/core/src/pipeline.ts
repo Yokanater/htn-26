@@ -1,11 +1,6 @@
-/**
- * @sei/core: pipeline interfaces. Owner: L3 (Reasoning & Pipeline).
- *
- * Interfaces to write in Step 0 (split §3.2), mirroring design exactly:
- * - §3.5: Stage<K>, StageIO, PipelineRunner (implemented by LiveRunner in @sei/pipeline and
- *         ReplayRunner in apps/server)
- * - §4.7: StageOutputs (StageKey → output contract type)
- *
- * Interfaces only; implementations live in @sei/pipeline.
+/** Reserved pipeline module from the v2 bootstrap; no runtime implementation yet.
+ * Follow design v3 and active S1–S5 cards. Shared intent-loop contracts/ports are in
+ * intent/shopping/demand/opportunity (contracts) and shopping/demand (core).
+ * Do not transcribe the archived report-first specification into this placeholder.
  */
 export {};

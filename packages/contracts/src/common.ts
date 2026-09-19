@@ -2,16 +2,16 @@
  * @sei/contracts: common primitives. Owner: L4 (Product & Platform).
  *
  * Shared by every lane and by the web app (keep it browser-safe: no node:* imports).
- * Design refs: §4 rules (IDs, money, SCHEMA_VERSION) and §4.1 (SourceType).
- * Changes after M0 are additive only (split §11.3).
+ * Design v3 §4: IDs, money, provenance and additive versioning.
+ * Changes after bootstrap are additive only (split §11.3).
  */
 import { ulid } from 'ulid';
 import { z } from 'zod';
 
 /** Contract version. Additive change → bump minor; breaking change → all-hands, bump major. */
-export const SCHEMA_VERSION = '1.0.0';
+export const SCHEMA_VERSION = '1.1.0';
 
-/** ID prefixes (design §4 rules). Every ID is `<prefix><ULID>`, e.g. `ev_01J9ZK...`. */
+/** ID prefixes (design §4 rules). Generated IDs are `<prefix><ULID>`, e.g. `ev_01J9ZK...`. */
 export const ID_PREFIXES = {
   profile: 'prof_',
   run: 'run_',
@@ -23,6 +23,16 @@ export const ID_PREFIXES = {
   cluster: 'clu_',
   item: 'item_',
   action: 'act_',
+  asset: 'asset_',
+  brief: 'brief_',
+  slot: 'slot_',
+  offer: 'offer_',
+  match: 'match_',
+  session: 'sess_',
+  demandEvent: 'evt_',
+  aggregate: 'agg_',
+  merchant: 'mer_',
+  opportunity: 'opp_',
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];
@@ -52,7 +62,7 @@ export const MoneySchema = z.object({
 });
 export type Money = z.infer<typeof MoneySchema>;
 
-/** Where a source came from (design §4.1). */
+/** Legacy source types retained for compatibility; product captures use ProductEvidence. */
 export const SourceTypeSchema = z.enum([
   'storefront',
   'shopify_catalog',

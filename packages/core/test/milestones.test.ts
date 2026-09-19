@@ -10,10 +10,10 @@ describe('resolveMilestones', () => {
     });
   });
 
-  it('defaults to m1 when missing or blank', () => {
-    expect(resolveMilestones()).toEqual(resolveMilestones('m1'));
-    expect(resolveMilestones(undefined)).toEqual(resolveMilestones('m1'));
-    expect(resolveMilestones('  ')).toEqual(resolveMilestones('m1'));
+  it('defaults to s1 when missing or blank', () => {
+    expect(resolveMilestones()).toEqual(resolveMilestones('s1'));
+    expect(resolveMilestones(undefined)).toEqual(resolveMilestones('s1'));
+    expect(resolveMilestones('  ')).toEqual(resolveMilestones('s1'));
   });
 
   it('m1,m2,m4 → union of sections and flags', () => {
@@ -63,11 +63,16 @@ describe('featureFlags', () => {
       FEATURE_ACTIONS: false,
       FEATURE_BUNDLE_STUDIO: false,
       FEATURE_SHOPIFY_WRITEBACK: false,
+      FEATURE_INTENT_CAPTURE: false,
+      FEATURE_COLLECTION_MATCHING: false,
+      FEATURE_DEMAND_LEDGER: false,
+      FEATURE_MERCHANT_OPPORTUNITIES: false,
+      FEATURE_DRAFT_ACTIVATION: false,
     });
   });
 
-  it('defaults to m1 when MILESTONES is unset', () => {
-    expect(featureFlags({})).toEqual(featureFlags({ MILESTONES: 'm1' }));
+  it('defaults to s1 when MILESTONES is unset', () => {
+    expect(featureFlags({})).toEqual(featureFlags({ MILESTONES: 's1' }));
   });
 
   it('turns on the flags of enabled milestones', () => {
@@ -101,5 +106,39 @@ describe('featureFlags', () => {
 
   it('propagates invalid MILESTONES errors', () => {
     expect(() => featureFlags({ MILESTONES: 'm5' })).toThrow(/m5 requires m4/);
+  });
+});
+
+describe('active intent milestones', () => {
+  it('requires the complete two-sided dependency chain', () => {
+    expect(resolveMilestones('s4,s2,s1,s3').sections).toEqual([
+      'intent',
+      'collections',
+      'demand',
+      'opportunities',
+    ]);
+    expect(() => resolveMilestones('s1,s4')).toThrow(/s4 requires s3/);
+    expect(() => resolveMilestones('s1,s3,s4')).toThrow(/s3 requires s2/);
+    expect(() => resolveMilestones('s1,s2,s3,s5')).toThrow(/s5 requires s4/);
+  });
+  it('does not reinterpret legacy settings or mix the two plans', () => {
+    expect(resolveMilestones('m1').sections).toEqual(['collaborators']);
+    expect(() => resolveMilestones('m1,s1')).toThrow(/cannot mix/);
+    expect(() => resolveMilestones(', ,')).toThrow(/at least one/);
+  });
+  it('rejects effective flags that bypass prerequisites', () => {
+    expect(() => featureFlags({ MILESTONES: 's1,s2', FEATURE_INTENT_CAPTURE: 'false' })).toThrow(
+      /requires FEATURE_INTENT_CAPTURE/,
+    );
+    expect(() => featureFlags({ FEATURE_DEMAND_LEDGER: 'true' })).toThrow(
+      /requires FEATURE_COLLECTION_MATCHING/,
+    );
+    expect(() => featureFlags({ MILESTONES: 'm1', FEATURE_INTENT_CAPTURE: 'true' })).toThrow(
+      /requires an active s-preset/,
+    );
+    expect(
+      featureFlags({ MILESTONES: 's1,s2', FEATURE_COLLECTION_MATCHING: 'false' })
+        .FEATURE_COLLECTION_MATCHING,
+    ).toBe(false);
   });
 });

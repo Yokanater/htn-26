@@ -11,15 +11,36 @@ import {
 const ULID_BODY = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 describe('SCHEMA_VERSION', () => {
-  it('starts at 1.0.0', () => {
-    expect(SCHEMA_VERSION).toBe('1.0.0');
+  it('uses additive contract version 1.1.0', () => {
+    expect(SCHEMA_VERSION).toBe('1.1.0');
   });
 });
 
 describe('newId', () => {
-  it('has exactly the ten design §4 prefixes', () => {
+  it('preserves the original prefixes and adds intent-loop identities', () => {
     expect(Object.values(ID_PREFIXES).sort()).toEqual(
-      ['act_', 'cand_', 'clu_', 'ent_', 'ev_', 'item_', 'prof_', 'run_', 'src_', 'task_'].sort(),
+      [
+        'act_',
+        'cand_',
+        'clu_',
+        'ent_',
+        'ev_',
+        'item_',
+        'prof_',
+        'run_',
+        'src_',
+        'task_',
+        'asset_',
+        'brief_',
+        'slot_',
+        'offer_',
+        'match_',
+        'sess_',
+        'evt_',
+        'agg_',
+        'mer_',
+        'opp_',
+      ].sort(),
     );
   });
 

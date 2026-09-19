@@ -8,7 +8,7 @@ import { loadRootEnv, serverPort } from './env';
 
 loadRootEnv();
 
-const server = serve({ fetch: createApp().fetch, port: serverPort() }, (info) => {
+const server = serve({ fetch: createApp(process.env).fetch, port: serverPort() }, (info) => {
   console.log(`[server] listening on http://localhost:${info.port}`);
 });
 

@@ -1,11 +1,6 @@
-/**
- * @sei/core: collection interfaces. Owner: L1 (Collection).
- *
- * Interfaces to write in Step 0 (split §3.2), mirroring design exactly:
- * - §3.5: CatalogProvider, SearchProvider, PageFetcher, BrowserRunner, SourceAdapter
- * - §4.7: CatalogQuery, FetchedPage, BrowserSession (stagehand: unknown), CollectTarget,
- *         PolicyChecker, CollectTools
- *
- * Interfaces only; implementations and fakes live in @sei/collect.
+/** Reserved collect module from the v2 bootstrap; no runtime implementation yet.
+ * Follow design v3 and active S1–S5 cards. Shared intent-loop contracts/ports are in
+ * intent/shopping/demand/opportunity (contracts) and shopping/demand (core).
+ * Do not transcribe the archived report-first specification into this placeholder.
  */
 export {};

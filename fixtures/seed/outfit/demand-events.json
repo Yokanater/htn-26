@@ -1,0 +1,170 @@
+[
+  {
+    "id": "evt_outfit_1",
+    "sessionId": "sess_outfit_1",
+    "briefId": "brief_outfit_1",
+    "briefRevision": 1,
+    "consentVersion": 1,
+    "occurredAt": "2026-09-19T12:05:00Z",
+    "sampleOrigin": "seed",
+    "kind": "collection_saved",
+    "matchId": "match_outfit_1",
+    "selections": [
+      {
+        "slotId": "slot_outfit_1",
+        "offerId": "offer_outfit_1",
+        "merchantId": "mer_outfit_1"
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "offerId": "offer_outfit_2",
+        "merchantId": "mer_outfit_2"
+      }
+    ],
+    "rejectionReason": null
+  },
+  {
+    "id": "evt_outfit_2",
+    "sessionId": "sess_outfit_2",
+    "briefId": "brief_outfit_2",
+    "briefRevision": 1,
+    "consentVersion": 1,
+    "occurredAt": "2026-09-19T12:05:00Z",
+    "sampleOrigin": "seed",
+    "kind": "collection_saved",
+    "matchId": "match_outfit_2",
+    "selections": [
+      {
+        "slotId": "slot_outfit_1",
+        "offerId": "offer_outfit_1",
+        "merchantId": "mer_outfit_1"
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "offerId": "offer_outfit_2",
+        "merchantId": "mer_outfit_2"
+      }
+    ],
+    "rejectionReason": null
+  },
+  {
+    "id": "evt_outfit_3",
+    "sessionId": "sess_outfit_3",
+    "briefId": "brief_outfit_3",
+    "briefRevision": 1,
+    "consentVersion": 1,
+    "occurredAt": "2026-09-19T12:05:00Z",
+    "sampleOrigin": "seed",
+    "kind": "collection_saved",
+    "matchId": "match_outfit_3",
+    "selections": [
+      {
+        "slotId": "slot_outfit_1",
+        "offerId": "offer_outfit_1",
+        "merchantId": "mer_outfit_1"
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "offerId": "offer_outfit_2",
+        "merchantId": "mer_outfit_2"
+      }
+    ],
+    "rejectionReason": null
+  },
+  {
+    "id": "evt_outfit_4",
+    "sessionId": "sess_outfit_4",
+    "briefId": "brief_outfit_4",
+    "briefRevision": 1,
+    "consentVersion": 1,
+    "occurredAt": "2026-09-19T12:05:00Z",
+    "sampleOrigin": "seed",
+    "kind": "collection_saved",
+    "matchId": "match_outfit_4",
+    "selections": [
+      {
+        "slotId": "slot_outfit_1",
+        "offerId": "offer_outfit_1",
+        "merchantId": "mer_outfit_1"
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "offerId": "offer_outfit_2",
+        "merchantId": "mer_outfit_2"
+      }
+    ],
+    "rejectionReason": null
+  },
+  {
+    "id": "evt_outfit_5",
+    "sessionId": "sess_outfit_5",
+    "briefId": "brief_outfit_5",
+    "briefRevision": 1,
+    "consentVersion": 1,
+    "occurredAt": "2026-09-19T12:05:00Z",
+    "sampleOrigin": "seed",
+    "kind": "collection_saved",
+    "matchId": "match_outfit_5",
+    "selections": [
+      {
+        "slotId": "slot_outfit_1",
+        "offerId": "offer_outfit_1",
+        "merchantId": "mer_outfit_1"
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "offerId": "offer_outfit_2",
+        "merchantId": "mer_outfit_2"
+      }
+    ],
+    "rejectionReason": null
+  },
+  {
+    "id": "evt_outfit_6",
+    "sessionId": "sess_outfit_6",
+    "briefId": "brief_outfit_6",
+    "briefRevision": 1,
+    "consentVersion": 1,
+    "occurredAt": "2026-09-19T12:05:00Z",
+    "sampleOrigin": "seed",
+    "kind": "collection_saved",
+    "matchId": "match_outfit_6",
+    "selections": [
+      {
+        "slotId": "slot_outfit_1",
+        "offerId": "offer_outfit_1",
+        "merchantId": "mer_outfit_1"
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "offerId": "offer_outfit_2",
+        "merchantId": "mer_outfit_2"
+      }
+    ],
+    "rejectionReason": null
+  },
+  {
+    "id": "evt_outfit_7",
+    "sessionId": "sess_outfit_7",
+    "briefId": "brief_outfit_7",
+    "briefRevision": 1,
+    "consentVersion": 1,
+    "occurredAt": "2026-09-19T12:05:00Z",
+    "sampleOrigin": "seed",
+    "kind": "collection_saved",
+    "matchId": "match_outfit_7",
+    "selections": [
+      {
+        "slotId": "slot_outfit_1",
+        "offerId": "offer_outfit_1",
+        "merchantId": "mer_outfit_1"
+      },
+      {
+        "slotId": "slot_outfit_2",
+        "offerId": "offer_outfit_2",
+        "merchantId": "mer_outfit_2"
+      }
+    ],
+    "rejectionReason": null
+  }
+]

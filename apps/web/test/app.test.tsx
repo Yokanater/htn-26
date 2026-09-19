@@ -40,5 +40,18 @@ it('renders the contracts schema version (workspace TS source resolves)', () => 
     vi.fn(async () => Response.json({ ok: true })),
   );
   renderApp();
-  expect(screen.getByText(/contracts v1\.0\.0/)).toBeTruthy();
+  expect(screen.getByText(/contracts v1\.1\.0/)).toBeTruthy();
+});
+
+it('describes both surfaces without presenting unfinished features as available', () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ ok: true })),
+  );
+  renderApp();
+  expect(screen.getByRole('heading', { name: 'Shopify Intent Studio' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'For shoppers' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'For merchants' })).toBeTruthy();
+  expect(screen.getByText(/Outfits and room or desk setups/)).toBeTruthy();
+  expect(screen.getByText(/not yet available/)).toBeTruthy();
 });
