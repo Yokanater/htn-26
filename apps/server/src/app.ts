@@ -13,11 +13,13 @@ import { errorBody } from './errors';
 import { type AppProviders, defaultProviders } from './providers';
 import { assetRoutes } from './routes/assets';
 import { briefRoutes } from './routes/briefs';
+import { eventRoutes } from './routes/events';
+import { matchRoutes } from './routes/matches';
 import { sessionRoutes } from './routes/session';
 
 /** Pure factory: no listeners, environment reads or provider calls. */
 export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): Hono {
-  const providers = { ...defaultProviders(env), ...injected };
+  const providers = defaultProviders(env, { overrides: injected });
   const resolved = resolveMilestones(env.MILESTONES);
   const flags = featureFlags(env);
   const sections = resolved.milestones.flatMap((id) => {
@@ -66,6 +68,10 @@ export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): 
     app.route('/api', sessionRoutes(providers));
     app.route('/api', assetRoutes(providers));
     app.route('/api', briefRoutes(providers));
+  }
+  if (flags.FEATURE_COLLECTION_MATCHING) {
+    app.route('/api', matchRoutes(providers));
+    app.route('/api', eventRoutes(providers));
   }
   return app;
 }

@@ -7,10 +7,10 @@ merchants, including ones who join later, find useful collaborations.
 
 Both launch domains, **outfits** and **room/desk setups**, have equal support throughout.
 
-> **Status:** early build. The bootstrap is done: contracts, core interfaces, seed fixtures, a
-> health/capabilities server and a landing page. The S1 intent interpreter and brief editor are
-> in progress. Uploads, catalog matching, the demand ledger and merchant features are not built
-> yet, and all providers default to fakes. See [bootstrap status](docs/BOOTSTRAP_STATUS.md).
+> **Status:** early build. Text or image intake, brief confirmation and offline collection matching
+> work end to end in both domains (S1 and S2, enabled with `MILESTONES=s1,s2`). The demand ledger
+> and merchant features are not built yet, and all providers default to fakes. See
+> [bootstrap status](docs/BOOTSTRAP_STATUS.md) for what is real and what is still synthetic.
 
 ## How it works
 

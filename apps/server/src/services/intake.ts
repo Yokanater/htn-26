@@ -90,11 +90,17 @@ export class IntakeStore {
     return record?.ownerId === ownerId ? record.brief : null;
   }
 
-  deleteOwner(ownerId: string): void {
+  /** Deletes everything an owner holds and returns the brief IDs, so derived data can follow. */
+  deleteOwner(ownerId: string): string[] {
+    const briefIds: string[] = [];
     for (const [id, record] of this.#assets)
       if (record.ownerId === ownerId) this.#assets.delete(id);
     for (const [id, record] of this.#briefs)
-      if (record.ownerId === ownerId) this.#briefs.delete(id);
+      if (record.ownerId === ownerId) {
+        briefIds.push(id);
+        this.#briefs.delete(id);
+      }
+    return briefIds;
   }
 }
 

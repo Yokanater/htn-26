@@ -1,4 +1,18 @@
-import type { EnvLike } from '@sei/core';
+/** Composition root: providers are wired here once, in dependency order. Owner: L4. */
+import { createInjectedShoppingCatalog } from '@sei/collect';
+import {
+  type CollectionMatcher,
+  type EnvLike,
+  featureFlags,
+  type ShoppingCatalog,
+} from '@sei/core';
+import { createCollectionMatcher } from '@sei/enrich';
+import {
+  type CollectionRunner,
+  type CollectionRunnerOptions,
+  createCollectionRunner,
+  staticCatalog,
+} from '@sei/pipeline';
 import {
   createIntentInterpreter,
   createOpenAiIntentModel,
@@ -7,6 +21,7 @@ import {
   IntentModelError,
   type OpenAiIntentModelOptions,
 } from '@sei/reason';
+import { loadSeedOffers } from './replay';
 import { ContainerImageNormalizer } from './services/image';
 import {
   type ImageNormalizer,
@@ -14,6 +29,7 @@ import {
   type IntentDraftService,
   InterpreterIntentDraftService,
 } from './services/intake';
+import { PrivateCheckpointStore, RunRegistry } from './services/runs';
 import { OwnerSessions } from './services/session';
 
 export interface AppProviders {
@@ -21,12 +37,23 @@ export interface AppProviders {
   intake: IntakeStore;
   intent: IntentDraftService;
   imageNormalizer: ImageNormalizer | null;
+  catalog: ShoppingCatalog;
+  matcher: CollectionMatcher;
+  checkpoints: PrivateCheckpointStore;
+  runs: RunRegistry;
+  runner: CollectionRunner;
   now: () => Date;
 }
 
 export interface ProviderOptions {
   /** Test seam: inject the OpenAI client/logger/sleep. Never used to reach a live provider. */
   intentModel?: OpenAiIntentModelOptions;
+  /** Runner tuning (caps, timeouts). `enabled`, catalog, matcher and events stay wired here. */
+  runner?: Partial<
+    Omit<CollectionRunnerOptions, 'enabled' | 'openCatalog' | 'matcher' | 'onEvent'>
+  >;
+  /** Replace individual providers; everything else is still built from the environment. */
+  overrides?: Partial<AppProviders>;
 }
 
 /**
@@ -78,13 +105,47 @@ function createIntentService(
   throw new Error(`Unsupported VISION_PROVIDER "${provider}" (expected "fake" or "openai")`);
 }
 
+/** CATALOG_PROVIDER: `fake` (default) serves the synthetic seed offers; live is not wired yet. */
+function createCatalog(env: EnvLike): ShoppingCatalog {
+  const provider = env.CATALOG_PROVIDER?.trim().toLowerCase() || 'fake';
+  if (provider === 'fake') {
+    return createInjectedShoppingCatalog({ offers: loadSeedOffers(), sampleOrigin: 'seed' });
+  }
+  throw new Error(
+    `Unsupported CATALOG_PROVIDER "${provider}": only "fake" is available until the live catalog spike lands`,
+  );
+}
+
 export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {}): AppProviders {
-  const now = () => new Date();
+  const overrides = options.overrides ?? {};
+  const now = overrides.now ?? (() => new Date());
+  const runs = overrides.runs ?? new RunRegistry();
+  const checkpoints = overrides.checkpoints ?? new PrivateCheckpointStore();
+  const catalog = overrides.catalog ?? createCatalog(env);
+  const matcher = overrides.matcher ?? createCollectionMatcher();
   return {
-    sessions: new OwnerSessions(),
-    intake: new IntakeStore(),
-    intent: createIntentService(env, options.intentModel, now),
-    imageNormalizer: new ContainerImageNormalizer(),
+    sessions: overrides.sessions ?? new OwnerSessions(),
+    intake: overrides.intake ?? new IntakeStore(),
+    intent: overrides.intent ?? createIntentService(env, options.intentModel, now),
+    imageNormalizer:
+      overrides.imageNormalizer === undefined
+        ? new ContainerImageNormalizer()
+        : overrides.imageNormalizer,
+    catalog,
+    matcher,
+    checkpoints,
+    runs,
+    runner:
+      overrides.runner ??
+      createCollectionRunner({
+        clock: now,
+        ...options.runner,
+        enabled: featureFlags(env).FEATURE_COLLECTION_MATCHING === true,
+        openCatalog: staticCatalog(catalog),
+        matcher,
+        checkpoints,
+        onEvent: (event) => runs.publish(event),
+      }),
     now,
   };
 }

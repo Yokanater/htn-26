@@ -1,4 +1,5 @@
 /** Typed JSON error bodies. Messages are fixed strings: never shopper text, bytes or provider output. */
+import { CollectionRunError, type CollectionRunErrorKind } from '@sei/pipeline';
 import { IntentInterpretationError, type IntentInterpretationErrorKind } from '@sei/reason';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
@@ -60,6 +61,33 @@ const INTENT_FAILURES: Record<IntentInterpretationErrorKind, IntentFailure> = {
     body: errorBody('INTENT_CANCELLED', 'Interpretation was cancelled.'),
   },
 };
+
+const RUN_FAILURES: Record<CollectionRunErrorKind, IntentFailure> = {
+  feature_disabled: {
+    status: 404,
+    body: errorBody('FEATURE_DISABLED', 'Collection matching is not enabled.'),
+  },
+  invalid_brief: {
+    status: 400,
+    body: errorBody('INVALID_BRIEF', 'Review the brief fields and constraints.'),
+  },
+  not_confirmed: {
+    status: 409,
+    body: errorBody('BRIEF_NOT_CONFIRMED', 'Confirm the brief before searching for products.'),
+  },
+  stale_revision: {
+    status: 409,
+    body: errorBody(
+      'STALE_REVISION',
+      'A newer version of this brief exists. Reload it and search again.',
+    ),
+  },
+};
+
+/** The typed response for a refused collection run, or null when the error is not one. */
+export function describeRunFailure(error: unknown): IntentFailure | null {
+  return error instanceof CollectionRunError ? RUN_FAILURES[error.kind] : null;
+}
 
 /** The typed response for an interpreter failure, or null when the error is not one. */
 export function describeIntentFailure(error: unknown): IntentFailure | null {

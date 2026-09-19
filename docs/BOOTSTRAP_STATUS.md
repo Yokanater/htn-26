@@ -56,17 +56,31 @@ references, fictional provenance and the withdrawn-session fixture story. Actual
 
 ## Integration status — 2026-09-19
 
-The current L4 integration branch composes the delivered L1, L3, and L4 slices:
+The integration branch (`codex/s1-integration`) composes the delivered L1, L2, L3 and L4 slices:
 
-- L1 media validation, browser normalization, product evidence components, and bounded catalog
-  utilities are present.
-- L3's fake-backed, budgeted intent interpreter now powers L4's private brief API. Its editable brief
-  component is mounted in the shopper journey for both domains.
+- L1 media validation, browser normalization, product tiles/evidence drawer, and the catalog adapter.
+- L3's budgeted intent interpreter powers the private brief API; its editable brief component and
+  collection workspace are mounted in the shopper journey for both domains.
+- L2's constrained collection engine and L3's checkpointed run pipeline are wired by the server
+  composition root (`apps/server/src/providers.ts`).
 - L4 owner sessions, same-origin writes, private assets, expiry/deletion, compare-and-set brief
-  revisions, the shopper shell, and the labeled merchant preview are connected.
+  revisions, match/SSE routes, the shopper shell and the labeled merchant preview.
 
-The runnable path is text description -> editable draft -> explicit confirmation. The L1 image
-component normalizes and previews images in the browser, but the server continues to reject image
-submission until the approved decoder is installed and injected. Catalog search, matching, consented
-demand projection, and merchant profiling are not mounted yet; the merchant card remains explicitly
-synthetic. No live provider was called during integration.
+The runnable path is text or image -> editable draft -> explicit confirmation -> "Find products" ->
+streamed collection with cited checks, named gaps and alternatives. Gates:
+`evals/milestones/s1.test.ts` and `evals/milestones/s2.test.ts` (both domains).
+
+Known limits, all requiring a human decision or spike:
+
+- **Uploads are sanitized, not decoded.** No image library is installed and dependencies are
+  human-only, so `apps/server/src/services/image.ts` validates container structure, checksums and
+  size/pixel limits, rejects animation, strips EXIF/XMP/ICC/text and trailing bytes, but never
+  decodes pixels. Swap in a real decoder behind the `ImageNormalizer` seam if one is approved.
+- **Vision is synthetic unless configured.** `VISION_PROVIDER=openai` (with `OPENAI_API_KEY` and
+  `OPENAI_MODEL_VISION`) uses the L3 adapter and marks drafts `live`; it has never been run against
+  the real API. The default returns canned drafts marked `seed`.
+- **The catalog is the synthetic seed inventory** (`CATALOG_PROVIDER=fake`). Seed offers only match
+  `seed` briefs, so a `live` brief finds nothing until a live catalog adapter is approved.
+- Runs, checkpoints and sessions are in memory; a restart drops them.
+- Demand projection, consent and merchant profiling (S3/S4) are not mounted; the merchant card
+  remains explicitly synthetic. No live provider was called during integration.

@@ -132,6 +132,8 @@ export function briefRoutes(providers: AppProviders): Hono {
       );
     try {
       providers.intake.saveBrief(ownerId, next.data, expectedRevision);
+      // A new revision supersedes any search still running for the old one.
+      providers.runner.invalidate(next.data.id, next.data.revision);
       return c.json(next.data);
     } catch (error) {
       if (error instanceof RevisionConflictError)

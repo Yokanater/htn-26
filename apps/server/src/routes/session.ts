@@ -21,8 +21,13 @@ export function sessionRoutes(providers: AppProviders): Hono {
   routes.delete('/session', (c) => {
     const ownerId = getCookie(c, SESSION_COOKIE);
     if (providers.sessions.valid(ownerId)) {
-      providers.intake.deleteOwner(ownerId);
+      // Revoke first so a run finishing mid-delete cannot store anything for this owner.
       providers.sessions.revoke(ownerId);
+      const briefIds = new Set([
+        ...providers.intake.deleteOwner(ownerId),
+        ...providers.runs.deleteOwner(ownerId),
+      ]);
+      for (const briefId of briefIds) providers.checkpoints.dropBrief(briefId);
     }
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ deleted: true });
