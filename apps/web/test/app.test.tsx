@@ -84,7 +84,7 @@ it('creates a private text brief and stops at the confirmation barrier', async (
   expect(
     await screen.findByRole('heading', { name: /Here’s the collection we heard/ }),
   ).toBeTruthy();
-  expect(screen.getByRole('button', { name: /Confirm this direction/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Confirm brief/ })).toBeTruthy();
   expect(screen.queryByText(/search results/i)).toBeNull();
   await waitFor(() =>
     expect(fetchMock).toHaveBeenCalledWith(

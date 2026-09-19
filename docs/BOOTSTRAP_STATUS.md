@@ -53,3 +53,20 @@ Implemented exports: intent/offer/match/consent/event/aggregate/opportunity sche
 provider and store interfaces, equal-domain configuration, s-presets and capability metadata.
 Sixteen required JSON fixtures (eight per domain) validate without skips; the integration suite checks
 references, fictional provenance and the withdrawn-session fixture story. Actual projection is S3.
+
+## Integration status — 2026-09-19
+
+The current L4 integration branch composes the delivered L1, L3, and L4 slices:
+
+- L1 media validation, browser normalization, product evidence components, and bounded catalog
+  utilities are present.
+- L3's fake-backed, budgeted intent interpreter now powers L4's private brief API. Its editable brief
+  component is mounted in the shopper journey for both domains.
+- L4 owner sessions, same-origin writes, private assets, expiry/deletion, compare-and-set brief
+  revisions, the shopper shell, and the labeled merchant preview are connected.
+
+The runnable path is text description -> editable draft -> explicit confirmation. The L1 image
+component normalizes and previews images in the browser, but the server continues to reject image
+submission until the approved decoder is installed and injected. Catalog search, matching, consented
+demand projection, and merchant profiling are not mounted yet; the merchant card remains explicitly
+synthetic. No live provider was called during integration.

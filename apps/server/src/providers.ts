@@ -1,8 +1,9 @@
+import { createIntentInterpreter, FakeIntentModel } from '@sei/reason';
 import {
-  FakeIntentDraftService,
   type ImageNormalizer,
   IntakeStore,
   type IntentDraftService,
+  InterpreterIntentDraftService,
 } from './services/intake';
 import { OwnerSessions } from './services/session';
 
@@ -15,11 +16,14 @@ export interface AppProviders {
 }
 
 export function defaultProviders(): AppProviders {
+  const now = () => new Date();
   return {
     sessions: new OwnerSessions(),
     intake: new IntakeStore(),
-    intent: new FakeIntentDraftService(),
+    intent: new InterpreterIntentDraftService(
+      createIntentInterpreter({ model: new FakeIntentModel(), clock: now }),
+    ),
     imageNormalizer: null,
-    now: () => new Date(),
+    now,
   };
 }

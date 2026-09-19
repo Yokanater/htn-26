@@ -6,6 +6,7 @@ import {
   newId,
   type ShoppingDomain,
 } from '@sei/contracts';
+import type { IntentInterpreter } from '@sei/core';
 
 export const ASSET_MAX_BYTES = 8 * 1024 * 1024;
 export const ASSET_TTL_MS = 24 * 60 * 60 * 1000;
@@ -21,7 +22,9 @@ export interface ImageNormalizer {
 
 export interface IntentDraftInput {
   domain: ShoppingDomain;
-  source: { kind: 'text'; text: string } | { kind: 'image'; assetId: string };
+  source:
+    | { kind: 'text'; text: string }
+    | { kind: 'image'; asset: InspirationAsset; bytes: Uint8Array };
   country: string;
   currency: string;
 }
@@ -100,44 +103,29 @@ export class RevisionConflictError extends Error {
   }
 }
 
-const defaultSlots = {
-  outfit: [
-    { category: 'top', description: 'A lead garment matching the described color and silhouette' },
-    { category: 'bottom', description: 'A coordinating bottom that completes the outfit' },
-    { category: 'accessory', description: 'One optional finishing piece' },
-  ],
-  setup: [
-    { category: 'anchor', description: 'The main furniture or workspace anchor' },
-    { category: 'lighting', description: 'Lighting that supports the intended mood and function' },
-    { category: 'accessory', description: 'One optional object that ties the setup together' },
-  ],
-} satisfies Record<ShoppingDomain, { category: string; description: string }[]>;
+/** Adapts L3's budgeted interpreter to the private intake API. */
+export class InterpreterIntentDraftService implements IntentDraftService {
+  constructor(private readonly interpreter: IntentInterpreter) {}
 
-/** Offline fallback until the L3 interpreter lands. It produces an editable draft and never confirms it. */
-export class FakeIntentDraftService implements IntentDraftService {
   async createDraft(input: IntentDraftInput): Promise<IntentBrief> {
-    return IntentBriefSchema.parse({
-      id: newId('brief_'),
-      domain: input.domain,
-      revision: 1,
-      status: 'draft',
-      input: input.source,
-      slots: defaultSlots[input.domain].map((slot, index) => ({
-        id: newId('slot_'),
-        ...slot,
-        description:
-          input.source.kind === 'text' && index === 0
-            ? `${slot.description}: ${input.source.text.slice(0, 180)}`
-            : slot.description,
-        required: index < 2,
-        visualAttributes: [],
-        constraints: [],
-      })),
-      country: input.country,
-      currency: input.currency,
-      itemBudget: null,
-      sampleOrigin: 'seed',
-      createdAt: new Date().toISOString(),
-    });
+    let consumed = 0;
+    return this.interpreter.interpret(
+      {
+        domain: input.domain,
+        source: input.source,
+        country: input.country,
+        currency: input.currency,
+      },
+      {
+        signal: new AbortController().signal,
+        sampleOrigin: 'seed',
+        consume(resource, amount) {
+          if (resource !== 'model_call' || consumed + amount > 2) {
+            throw new Error('Intent budget exceeded');
+          }
+          consumed += amount;
+        },
+      },
+    );
   }
 }

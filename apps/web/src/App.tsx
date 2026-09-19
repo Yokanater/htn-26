@@ -1,11 +1,15 @@
-import { type IntentBrief, SCHEMA_VERSION, type ShoppingDomain } from '@sei/contracts';
+import {
+  type InspirationAsset,
+  type IntentBrief,
+  SCHEMA_VERSION,
+  type ShoppingDomain,
+} from '@sei/contracts';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   CircleGauge,
-  ImagePlus,
   LockKeyhole,
   PackageSearch,
   RefreshCw,
@@ -16,13 +20,18 @@ import {
   Store,
 } from 'lucide-react';
 import { useState } from 'react';
+import { BriefEditor, type DomainHint } from './features/shopper/brief';
+import { MediaIntake, type MediaSelection } from './features/shopper/media';
 
 type Surface = 'home' | 'shopper' | 'merchant';
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !(init.body instanceof FormData))
+    headers.set('Content-Type', 'application/json');
   const response = await fetch(path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers,
   });
   const payload = (await response.json()) as T & { error?: { message?: string } };
   if (!response.ok)
@@ -182,13 +191,29 @@ function DomainToggle({
 
 function BriefReview({
   brief,
+  save,
   confirm,
   pending,
 }: {
   brief: IntentBrief;
-  confirm: () => void;
+  save: (brief: IntentBrief) => void;
+  confirm: (brief: IntentBrief) => void;
   pending: boolean;
 }) {
+  const hints: Record<ShoppingDomain, DomainHint> = {
+    outfit: {
+      label: 'Fit check',
+      exampleCategories: ['outerwear', 'trousers', 'bag'],
+      constraintKinds: ['size', 'exclude material'],
+      confirmationHint: 'Add sizes and anything you will not wear.',
+    },
+    setup: {
+      label: 'Space check',
+      exampleCategories: ['desk', 'lighting', 'storage'],
+      constraintKinds: ['dimensions', 'mounting', 'exclude material'],
+      confirmationHint: 'Add maximum dimensions and installation limits.',
+    },
+  };
   return (
     <section className="brief-review" aria-live="polite">
       <div className="review-heading">
@@ -230,15 +255,20 @@ function BriefReview({
           </div>
         </div>
       ) : (
-        <button
-          className="primary confirm-button"
-          type="button"
-          disabled={pending}
-          onClick={confirm}
-        >
-          {pending ? <RefreshCw className="spin" aria-hidden /> : <Check aria-hidden />} Confirm
-          this direction
-        </button>
+        <div className="brief-editor-shell" aria-busy={pending}>
+          <div className="editor-intro">
+            <p className="eyebrow">FINAL CHECK</p>
+            <h3>Make it exact before search.</h3>
+            <p>Adjust categories, sizes, dimensions, and required items. Nothing here is shared.</p>
+          </div>
+          <BriefEditor
+            key={`${brief.id}-${brief.revision}`}
+            brief={brief}
+            hints={hints[brief.domain]}
+            onSave={save}
+            onConfirm={confirm}
+          />
+        </div>
       )}
     </section>
   );
@@ -246,34 +276,45 @@ function BriefReview({
 
 function ShopperWorkspace({ back }: { back: () => void }) {
   const [domain, setDomain] = useState<ShoppingDomain>('outfit');
-  const [description, setDescription] = useState('');
+  const [selection, setSelection] = useState<MediaSelection | null>(null);
   const [brief, setBrief] = useState<IntentBrief | null>(null);
   const create = useMutation({
-    mutationFn: () =>
-      json<IntentBrief>('/api/briefs', {
+    mutationFn: async () => {
+      if (!selection) throw new Error('Add an image or description first.');
+      let source: { text: string } | { assetId: string };
+      if (selection.kind === 'text') {
+        source = { text: selection.text };
+      } else {
+        const form = new FormData();
+        form.set('image', selection.file);
+        const asset = await json<InspirationAsset>('/api/assets', { method: 'POST', body: form });
+        source = { assetId: asset.id };
+      }
+      return json<IntentBrief>('/api/briefs', {
         method: 'POST',
-        body: JSON.stringify({ domain, text: description, country: 'CA', currency: 'CAD' }),
-      }),
+        body: JSON.stringify({ domain, ...source, country: 'CA', currency: 'CAD' }),
+      });
+    },
     onSuccess: setBrief,
   });
-  const confirm = useMutation({
-    mutationFn: () => {
-      if (!brief) throw new Error('No brief to confirm.');
-      return json<IntentBrief>(`/api/briefs/${brief.id}`, {
+  const update = useMutation({
+    mutationFn: ({ edited, status }: { edited: IntentBrief; status: 'draft' | 'confirmed' }) => {
+      if (!brief || edited.id !== brief.id) throw new Error('No brief to update.');
+      return json<IntentBrief>(`/api/briefs/${edited.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           expectedRevision: brief.revision,
-          status: 'confirmed',
-          slots: brief.slots,
-          country: brief.country,
-          currency: brief.currency,
-          itemBudget: brief.itemBudget,
+          status,
+          slots: edited.slots,
+          country: edited.country,
+          currency: edited.currency,
+          itemBudget: edited.itemBudget,
         }),
       });
     },
     onSuccess: setBrief,
   });
-  const error = create.error ?? confirm.error;
+  const error = create.error ?? update.error;
   return (
     <main className="workspace-main">
       <button className="back-button" type="button" onClick={back}>
@@ -321,37 +362,15 @@ function ShopperWorkspace({ back }: { back: () => void }) {
             }}
           >
             <DomainToggle value={domain} onChange={setDomain} />
-            <div className="upload-disabled">
-              <ImagePlus aria-hidden />
-              <div>
-                <strong>Drop an inspiration image</strong>
-                <span>Image intake connects after the approved decoder check.</span>
-              </div>
-              <small>JPEG · PNG · WEBP</small>
-            </div>
-            <div className="or-row">
-              <span />
-              or describe it
-              <span />
-            </div>
-            <label>
-              <span>Your collection idea</span>
-              <textarea
-                aria-label="Your collection idea"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder={
-                  domain === 'outfit'
-                    ? 'A relaxed dinner outfit in moss and cream, with a structured layer…'
-                    : 'A compact reading corner with warm wood, soft light, and no wall drilling…'
-                }
-                rows={5}
-                minLength={8}
-                maxLength={2000}
-                required
+            <div className="integrated-media-intake">
+              <MediaIntake
+                label={domain === 'outfit' ? 'Outfit inspiration' : 'Room or desk inspiration'}
+                textLabel="Your collection idea"
+                initialMode="text"
+                disabled={create.isPending}
+                onSelectionChange={setSelection}
               />
-              <small>{description.length}/2000</small>
-            </label>
+            </div>
             {error && (
               <p className="form-error" role="alert">
                 {error.message}
@@ -360,7 +379,7 @@ function ShopperWorkspace({ back }: { back: () => void }) {
             <button
               className="primary wide"
               type="submit"
-              disabled={create.isPending || description.trim().length < 8}
+              disabled={create.isPending || !selection}
             >
               {create.isPending ? (
                 <RefreshCw className="spin" aria-hidden />
@@ -376,7 +395,12 @@ function ShopperWorkspace({ back }: { back: () => void }) {
           </form>
         </section>
       ) : (
-        <BriefReview brief={brief} pending={confirm.isPending} confirm={() => confirm.mutate()} />
+        <BriefReview
+          brief={brief}
+          pending={update.isPending}
+          save={(edited) => update.mutate({ edited, status: 'draft' })}
+          confirm={(edited) => update.mutate({ edited, status: 'confirmed' })}
+        />
       )}
     </main>
   );

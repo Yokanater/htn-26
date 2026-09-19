@@ -32,6 +32,8 @@ export type MediaIntakeProps = {
   textLabel?: string;
   id?: string;
   disabled?: boolean;
+  /** Initial input choice. Integration shells may prefer text while server decoding is unavailable. */
+  initialMode?: MediaIntakeMode;
   /** Inject browser primitives for deterministic tests. Production uses real APIs. */
   browser?: MediaNormalizeBrowser;
   /** When false, A1-only behavior: accept raw file without normalize (tests). Default true. */
@@ -45,6 +47,7 @@ export function MediaIntake({
   textLabel = 'Describe the collection',
   id,
   disabled = false,
+  initialMode = 'image',
   browser,
   normalize = true,
 }: MediaIntakeProps) {
@@ -58,7 +61,7 @@ export function MediaIntake({
   const previewUrlRef = useRef<string | null>(null);
   const generationRef = useRef(0);
 
-  const [mode, setMode] = useState<MediaIntakeMode>('image');
+  const [mode, setMode] = useState<MediaIntakeMode>(initialMode);
   const [error, setError] = useState<string | null>(null);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

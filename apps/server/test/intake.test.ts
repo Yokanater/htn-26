@@ -28,7 +28,7 @@ describe('S1 private intake API', () => {
       const created = IntentBriefSchema.parse(await createdResponse.json());
       expect(created.status).toBe('draft');
       expect(created.domain).toBe(domain);
-      expect(created.slots).toHaveLength(3);
+      expect(created.slots.length).toBeGreaterThanOrEqual(2);
       const confirmedResponse = await app.request(`/api/briefs/${created.id}`, {
         method: 'PATCH',
         headers: headers(cookie),
@@ -162,6 +162,17 @@ describe('S1 private intake API', () => {
     );
     expect(createdResponse.status).toBe(201);
     const asset = InspirationAssetSchema.parse(await createdResponse.json());
+    const imageBriefResponse = await app.request('/api/briefs', {
+      method: 'POST',
+      headers: headers(owner),
+      body: JSON.stringify({ domain: 'setup', assetId: asset.id, country: 'CA', currency: 'CAD' }),
+    });
+    expect(imageBriefResponse.status).toBe(201);
+    expect(IntentBriefSchema.parse(await imageBriefResponse.json())).toMatchObject({
+      domain: 'setup',
+      status: 'draft',
+      input: { kind: 'image', assetId: asset.id },
+    });
     expect(
       (await app.request(`/api/assets/${asset.id}`, { headers: { cookie: stranger } })).status,
     ).toBe(404);

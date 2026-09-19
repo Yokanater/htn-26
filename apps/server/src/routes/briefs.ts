@@ -6,18 +6,23 @@ import type { AppProviders } from '../providers';
 import { RevisionConflictError } from '../services/intake';
 import { SESSION_COOKIE } from '../services/session';
 
-const createInput = z.strictObject({
-  domain: ShoppingDomainSchema,
-  text: z.string().trim().min(8).max(2000),
-  country: z
-    .string()
-    .regex(/^[A-Z]{2}$/)
-    .default('CA'),
-  currency: z
-    .string()
-    .regex(/^[A-Z]{3}$/)
-    .default('CAD'),
-});
+const createInput = z
+  .strictObject({
+    domain: ShoppingDomainSchema,
+    text: z.string().trim().min(8).max(2000).optional(),
+    assetId: z.string().min(1).optional(),
+    country: z
+      .string()
+      .regex(/^[A-Z]{2}$/)
+      .default('CA'),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .default('CAD'),
+  })
+  .refine((value) => Boolean(value.text) !== Boolean(value.assetId), {
+    message: 'Provide one text description or one private asset.',
+  });
 
 const updateInput = z.strictObject({
   expectedRevision: z.number().int().positive(),
@@ -48,9 +53,31 @@ export function briefRoutes(providers: AppProviders): Hono {
         },
         400,
       );
+    const source = input.data.text
+      ? { kind: 'text' as const, text: input.data.text }
+      : (() => {
+          const record = providers.intake.readAsset(
+            ownerId,
+            input.data.assetId ?? '',
+            providers.now(),
+          );
+          return record
+            ? { kind: 'image' as const, asset: record.asset, bytes: record.bytes }
+            : null;
+        })();
+    if (!source)
+      return c.json(
+        {
+          error: {
+            code: 'ASSET_NOT_FOUND',
+            message: 'That private image is unavailable or expired.',
+          },
+        },
+        404,
+      );
     const brief = await providers.intent.createDraft({
       domain: input.data.domain,
-      source: { kind: 'text', text: input.data.text },
+      source,
       country: input.data.country,
       currency: input.data.currency,
     });
