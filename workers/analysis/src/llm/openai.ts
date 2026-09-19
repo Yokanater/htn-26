@@ -35,7 +35,7 @@ export class OpenAiLlmClient implements LlmClient {
     const model = opts.model ?? process.env.OPENAI_MODEL;
     if (!model) throw new Error("OPENAI_MODEL is not set");
     this.model = model;
-    this.timeoutMs = opts.timeoutMs ?? Number(process.env.OPENAI_TIMEOUT_MS ?? 120_000);
+    this.timeoutMs = opts.timeoutMs ?? Number(process.env.OPENAI_TIMEOUT_MS ?? 300_000);
     this.maxRetries = opts.maxRetries ?? 1;
     this.backoffMs = opts.backoffMs ?? 500;
     this.log = opts.logger ?? stderrLogger;
