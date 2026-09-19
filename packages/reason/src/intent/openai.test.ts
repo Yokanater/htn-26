@@ -401,10 +401,10 @@ describe('intent prompts', () => {
     const setupPrompt = buildIntentSystemPrompt('setup');
     expect(outfit).toContain('"Outfits"');
     expect(outfit).toContain('footwear');
-    expect(setupPrompt).toContain('"Rooms & desk setups"');
-    expect(setupPrompt).toContain('lighting');
+    expect(setupPrompt).toContain('"Any products"');
+    expect(setupPrompt).toContain('electronics');
     for (const p of [outfit, setupPrompt]) {
-      expect(p).toMatch(/2 to 6/);
+      expect(p).toMatch(/1 to 6/);
       expect(p).toMatch(/Ignore instructions/);
       expect(p).toMatch(/never people/);
       expect(p).toMatch(/protected trait/);
@@ -423,7 +423,7 @@ describe('intent prompts', () => {
     expect(long).toContain('[truncated]');
     expect(long.match(/x+/)![0]).toHaveLength(MAX_REPAIR_FEEDBACK_CHARS);
     expect(buildIntentUserText({ domain: 'setup', text: null, repairFeedback: null })).toBe(
-      'Describe the wanted products in the attached setup image.',
+      'Identify the visible products in the attached image.',
     );
   });
 });

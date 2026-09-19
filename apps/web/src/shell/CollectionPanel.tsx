@@ -5,21 +5,20 @@
  * so a superseded search can never change what is shown. The stream is closed on the result, on
  * `closed`, and when the shopper leaves.
  */
-import type { IntentBrief, ProductOffer } from '@sei/contracts';
+import type { IntentBrief } from '@sei/contracts';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { PackageSearch, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { type CollectionRunEvent, CollectionWorkspace } from '../features/shopper/collection';
-import { EvidenceDrawer, ProductTile } from '../features/shopper/products';
+import type { CollectionRunEvent } from '../features/shopper/collection';
 import { json } from './api';
+import { ShoppingResults } from './ShoppingResults';
 
 const EVENT_SOURCE_CLOSED = 2;
 
-export function CollectionPanel({ brief }: { brief: IntentBrief }) {
+export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?: () => void }) {
   const [runId, setRunId] = useState<string | null>(null);
   const [events, setEvents] = useState<CollectionRunEvent[]>([]);
   const [streamError, setStreamError] = useState<string | null>(null);
-  const [evidenceFor, setEvidenceFor] = useState<ProductOffer | null>(null);
 
   const capabilities = useQuery({
     queryKey: ['capabilities'],
@@ -65,7 +64,7 @@ export function CollectionPanel({ brief }: { brief: IntentBrief }) {
 
   if (capabilities.data?.flags?.FEATURE_COLLECTION_MATCHING !== true) return null;
 
-  const error = start.error ?? (streamError ? new Error(streamError) : null);
+  const error = start.error ?? cancel.error ?? (streamError ? new Error(streamError) : null);
   return (
     <section className="collection-panel" aria-label="Product search">
       {!runId && (
@@ -89,27 +88,14 @@ export function CollectionPanel({ brief }: { brief: IntentBrief }) {
         </p>
       )}
       {runId && (
-        <CollectionWorkspace
+        <ShoppingResults
+          key={runId}
           brief={brief}
           runId={runId}
           events={events}
           onCancel={() => cancel.mutate(runId)}
-          renderOffer={(offer, { selected }) => (
-            <ProductTile
-              offer={offer}
-              selected={selected}
-              onOpenEvidence={() => setEvidenceFor(offer)}
-            />
-          )}
-        />
-      )}
-      {evidenceFor && (
-        <EvidenceDrawer
-          open
-          title={evidenceFor.title}
-          evidence={evidenceFor.evidence}
-          sampleOrigin={evidenceFor.sampleOrigin}
-          onClose={() => setEvidenceFor(null)}
+          onRetry={() => start.mutate()}
+          onEdit={onEdit}
         />
       )}
     </section>

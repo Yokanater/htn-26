@@ -1,5 +1,6 @@
 /** Composition root: providers are wired here once, in dependency order. Owner: L4. */
 import { createInjectedShoppingCatalog } from '@sei/collect';
+import type { IntentBrief } from '@sei/contracts';
 import {
   type CollectionMatcher,
   type EnvLike,
@@ -23,12 +24,14 @@ import {
 } from '@sei/reason';
 import { loadSeedOffers } from './replay';
 import { ContainerImageNormalizer } from './services/image';
+import { SipsImageNormalizer } from './services/image-normalizer';
 import {
   type ImageNormalizer,
   IntakeStore,
   type IntentDraftService,
   InterpreterIntentDraftService,
 } from './services/intake';
+import { liveCatalog } from './services/live-catalog';
 import { PrivateCheckpointStore, RunRegistry } from './services/runs';
 import { OwnerSessions } from './services/session';
 
@@ -37,7 +40,7 @@ export interface AppProviders {
   intake: IntakeStore;
   intent: IntentDraftService;
   imageNormalizer: ImageNormalizer | null;
-  catalog: ShoppingCatalog;
+  catalog: ShoppingCatalog | ((brief: IntentBrief) => Pick<ShoppingCatalog, 'search'>);
   matcher: CollectionMatcher;
   checkpoints: PrivateCheckpointStore;
   runs: RunRegistry;
@@ -105,15 +108,24 @@ function createIntentService(
   throw new Error(`Unsupported VISION_PROVIDER "${provider}" (expected "fake" or "openai")`);
 }
 
-/** CATALOG_PROVIDER: `fake` (default) serves the synthetic seed offers; live is not wired yet. */
-function createCatalog(env: EnvLike): ShoppingCatalog {
+/** Live discovery is opt-in; tests and the default application use synthetic inventory. */
+function createCatalog(env: EnvLike): AppProviders['catalog'] {
   const provider = env.CATALOG_PROVIDER?.trim().toLowerCase() || 'fake';
   if (provider === 'fake') {
     return createInjectedShoppingCatalog({ offers: loadSeedOffers(), sampleOrigin: 'seed' });
   }
-  throw new Error(
-    `Unsupported CATALOG_PROVIDER "${provider}": only "fake" is available until the live catalog spike lands`,
-  );
+  if (provider === 'openai') {
+    if (
+      !env.OPENAI_API_KEY?.trim() ||
+      !(env.OPENAI_MODEL_SEARCH || env.OPENAI_MODEL_VISION)?.trim()
+    ) {
+      throw new Error(
+        'CATALOG_PROVIDER=openai requires OPENAI_API_KEY and a search or vision model',
+      );
+    }
+    return (brief) => liveCatalog(brief, env);
+  }
+  throw new Error(`Unsupported CATALOG_PROVIDER "${provider}" (expected "fake" or "openai")`);
 }
 
 export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {}): AppProviders {
@@ -129,7 +141,9 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
     intent: overrides.intent ?? createIntentService(env, options.intentModel, now),
     imageNormalizer:
       overrides.imageNormalizer === undefined
-        ? new ContainerImageNormalizer()
+        ? env.IMAGE_NORMALIZER === 'sips'
+          ? new SipsImageNormalizer()
+          : new ContainerImageNormalizer()
         : overrides.imageNormalizer,
     catalog,
     matcher,
@@ -141,7 +155,10 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
         clock: now,
         ...options.runner,
         enabled: featureFlags(env).FEATURE_COLLECTION_MATCHING === true,
-        openCatalog: staticCatalog(catalog),
+        openCatalog:
+          typeof catalog === 'function'
+            ? async (_signal, brief) => ({ ...catalog(brief), close: async () => {} })
+            : staticCatalog(catalog),
         matcher,
         checkpoints,
         onEvent: (event) => runs.publish(event),

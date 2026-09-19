@@ -67,12 +67,13 @@ describe('BriefEditor', () => {
   it('enforces add/remove limits and does not mutate the input brief', () => {
     const source = structuredClone(outfit);
     renderEditor(source);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove item' })[0]!);
     expect(
       screen
         .getAllByRole('button', { name: 'Remove item' })
         .every((button) => (button as HTMLButtonElement).disabled),
     ).toBe(true);
-    for (let index = 0; index < 4; index += 1)
+    for (let index = 0; index < 5; index += 1)
       fireEvent.click(screen.getByRole('button', { name: 'Add missed item' }));
     expect(screen.getAllByRole('group', { name: /Item/ })).toHaveLength(6);
     expect(

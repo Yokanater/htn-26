@@ -285,8 +285,8 @@ export function MediaIntake({
             {textLabel}
           </label>
           <p id={`${textId}-help`} className="text-sm text-muted-foreground">
-            Describe the outfit or room/setup collection in up to {MEDIA_TEXT_MAX_LENGTH}{' '}
-            characters. Interpretation and brief construction happen after you continue.
+            Describe the products or collection in up to {MEDIA_TEXT_MAX_LENGTH} characters.
+            Interpretation and brief construction happen after you continue.
           </p>
           <textarea
             id={textId}

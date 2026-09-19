@@ -1,0 +1,30 @@
+{
+  "id": "brief_general_mug",
+  "domain": "setup",
+  "revision": 1,
+  "status": "draft",
+  "input": {
+    "kind": "text",
+    "text": "A red coffee mug"
+  },
+  "slots": [
+    {
+      "id": "slot_general_mug",
+      "category": "mug",
+      "description": "A red coffee mug",
+      "required": true,
+      "visualAttributes": [
+        "red"
+      ],
+      "constraints": []
+    }
+  ],
+  "country": "CA",
+  "currency": "CAD",
+  "itemBudget": {
+    "amount": 30000,
+    "currency": "CAD"
+  },
+  "sampleOrigin": "seed",
+  "createdAt": "2026-09-19T12:00:00Z"
+}

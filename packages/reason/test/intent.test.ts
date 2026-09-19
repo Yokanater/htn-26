@@ -84,9 +84,9 @@ async function rejection(promise: Promise<unknown>): Promise<IntentInterpretatio
   return typed;
 }
 
-function oneSlotDraft(domain: ShoppingDomain): VisionDraft {
+function emptyDraft(domain: ShoppingDomain): VisionDraft {
   const draft = fakeVisionDraft(domain);
-  return { ...draft, slots: draft.slots.slice(0, 1) };
+  return { ...draft, slots: [] };
 }
 
 describe.each(DOMAINS)('%s interpretation', (domain) => {
@@ -142,7 +142,7 @@ describe.each(DOMAINS)('%s interpretation', (domain) => {
   });
 
   it('repairs once with schema-issue feedback when the mapped brief is invalid', async () => {
-    const { model, interpreter } = setup([{ kind: 'draft', draft: oneSlotDraft(domain) }]);
+    const { model, interpreter } = setup([{ kind: 'draft', draft: emptyDraft(domain) }]);
     const context = makeContext();
     const brief = await interpreter.interpret(textInput(domain), context);
 
@@ -165,7 +165,7 @@ describe.each(DOMAINS)('%s interpretation', (domain) => {
 
   it('fails as invalid_output after the single repair is exhausted', async () => {
     const { model, interpreter } = setup([
-      { kind: 'draft', draft: oneSlotDraft(domain) },
+      { kind: 'draft', draft: emptyDraft(domain) },
       { kind: 'draft', draft: { slots: [], ambiguityNote: null } },
     ]);
     const context = makeContext();
@@ -199,7 +199,7 @@ describe.each(DOMAINS)('%s interpretation', (domain) => {
   });
 
   it('checks the budget before the repair attempt', async () => {
-    const { model, interpreter } = setup([{ kind: 'draft', draft: oneSlotDraft(domain) }]);
+    const { model, interpreter } = setup([{ kind: 'draft', draft: emptyDraft(domain) }]);
     const error = await rejection(
       interpreter.interpret(textInput(domain), makeContext({ budget: 1 })),
     );
@@ -234,7 +234,7 @@ describe.each(DOMAINS)('%s interpretation', (domain) => {
 
   it('times out on the shared deadline, even across a repair', async () => {
     const { model, interpreter } = setup(
-      [{ kind: 'draft', draft: oneSlotDraft(domain) }, { kind: 'hang' }],
+      [{ kind: 'draft', draft: emptyDraft(domain) }, { kind: 'hang' }],
       30,
     );
     const error = await rejection(interpreter.interpret(textInput(domain), makeContext()));
@@ -319,7 +319,7 @@ describe('mapper', () => {
     expect(IntentBriefSchema.safeParse(brief).success).toBe(true);
   });
 
-  it('drops blank or duplicate slots and reports too few slots as issues', () => {
+  it('drops blank or duplicate slots and accepts a single actual object', () => {
     const slot = fakeVisionDraft('outfit').slots[0]!;
     const result = mapVisionDraft(
       {
@@ -328,8 +328,8 @@ describe('mapper', () => {
       },
       { ...base, domain: 'outfit' },
     );
-    expect(result.ok).toBe(false);
-    expect((result as { issues: string[] }).issues.join(' ')).toContain('slots');
+    expect(result.ok).toBe(true);
+    expect((result as { brief: IntentBrief }).brief.slots).toHaveLength(1);
   });
 });
 

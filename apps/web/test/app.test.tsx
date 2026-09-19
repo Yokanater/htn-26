@@ -77,6 +77,7 @@ it('creates a private text brief and stops at the confirmation barrier', async (
   renderApp();
   fireEvent.click(screen.getByRole('button', { name: /Start a collection/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Room or desk' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Text description' }));
   fireEvent.change(screen.getByRole('textbox', { name: 'Your collection idea' }), {
     target: { value: 'A compact reading corner with warm wood and soft light' },
   });

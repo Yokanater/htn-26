@@ -56,7 +56,7 @@ references, fictional provenance and the withdrawn-session fixture story. Actual
 
 ## Integration status — 2026-09-19
 
-The integration branch (`codex/s1-integration`) composes the delivered L1, L2, L3 and L4 slices:
+The final S1/S2 integration composes the delivered L1, L2, L3 and L4 slices:
 
 - L1 media validation, browser normalization, product tiles/evidence drawer, and the catalog adapter.
 - L3's budgeted intent interpreter powers the private brief API; its editable brief component and
@@ -79,8 +79,35 @@ Known limits, all requiring a human decision or spike:
 - **Vision is synthetic unless configured.** `VISION_PROVIDER=openai` (with `OPENAI_API_KEY` and
   `OPENAI_MODEL_VISION`) uses the L3 adapter and marks drafts `live`; it has never been run against
   the real API. The default returns canned drafts marked `seed`.
-- **The catalog is the synthetic seed inventory** (`CATALOG_PROVIDER=fake`). Seed offers only match
-  `seed` briefs, so a `live` brief finds nothing until a live catalog adapter is approved.
+- **The default catalog is synthetic seed inventory** (`CATALOG_PROVIDER=fake`). Seed offers only
+  match `seed` briefs. `CATALOG_PROVIDER=openai` explicitly enables the newly integrated web-search
+  discovery and verified storefront-JSON adapter; it rejects synthetic/replay briefs. It is covered
+  by offline injected HTTP/DNS tests, not certified by live calls. Shipping, materials and dimensions
+  stay unknown unless sourced, so partial results are expected. Human validation is still required.
+- The optional macOS decoder is selected with `IMAGE_NORMALIZER=sips`. The accepted default remains
+  the documented container sanitizer, including on Windows. Neither implies a completed decoder spike.
+- Single-object input is supported alongside both outfit and setup collections; setup interpretation
+  also accepts other product types. The richer result cards, evidence and downloadable shortlist use
+  the owner-scoped run/SSE API, preserving cancellation, deletion and revision invalidation.
 - Runs, checkpoints and sessions are in memory; a restart drops them.
 - Demand projection, consent and merchant profiling (S3/S4) are not mounted; the merchant card
   remains explicitly synthetic. No live provider was called during integration.
+
+## Final merge verification — 2026-09-19
+
+Combined local `codex/s1-integration` (`db72beb`) with remote
+`codex/integrate-l1-l3-l4` (`5a446b5`), including S2 L2/L3. The corrected owner-scoped APIs,
+SSE/revision invalidation, non-recording fake, cache-content fingerprint and query accounting
+take precedence over duplicate implementations. New result cards/shortlists use those APIs.
+Live discovery is explicit, rejects seed/replay input, and has offline HTTP/DNS regressions.
+
+Observed: 38 test files passed, 523 tests passed; two native macOS tests skipped on Windows.
+S1/S2 gates: 2 files / 22 tests passed. Fixtures: 3 files / 67 tests passed. All workspace and
+eval TypeScript checks passed; Biome checked 173 files with no remaining changes; web build
+transformed 2034 modules. Checks used installed binaries because pnpm attempted an unavailable
+dependency refresh in the isolated checkout. No dependency manifest or lockfile was edited.
+
+The user accepted the documented sanitizer limitation and authorized main integration and removal
+of fully merged branches. This is an integrated offline S1/S2 baseline with opt-in live adapters,
+not a claim that human live-provider, decoder or persistence validation has completed. Historical
+main is retained in Git ancestry; the obsolete report application is superseded by this workspace.

@@ -16,8 +16,8 @@ export const SHOPPING_DOMAINS = {
     confirmationHint: 'Confirm the items you want and enter sizes; a photo cannot establish fit.',
   },
   setup: {
-    label: 'Rooms & desk setups',
-    exampleCategories: ['desk', 'chair', 'lighting', 'storage'],
+    label: 'Any products',
+    exampleCategories: ['headphones', 'camera', 'sports gear', 'kitchenware', 'furniture'],
     constraintKinds: ['dimension', 'mounting', 'exclude_material'],
     confirmationHint: 'Confirm the items you want and enter dimensions or mounting restrictions.',
   },

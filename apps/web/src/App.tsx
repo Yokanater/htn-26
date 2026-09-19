@@ -212,6 +212,9 @@ function BriefReview({
         <div>
           <p className="eyebrow">DRAFT · REVISION {brief.revision}</p>
           <h2>Here’s the collection we heard.</h2>
+          {brief.sampleOrigin === 'seed' && (
+            <p>Synthetic demo draft. Review and edit every item.</p>
+          )}
           <p>Nothing is searched until you confirm. The full editor can refine every detail.</p>
         </div>
         <span className="private-badge">
@@ -247,7 +250,11 @@ function BriefReview({
               <p>Collection matching will use this exact revision.</p>
             </div>
           </div>
-          <CollectionPanel key={`${brief.id}-${brief.revision}`} brief={brief} />
+          <CollectionPanel
+            key={`${brief.id}-${brief.revision}`}
+            brief={brief}
+            onEdit={() => save(brief)}
+          />
         </>
       ) : (
         <div className="brief-editor-shell" aria-busy={pending}>
@@ -508,6 +515,12 @@ function MerchantWorkspace({ back }: { back: () => void }) {
 
 export function App() {
   const [surface, setSurface] = useState<Surface>('home');
+  const capabilities = useQuery({
+    queryKey: ['capabilities'],
+    queryFn: () => json<{ flags?: Record<string, boolean> }>('/api/capabilities'),
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
   const session = useQuery({
     queryKey: ['private-session'],
     queryFn: () => json<{ owner: boolean }>('/api/session'),
@@ -543,7 +556,14 @@ export function App() {
         </span>
       </header>
       {surface === 'home' && <Home enter={setSurface} />}
-      {surface === 'shopper' && <ShopperWorkspace back={() => setSurface('home')} />}
+      {surface === 'shopper' &&
+        (capabilities.data?.flags?.FEATURE_INTENT_CAPTURE === false ? (
+          <main>
+            <p>Shopper intake is currently disabled.</p>
+          </main>
+        ) : (
+          <ShopperWorkspace back={() => setSurface('home')} />
+        ))}
       {surface === 'merchant' && <MerchantWorkspace back={() => setSurface('home')} />}
       <footer>
         <Brand />

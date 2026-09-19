@@ -60,7 +60,7 @@ export const IntentBriefSchema = z
       z.strictObject({ kind: z.literal('image'), assetId: idSchema('asset_') }),
       z.strictObject({ kind: z.literal('text'), text: z.string().min(1).max(2000) }),
     ]),
-    slots: z.array(IntentSlotSchema).min(2).max(6),
+    slots: z.array(IntentSlotSchema).min(1).max(6),
     country: CountryCodeSchema,
     currency: CurrencyCodeSchema,
     itemBudget: PriceSchema.nullable(),

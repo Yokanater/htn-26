@@ -41,7 +41,7 @@ import { matchIssues } from './validate';
 
 /** A catalog that may hold resources (e.g. browser sessions) for the life of one run. */
 export type CatalogSession = Pick<ShoppingCatalog, 'search'> & { close(): Promise<void> };
-export type OpenCatalog = (signal: AbortSignal) => Promise<CatalogSession>;
+export type OpenCatalog = (signal: AbortSignal, brief: IntentBrief) => Promise<CatalogSession>;
 
 /** Wraps a stateless catalog; `close` is a no-op. */
 export function staticCatalog(catalog: Pick<ShoppingCatalog, 'search'>): OpenCatalog {
@@ -182,7 +182,7 @@ export async function executeCollectionRun(
   let closed = false;
   const openSession = (): Promise<CatalogSession> => {
     if (closed) return Promise.reject(new Error('Catalog session closed'));
-    session ??= settings.openCatalog(discoverySignal).then((value) => {
+    session ??= settings.openCatalog(discoverySignal, brief).then((value) => {
       opened = value;
       return value;
     });
