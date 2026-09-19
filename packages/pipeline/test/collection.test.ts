@@ -303,6 +303,51 @@ describe.each(DOMAINS)('%s collection run', (domain) => {
     expect(newSearches.every((query) => query.slotId === slot(0).id)).toBe(true);
   });
 
+  describe('match checkpoint after a discovery refresh', () => {
+    const PAST_FACT_TTL_MS = 16 * 60_000;
+
+    function refreshHarness() {
+      let now = NOW;
+      const offers = seedOffers(domain);
+      const parts = harness(domain, { catalog: { offers }, runner: { clock: () => now } });
+      return {
+        ...parts,
+        offers,
+        expireFacts: () => {
+          now = new Date(NOW.getTime() + PAST_FACT_TTL_MS);
+        },
+      };
+    }
+
+    it('rematches when a refreshed offer keeps its ID but changes its listed facts', async () => {
+      const { brief, offers, matcher, runner, expireFacts } = refreshHarness();
+      const first = await runner.start(brief).result;
+      expect(first.stages).toContainEqual({ stage: 'match', status: 'completed' });
+
+      // The seller relists the same offer as a different size; the catalog refetch returns it.
+      const target = offers[0]!;
+      target.attributes = { ...target.attributes, size: 'L' };
+      expireFacts();
+
+      const second = await runner.start(brief).result;
+      expect(second.queries.every((query) => query.status === 'fetched')).toBe(true);
+      expect(second.offers.find((offer) => offer.id === target.id)?.attributes.size).toBe('L');
+      expect(second.stages).toContainEqual({ stage: 'match', status: 'completed' });
+      expect(matcher.calls).toHaveLength(2);
+    });
+
+    it('still reuses the match when the refetch returns identical offers', async () => {
+      const { brief, matcher, runner, expireFacts } = refreshHarness();
+      await runner.start(brief).result;
+      expireFacts();
+
+      const second = await runner.start(brief).result;
+      expect(second.queries.every((query) => query.status === 'fetched')).toBe(true);
+      expect(second.stages).toContainEqual({ stage: 'match', status: 'reused' });
+      expect(matcher.calls).toHaveLength(1);
+    });
+  });
+
   it('spends the catalog-query budget on each slot first query before any second query', async () => {
     const two = harness(domain, { runner: { caps: { catalog_query: 2 } } });
     const covered = await two.runner.start(two.brief).result;
@@ -318,6 +363,42 @@ describe.each(DOMAINS)('%s collection run', (domain) => {
     expect(short.missing).toEqual([
       expect.objectContaining({ slotId: one.slot(1).id, reason: 'budget_exhausted' }),
     ]);
+  });
+
+  describe('catalog adapters that also charge the budget', () => {
+    it('charges each planned query once, not once by the runner and again by the adapter', async () => {
+      const { brief, runner } = harness(domain, { catalog: { chargesBudget: 1 } });
+      const result = await runner.start(brief).result;
+      expect(result.queries).toHaveLength(brief.slots.length * 2);
+      expect(result.usage.catalog_query).toBe(result.queries.length);
+    });
+
+    it('lets a cap equal to the planned query count fetch every query', async () => {
+      const cap = seedBrief(domain).slots.length * 2;
+      const { brief, runner } = harness(domain, {
+        catalog: { chargesBudget: 1 },
+        runner: { caps: { catalog_query: cap } },
+      });
+      const result = await runner.start(brief).result;
+      expect(result.queries.every((query) => query.status === 'fetched')).toBe(true);
+      expect(result.status).toBe('ready');
+    });
+
+    it('still charges an adapter for upstream calls beyond the one the runner paid for', async () => {
+      const { brief, runner } = harness(domain, { catalog: { chargesBudget: 2 } });
+      const result = await runner.start(brief).result;
+      expect(result.usage.catalog_query).toBe(result.queries.length * 2);
+    });
+
+    it('does not let an adapter overspend past the cap', async () => {
+      const { brief, runner } = harness(domain, {
+        catalog: { chargesBudget: 2 },
+        runner: { caps: { catalog_query: seedBrief(domain).slots.length } },
+      });
+      const result = await runner.start(brief).result;
+      expect(result.usage.catalog_query).toBeLessThanOrEqual(brief.slots.length);
+      expect(result.queries.some((query) => query.status === 'budget_exhausted')).toBe(true);
+    });
   });
 
   it('rejects matcher output with a wrong revision, unknown offer or bad subtotal', async () => {

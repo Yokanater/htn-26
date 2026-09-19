@@ -53,6 +53,8 @@ export interface FakeCatalogOptions {
   openDelayMs?: number;
   /** Extra items appended to every response (e.g. malformed or foreign-origin offers). */
   extra?: unknown[];
+  /** Like L1's injected catalog, charge this many `catalog_query` units on every search. */
+  chargesBudget?: number;
 }
 
 export interface CatalogStats {
@@ -73,6 +75,7 @@ export function fakeCatalog(options: FakeCatalogOptions): {
   const search = async (query: ProductQuery, context: ShoppingContext): Promise<ProductOffer[]> => {
     stats.searches.push(query);
     try {
+      if (options.chargesBudget) context.consume('catalog_query', options.chargesBudget);
       if (options.hang?.(query)) {
         await new Promise<never>((_, reject) => {
           if (!options.ignoreSignal) {

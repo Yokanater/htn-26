@@ -1,6 +1,8 @@
 /** Per-run resource budget. Owner: L3 (S2-L3-1). Design v3 §9 initial caps.
  * `consume` throws before the provider is called. The pipeline consumes `catalog_query` once per
  * search it issues; catalog adapters consume `fetch`/`browser_session`, model adapters `model_call`.
+ * An adapter that also charges `catalog_query` inside `search` has its first unit absorbed by the
+ * runner's payment (see `withPrepaidCatalogQuery` in run.ts), so a query is never charged twice.
  */
 import type { BudgetResource } from './types';
 

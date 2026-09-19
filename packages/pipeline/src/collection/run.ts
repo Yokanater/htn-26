@@ -116,6 +116,29 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 
+/**
+ * The runner charges one `catalog_query` per search it issues, before the provider is called.
+ * Adapters such as L1's injected catalog also charge `catalog_query` inside `search` (the port
+ * says the runtime rejects an over-budget call before the provider runs), so without this every
+ * query would cost two units. The runner's payment absorbs the adapter's first unit for that
+ * search; an adapter that really makes several upstream calls is still charged for the rest.
+ */
+function withPrepaidCatalogQuery(context: ShoppingContext): ShoppingContext {
+  let credit = 1;
+  return {
+    ...context,
+    consume(resource, amount) {
+      let charge = amount;
+      if (resource === 'catalog_query' && credit > 0) {
+        const absorbed = Math.min(credit, charge);
+        credit -= absorbed;
+        charge -= absorbed;
+      }
+      if (charge > 0) context.consume(resource, charge);
+    },
+  };
+}
+
 interface DiscoveryOutcome {
   query: PlannedQuery;
   status: QueryOutcomeStatus;
@@ -253,7 +276,7 @@ export async function executeCollectionRun(
       try {
         const catalog = await untilAborted(openSession(), discoverySignal);
         const raw: unknown = await untilAborted(
-          catalog.search(query, { ...context, signal: discoverySignal }),
+          catalog.search(query, withPrepaidCatalogQuery({ ...context, signal: discoverySignal })),
           discoverySignal,
         );
         const offers: ProductOffer[] = [];
@@ -318,8 +341,10 @@ export async function executeCollectionRun(
     } else {
       setStage('match', 'running');
       const offers = [...offerIndex.values()];
+      // Content, not IDs: a refreshed listing keeps its offer ID but can change size, price or
+      // availability, and a match built on the old facts must not be served for the new ones.
       const key = `match:${brief.sampleOrigin}:${brief.id}:r${brief.revision}:${settings.matcherVersion}:${fingerprint(
-        offers.map((offer) => offer.id).sort(),
+        [...offers].sort((a, b) => a.id.localeCompare(b.id)),
       )}`;
       const cached = await readCheckpoint(store, key, MatchCheckpointSchema);
       const valid = (list: readonly unknown[]) =>
