@@ -7,6 +7,13 @@ import { coffeeProfile } from "../src/fixtures/profile.js";
 import { coffeeEvidence, INJECTION_CANARY, INJECTION_DOC_ID, MARKETING_COPY_DOC_ID } from "../src/fixtures/evidence.js";
 import { coffeeSeeds } from "../src/fixtures/seeds.js";
 import { fakeCollaboration, fakeCompetitors, fakePlan, fakeSwotActions } from "../src/fixtures/outputs.js";
+import {
+  adaptEnrichmentResponse, adaptEntityScores, adaptEvidenceDocuments,
+} from "../src/adapters/upstream.js";
+import {
+  failedEnrichmentDocument, failedEnrichmentResponse, invalidEntityScore, invalidEvidenceDocument, validEnrichmentResponse, validEntityScore, validEvidenceDocument,
+} from "../../../packages/contracts/fixtures/index.js";
+import { isCompatibleSchemaVersion, JSON_SCHEMAS, SCHEMA_VERSION } from "../../../packages/contracts/src/index.js";
 
 describe("fixtures", () => {
   it("profile, evidence and seeds match the contracts", () => {
@@ -43,6 +50,34 @@ describe("fixtures", () => {
 });
 
 describe("contracts", () => {
+  it("uses a compatible semver schema version and exports JSON Schemas", () => {
+    expect(SCHEMA_VERSION).toMatch(/^1\.\d+\.\d+$/);
+    expect(isCompatibleSchemaVersion("1.99.0")).toBe(true);
+    expect(isCompatibleSchemaVersion("2.0.0")).toBe(false);
+    expect(JSON_SCHEMAS.evidence_document.$schema).toBeDefined();
+    expect(JSON_SCHEMAS.report_item.definitions).toBeDefined();
+  });
+
+  it("adapts valid Phase C evidence and rejects malformed evidence", () => {
+    expect(adaptEvidenceDocuments([validEvidenceDocument])[0]?.id).toBe("ev_contract_1");
+    expect(() => adaptEvidenceDocuments([invalidEvidenceDocument])).toThrow();
+  });
+
+  it("adapts successful enrichment and degrades safely on a failed batch", () => {
+    const enriched = adaptEnrichmentResponse([validEvidenceDocument], validEnrichmentResponse);
+    expect(enriched[0]?.enrichment?.relevance).toBe(0.91);
+    const degraded = adaptEnrichmentResponse([validEvidenceDocument], failedEnrichmentResponse);
+    expect(degraded[0]?.enrichment).toBeUndefined();
+    expect(adaptEvidenceDocuments([failedEnrichmentDocument])[0]?.enrichment).toBeUndefined();
+    expect(() => adaptEnrichmentResponse([validEvidenceDocument], { items: [{ evidence_id: "ev_contract_1", relevance: 2 }] })).toThrow();
+  });
+
+  it("adapts real entity scores and rejects malformed score records", () => {
+    expect(adaptEntityScores([validEntityScore])[0]?.score_components.total).toBe(72);
+    expect(() => adaptEntityScores([{ ...validEntityScore, score_components: { components: {}, total: 101 } }])).toThrow();
+    expect(() => adaptEntityScores([invalidEntityScore])).toThrow();
+  });
+
   it("rejects out-of-range counts", () => {
     expect(CollaborationOutput.safeParse({ candidates: fakeCollaboration.candidates.slice(0, 4) }).success).toBe(false);
     expect(SwotActionsOutput.safeParse({ ...fakeSwotActions, actions: fakeSwotActions.actions.slice(0, 2) }).success).toBe(false);
