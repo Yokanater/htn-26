@@ -1,10 +1,11 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { evaluate, gateFailures } from "./eval.js";
+import { findStore } from "./fixtures/stores/index.js";
 import { OpenAiLlmClient } from "./llm/openai.js";
 import type { LlmClient, LlmRequest } from "./llm/types.js";
 
 /** Live benchmark: N full reports, per-workflow first-pass failure rate, latency and tokens.
- *  Usage: npm run bench -- [--runs 5] [--concurrency 3] [--label name] [--no-quarantine]
+ *  Usage: npm run bench -- [--runs 5] [--concurrency 3] [--label name] [--store coffee] [--no-quarantine]
  *  Optional cost: OPENAI_PRICE_IN / OPENAI_PRICE_OUT = USD per 1M tokens (not assumed; unset => tokens only). */
 const arg = (n: string, d: string) => (process.argv.includes(`--${n}`) ? process.argv[process.argv.indexOf(`--${n}`) + 1]! : d);
 try { process.loadEnvFile(".env"); } catch { /* env only */ }
@@ -36,11 +37,12 @@ async function one(i: number, quarantine: boolean) {
       }
     },
   };
-  const r = await evaluate(tap, { quarantineInjections: quarantine, run_id, logger: (e) => { if (e.event === "workflow_retry") retries.push(e); } });
+  const r = await evaluate(tap, { store, quarantineInjections: quarantine, run_id, logger: (e) => { if (e.event === "workflow_retry") retries.push(e); } });
   console.error(`run ${i}: status=${r.result.status} gates=${gateFailures(r).join(";") || "ok"}`);
   return { calls, r, retries };
 }
 
+const store = findStore(arg("store", "coffee"));
 const runs = Number(arg("runs", "5"));
 const conc = Number(arg("concurrency", "3"));
 const label = arg("label", "bench");
@@ -72,4 +74,4 @@ console.table(rows);
 console.log(`per full report: ${tin} in + ${tout} out tokens${priced ? ` = $${((tin * pIn + tout * pOut) / 1e6).toFixed(3)}` : " (set OPENAI_PRICE_IN/OUT for $)"}`);
 console.log(`statuses: ${results.map((x) => x.r.result.status).join(", ")}; wall time/report ≈ ${(results.reduce((a, x) => a + Math.max(...x.calls.map((c) => c.ms)), 0) / runs / 1000).toFixed(0)}s (longest call)`);
 mkdirSync("runs", { recursive: true });
-writeFileSync(`runs/${label}.json`, JSON.stringify({ rows, results: results.map((x) => ({ calls: x.calls, retries: x.retries, status: x.r.result.status, missing: x.r.result.missing_sections, first_pass: x.r.first_pass, shipped: x.r.shipped, low_evidence: x.r.low_evidence, injection: x.r.injection, items: x.r.result.items })) }, null, 2));
+writeFileSync(`runs/${label}.json`, JSON.stringify({ rows, results: results.map((x) => ({ calls: x.calls, retries: x.retries, status: x.r.result.status, missing: x.r.result.missing_sections, first_pass: x.r.first_pass, shipped: x.r.shipped, grades: x.r.grades, low_evidence: x.r.low_evidence, injection: x.r.injection, items: x.r.result.items })) }, null, 2));

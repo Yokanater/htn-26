@@ -1,0 +1,43 @@
+{
+  "store_id": "skincare",
+  "labeled_by": "analysis team (fixture author review)",
+  "labeled_at": "2026-09-19",
+  "collaborators": {
+    "relevant": [
+      { "entity_key": "softloom.example", "name": "Softloom" },
+      { "entity_key": "moonweave.example", "name": "Moonweave" },
+      { "entity_key": "glowtide.example", "name": "Glowtide" },
+      { "entity_key": "lathr.example", "name": "Lathr" }
+    ],
+    "irrelevant": [
+      { "entity_key": "clearpath.example", "name": "Clearpath", "note": "Humidifiers: weak product link, large infrequent purchase; reviewers rejected it as a collaborator." },
+      { "entity_key": "dewbare.example", "name": "Dewbare", "note": "Competitor." },
+      { "entity_key": "theplainlab.example", "name": "The Plain Lab", "note": "Competitor." }
+    ]
+  },
+  "competitors": {
+    "relevant": [
+      { "entity_key": "dewbare.example", "name": "Dewbare" },
+      { "entity_key": "theplainlab.example", "name": "The Plain Lab", "aliases": ["Plain Lab"] },
+      { "entity_key": "marrowskin.example", "name": "Marrow Skin" },
+      { "entity_key": "oakmoss.example", "name": "Oakmoss Apothecary", "aliases": ["Oakmoss"] },
+      { "entity_key": "glowboxmonthly.example", "name": "Glowbox Monthly", "aliases": ["Glowbox"] }
+    ],
+    "irrelevant": [
+      { "entity_key": "glowtide.example", "name": "Glowtide", "note": "Complement (makeup over SPF)." },
+      { "entity_key": "softloom.example", "name": "Softloom", "note": "Complement." }
+    ]
+  },
+  "themes": [
+    { "id": "praise_merchant_gentle", "theme_kind": "praise", "about": ["Fernleaf"], "supporting_evidence_ids": ["fern_009", "fern_010", "fern_022", "fern_015"], "note": "fern_016 is a neutral brand list, not praise." },
+    { "id": "complaint_merchant_spf_price", "theme_kind": "complaint", "about": ["Fernleaf"], "supporting_evidence_ids": ["fern_011", "fern_012"] },
+    { "id": "switching_dewbare_reformulation", "theme_kind": "switching_trigger", "about": ["Dewbare"], "supporting_evidence_ids": ["fern_013"] },
+    { "id": "unmet_tinted_spf", "theme_kind": "unmet_need", "about": ["Fernleaf"], "supporting_evidence_ids": ["fern_014"] },
+    { "id": "complaint_glowbox_fragrance", "theme_kind": "complaint", "about": ["Glowbox"], "supporting_evidence_ids": ["fern_018"] },
+    { "id": "praise_marrow_eczema", "theme_kind": "praise", "about": ["Marrow Skin"], "supporting_evidence_ids": ["fern_017", "fern_016"] }
+  ],
+  "unsupported_claims": [
+    { "pattern": "cures? (?:rosacea|eczema)", "reason": "Medical cure claim; sources only describe individual relief." },
+    { "pattern": "dermatologist[- ]recommended", "reason": "Merchant says dermatologist-tested, not recommended." }
+  ]
+}

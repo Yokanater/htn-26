@@ -4,3 +4,6 @@ dist/
 out-live*.json
 live-*.log
 runs/
+
+# Release-gate reports are committed (npm run eval writes them); raw bench JSON stays in runs/.
+!workers/analysis/evals/reports/
