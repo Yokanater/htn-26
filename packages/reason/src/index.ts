@@ -2,3 +2,4 @@
  * Implement active S1–S5 cards against @sei/core interfaces.
  */
 export * from './intent';
+export * from './matching';
