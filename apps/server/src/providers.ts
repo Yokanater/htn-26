@@ -114,18 +114,13 @@ function createCatalog(env: EnvLike): AppProviders['catalog'] {
   if (provider === 'fake') {
     return createInjectedShoppingCatalog({ offers: loadSeedOffers(), sampleOrigin: 'seed' });
   }
-  if (provider === 'openai') {
-    if (
-      !env.OPENAI_API_KEY?.trim() ||
-      !(env.OPENAI_MODEL_SEARCH || env.OPENAI_MODEL_VISION)?.trim()
-    ) {
-      throw new Error(
-        'CATALOG_PROVIDER=openai requires OPENAI_API_KEY and a search or vision model',
-      );
+  if (provider === 'browserbase') {
+    if (!env.BROWSERBASE_API_KEY?.trim()) {
+      throw new Error('CATALOG_PROVIDER=browserbase requires BROWSERBASE_API_KEY');
     }
     return (brief) => liveCatalog(brief, env);
   }
-  throw new Error(`Unsupported CATALOG_PROVIDER "${provider}" (expected "fake" or "openai")`);
+  throw new Error(`Unsupported CATALOG_PROVIDER "${provider}" (expected "fake" or "browserbase")`);
 }
 
 export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {}): AppProviders {
