@@ -18,7 +18,10 @@ export async function analyzeCompetitors(
       renderEvidence(bundle.documents),
       "Produce the competitor profiles and discourse themes.",
     ].join("\n\n"),
-    validate: (o) => validateReport({ competitors: o.competitors, themes: o.themes }, bundle),
+    validate: (o) =>
+      validateReport({ competitors: o.competitors, themes: o.themes }, bundle, {
+        complements: seeds.filter((s) => s.kind === "collaboration").map((s) => ({ entity_key: s.entity_key, name: s.name })),
+      }),
   });
   return {
     competitors: [...out.competitors]

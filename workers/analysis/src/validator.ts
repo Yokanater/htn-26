@@ -15,6 +15,7 @@ export type ValidationErrorCode =
   | "SUBSTITUTE_WITHOUT_CONFLICT"
   | "DUPLICATE_ID"
   | "DUPLICATE_ENTITY"
+  | "COMPLEMENT_LISTED_AS_COMPETITOR"
   | "MISSING_THEME_KIND"
   // produced by workflows rather than validateReport:
   | "SCHEMA_INVALID"
@@ -114,7 +115,12 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 
 const DUPLICATE_THRESHOLD = 0.6;
 
-export function validateReport(output: ReportSections, bundle: EvidenceBundle): ValidationError[] {
+export interface ValidateOptions {
+  /** Brands known upstream to be collaboration partners (complements). Listing one as a competitor is an error. */
+  complements?: { entity_key: string; name: string }[];
+}
+
+export function validateReport(output: ReportSections, bundle: EvidenceBundle, opts: ValidateOptions = {}): ValidationError[] {
   const errors: ValidationError[] = [];
   const docs = new Map(bundle.documents.map((d) => [d.id, d]));
   const push = (code: ValidationErrorCode, path: string, message: string, evidence_id?: string) =>
@@ -167,6 +173,11 @@ export function validateReport(output: ReportSections, bundle: EvidenceBundle): 
     });
   };
   dupEntities("collaboration", output.collaboration?.map((c) => ({ name: c.brand_name, key: c.entity_key })));
+  output.competitors?.forEach((c, i) => {
+    const hit = opts.complements?.find((p) => p.entity_key === c.entity_key || norm(p.name) === norm(c.name));
+    if (hit)
+      push("COMPLEMENT_LISTED_AS_COMPETITOR", `competitors[${i}]`, `"${c.name}" is a complementary collaboration partner, not a competitor. Competitors sell something a shopper would buy instead of the merchant's products.`);
+  });
   dupEntities("competitors", output.competitors?.map((c) => ({ name: c.name, key: c.entity_key })));
 
   // --- Discourse ------------------------------------------------------------------

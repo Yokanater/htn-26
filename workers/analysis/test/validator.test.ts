@@ -153,6 +153,17 @@ describe("validateReport", () => {
       expect(codes(r).sort()).toEqual(["DUPLICATE_ENTITY", "DUPLICATE_ID"]);
     });
 
+    it("rejects a collaboration partner listed as a competitor (seen live: Kiln & Kettle, Hale, Crumb & Co)", () => {
+      const r = good();
+      Object.assign(r.competitors![5]!, { name: "Kiln & Kettle", entity_key: null });
+      const complements = [{ entity_key: "kilnandkettle.example", name: "Kiln & Kettle" }];
+      expect(validateReport(r, bundle, { complements })).toEqual([expect.objectContaining({ code: "COMPLEMENT_LISTED_AS_COMPETITOR", path: "competitors[5]" })]);
+      r.competitors![5]!.entity_key = "kilnandkettle.example"; // matched by key too
+      r.competitors![5]!.name = "K&K";
+      expect(validateReport(r, bundle, { complements }).map((e) => e.code)).toEqual(["COMPLEMENT_LISTED_AS_COMPETITOR"]);
+      expect(validateReport(good(), bundle, { complements })).toEqual([]);
+    });
+
     it("requires all four discourse theme kinds", () => {
       const r = good();
       r.themes = r.themes!.filter((t) => t.theme_kind !== "unmet_need");
