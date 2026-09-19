@@ -4,6 +4,7 @@ import {
   type IntentBrief,
   IntentBriefSchema,
   newId,
+  type SampleOrigin,
   type ShoppingDomain,
 } from '@sei/contracts';
 import type { IntentInterpreter } from '@sei/core';
@@ -30,7 +31,7 @@ export interface IntentDraftInput {
 }
 
 export interface IntentDraftService {
-  createDraft(input: IntentDraftInput): Promise<IntentBrief>;
+  createDraft(input: IntentDraftInput, signal?: AbortSignal): Promise<IntentBrief>;
 }
 
 interface AssetRecord {
@@ -103,11 +104,21 @@ export class RevisionConflictError extends Error {
   }
 }
 
-/** Adapts L3's budgeted interpreter to the private intake API. */
+/**
+ * Adapts L3's budgeted interpreter to the private intake API. `sampleOrigin` says where drafts
+ * come from: 'live' only for a real provider, 'seed' for synthetic drafts so they can never be
+ * mistaken for observed demand.
+ */
 export class InterpreterIntentDraftService implements IntentDraftService {
-  constructor(private readonly interpreter: IntentInterpreter) {}
+  constructor(
+    private readonly interpreter: IntentInterpreter,
+    private readonly sampleOrigin: SampleOrigin = 'seed',
+  ) {}
 
-  async createDraft(input: IntentDraftInput): Promise<IntentBrief> {
+  async createDraft(
+    input: IntentDraftInput,
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<IntentBrief> {
     let consumed = 0;
     return this.interpreter.interpret(
       {
@@ -117,8 +128,8 @@ export class InterpreterIntentDraftService implements IntentDraftService {
         currency: input.currency,
       },
       {
-        signal: new AbortController().signal,
-        sampleOrigin: 'seed',
+        signal,
+        sampleOrigin: this.sampleOrigin,
         consume(resource, amount) {
           if (resource !== 'model_call' || consumed + amount > 2) {
             throw new Error('Intent budget exceeded');

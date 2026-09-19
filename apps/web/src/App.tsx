@@ -25,6 +25,15 @@ import { MediaIntake, type MediaSelection } from './features/shopper/media';
 
 type Surface = 'home' | 'shopper' | 'merchant';
 
+class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | null,
+  ) {
+    super(message);
+  }
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body && !(init.body instanceof FormData))
@@ -33,9 +42,15 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers,
   });
-  const payload = (await response.json()) as T & { error?: { message?: string } };
-  if (!response.ok)
-    throw new Error(payload.error?.message ?? `Request failed (${response.status})`);
+  // A proxy or crash can answer with plain text: never surface the JSON parse error.
+  const payload = (await response.json().catch(() => null)) as
+    | (T & { error?: { code?: string; message?: string } })
+    | null;
+  if (!response.ok || payload === null)
+    throw new ApiError(
+      payload?.error?.message ?? `Request failed (${response.status}). Try again.`,
+      payload?.error?.code ?? null,
+    );
   return payload;
 }
 
@@ -194,11 +209,15 @@ function BriefReview({
   save,
   confirm,
   pending,
+  error,
+  reload,
 }: {
   brief: IntentBrief;
   save: (brief: IntentBrief) => void;
   confirm: (brief: IntentBrief) => void;
   pending: boolean;
+  error: Error | null;
+  reload: () => void;
 }) {
   const hints: Record<ShoppingDomain, DomainHint> = {
     outfit: {
@@ -268,6 +287,16 @@ function BriefReview({
             onSave={save}
             onConfirm={confirm}
           />
+          {error && (
+            <div className="form-error" role="alert">
+              <p>{error.message}</p>
+              {error instanceof ApiError && error.code === 'REVISION_CONFLICT' && (
+                <button className="text-button" type="button" onClick={reload}>
+                  Reload latest brief
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -314,7 +343,16 @@ function ShopperWorkspace({ back }: { back: () => void }) {
     },
     onSuccess: setBrief,
   });
-  const error = create.error ?? update.error;
+  const reload = useMutation({
+    mutationFn: () => {
+      if (!brief) throw new Error('No brief to reload.');
+      return json<IntentBrief>(`/api/briefs/${brief.id}`);
+    },
+    onSuccess: (latest) => {
+      update.reset();
+      setBrief(latest);
+    },
+  });
   return (
     <main className="workspace-main">
       <button className="back-button" type="button" onClick={back}>
@@ -371,9 +409,9 @@ function ShopperWorkspace({ back }: { back: () => void }) {
                 onSelectionChange={setSelection}
               />
             </div>
-            {error && (
+            {create.error && (
               <p className="form-error" role="alert">
-                {error.message}
+                {create.error.message}
               </p>
             )}
             <button
@@ -397,7 +435,9 @@ function ShopperWorkspace({ back }: { back: () => void }) {
       ) : (
         <BriefReview
           brief={brief}
-          pending={update.isPending}
+          pending={update.isPending || reload.isPending}
+          error={update.error ?? reload.error}
+          reload={() => reload.mutate()}
           save={(edited) => update.mutate({ edited, status: 'draft' })}
           confirm={(edited) => update.mutate({ edited, status: 'confirmed' })}
         />

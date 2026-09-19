@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
+import { errorBody, SESSION_ENDED } from '../errors';
 import type { AppProviders } from '../providers';
-import { ASSET_MAX_BYTES } from '../services/intake';
+import { ASSET_MAX_BYTES, type NormalizedImage } from '../services/intake';
 import { SESSION_COOKIE } from '../services/session';
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -21,7 +22,9 @@ export function assetRoutes(providers: AppProviders): Hono {
         { error: { code: 'ASSET_TOO_LARGE', message: 'Choose an image smaller than 8 MiB.' } },
         413,
       );
-    const body = await c.req.parseBody();
+    const body = await c.req.parseBody().catch(() => null);
+    if (!body)
+      return c.json(errorBody('INVALID_UPLOAD', 'Send one image as a multipart form upload.'), 400);
     const upload = body.image;
     if (!(upload instanceof File) || !allowedTypes.has(upload.type))
       return c.json(
@@ -44,19 +47,21 @@ export function assetRoutes(providers: AppProviders): Hono {
         },
         503,
       );
+    let normalized: NormalizedImage;
     try {
-      const normalized = await providers.imageNormalizer.normalize(
+      normalized = await providers.imageNormalizer.normalize(
         new Uint8Array(await upload.arrayBuffer()),
         upload.type,
       );
-      const asset = providers.intake.putAsset(ownerId, normalized, providers.now());
-      return c.json(asset, 201);
     } catch {
       return c.json(
         { error: { code: 'MALFORMED_ASSET', message: 'That image could not be decoded safely.' } },
         415,
       );
     }
+    // The session may have been deleted while the image was processed: never store it.
+    if (!providers.sessions.valid(ownerId)) return c.json(SESSION_ENDED, 401);
+    return c.json(providers.intake.putAsset(ownerId, normalized, providers.now()), 201);
   });
   routes.get('/assets/:id', (c) => {
     const ownerId = getCookie(c, SESSION_COOKIE);

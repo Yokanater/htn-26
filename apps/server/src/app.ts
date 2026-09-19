@@ -8,6 +8,8 @@ import {
   SHOPPING_DOMAINS,
 } from '@sei/core';
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { errorBody } from './errors';
 import { type AppProviders, defaultProviders } from './providers';
 import { assetRoutes } from './routes/assets';
 import { briefRoutes } from './routes/briefs';
@@ -15,7 +17,7 @@ import { sessionRoutes } from './routes/session';
 
 /** Pure factory: no listeners, environment reads or provider calls. */
 export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): Hono {
-  const providers = { ...defaultProviders(), ...injected };
+  const providers = { ...defaultProviders(env), ...injected };
   const resolved = resolveMilestones(env.MILESTONES);
   const flags = featureFlags(env);
   const sections = resolved.milestones.flatMap((id) => {
@@ -47,6 +49,15 @@ export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): 
     }
     c.header('Cache-Control', 'no-store');
     await next();
+  });
+  app.notFound((c) => c.json(errorBody('NOT_FOUND', 'Not found.'), 404));
+  app.onError((error, c) => {
+    // Name only: messages can carry provider output or shopper text.
+    console.error('[server] unhandled error', error instanceof Error ? error.name : typeof error);
+    if (error instanceof HTTPException) {
+      return c.json(errorBody('HTTP_ERROR', 'The request could not be processed.'), error.status);
+    }
+    return c.json(errorBody('INTERNAL_ERROR', 'Something went wrong. Try again.'), 500);
   });
   app.get('/healthz', (c) => c.json({ ok: true }));
   app.get('/api/healthz', (c) => c.json({ ok: true }));

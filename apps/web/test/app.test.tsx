@@ -102,3 +102,108 @@ it('renders the shared contract version', () => {
   renderApp();
   expect(screen.getByText(/Contracts v1\.1\.0/)).toBeTruthy();
 });
+
+const CONFLICT_MESSAGE =
+  'The brief changed in another tab. Reload the latest revision before saving.';
+
+function draftBrief(revision = 1) {
+  return {
+    id: 'brief_web_1',
+    domain: 'setup',
+    revision,
+    status: 'draft',
+    input: { kind: 'text', text: 'A compact reading corner with warm wood and soft light' },
+    slots: [
+      {
+        id: 'slot_web_1',
+        category: 'chair',
+        description: 'A comfortable reading chair',
+        required: true,
+        visualAttributes: [],
+        constraints: [],
+      },
+      {
+        id: 'slot_web_2',
+        category: 'lighting',
+        description: 'Warm task lighting',
+        required: true,
+        visualAttributes: [],
+        constraints: [],
+      },
+    ],
+    country: 'CA',
+    currency: 'CAD',
+    itemBudget: null,
+    sampleOrigin: 'seed',
+    createdAt: '2026-09-19T12:00:00.000Z',
+  };
+}
+
+/** Routes the brief API; `create` and `patch` decide how those two calls respond. */
+function stubBriefApi(handlers: { create?: () => Response; patch: () => Response }) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(input);
+    if (path === '/api/session') return Response.json({ owner: true });
+    if (path === '/api/briefs' && init?.method === 'POST') {
+      return handlers.create?.() ?? Response.json(draftBrief(), { status: 201 });
+    }
+    if (path === '/api/briefs/brief_web_1' && init?.method === 'PATCH') return handlers.patch();
+    if (path === '/api/briefs/brief_web_1') return Response.json(draftBrief(2));
+    return new Response('not found', { status: 404 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function submitTextIdea() {
+  fireEvent.click(screen.getByRole('button', { name: /Start a collection/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Room or desk' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your collection idea' }), {
+    target: { value: 'A compact reading corner with warm wood and soft light' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /Build my draft brief/ }));
+}
+
+it('shows a failed confirmation on the brief screen and lets the shopper reload the latest revision', async () => {
+  const fetchMock = stubBriefApi({
+    patch: () =>
+      Response.json(
+        { error: { code: 'REVISION_CONFLICT', message: CONFLICT_MESSAGE } },
+        { status: 409 },
+      ),
+  });
+  renderApp();
+  submitTextIdea();
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm brief/ }));
+
+  expect((await screen.findByRole('alert')).textContent).toContain(CONFLICT_MESSAGE);
+
+  fireEvent.click(screen.getByRole('button', { name: /Reload latest/ }));
+  expect(await screen.findByText(/REVISION 2/)).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(fetchMock).toHaveBeenCalledWith('/api/briefs/brief_web_1', expect.anything());
+});
+
+it('explains a non-JSON server failure instead of leaking a parse error', async () => {
+  stubBriefApi({ patch: () => new Response('Internal Server Error', { status: 500 }) });
+  renderApp();
+  submitTextIdea();
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm brief/ }));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toMatch(/Request failed \(500\)/);
+  expect(alert.textContent).not.toMatch(/JSON|Unexpected/i);
+});
+
+it('explains a non-JSON failure while creating the draft', async () => {
+  stubBriefApi({
+    create: () => new Response('Internal Server Error', { status: 500 }),
+    patch: () => Response.json(draftBrief(2)),
+  });
+  renderApp();
+  submitTextIdea();
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toMatch(/Request failed \(500\)/);
+  expect(alert.textContent).not.toMatch(/JSON|Unexpected/i);
+});

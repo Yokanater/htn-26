@@ -1,7 +1,8 @@
-import { IntentBriefSchema, ShoppingDomainSchema } from '@sei/contracts';
+import { type IntentBrief, IntentBriefSchema, ShoppingDomainSchema } from '@sei/contracts';
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
+import { describeIntentFailure, SESSION_ENDED } from '../errors';
 import type { AppProviders } from '../providers';
 import { RevisionConflictError } from '../services/intake';
 import { SESSION_COOKIE } from '../services/session';
@@ -75,12 +76,24 @@ export function briefRoutes(providers: AppProviders): Hono {
         },
         404,
       );
-    const brief = await providers.intent.createDraft({
-      domain: input.data.domain,
-      source,
-      country: input.data.country,
-      currency: input.data.currency,
-    });
+    let brief: IntentBrief;
+    try {
+      brief = await providers.intent.createDraft(
+        {
+          domain: input.data.domain,
+          source,
+          country: input.data.country,
+          currency: input.data.currency,
+        },
+        c.req.raw.signal,
+      );
+    } catch (error) {
+      const failure = describeIntentFailure(error);
+      if (!failure) throw error;
+      return c.json(failure.body, failure.status);
+    }
+    // The session may have been deleted while the model ran: never store a draft for it.
+    if (!providers.sessions.valid(ownerId)) return c.json(SESSION_ENDED, 401);
     providers.intake.saveBrief(ownerId, brief, null);
     return c.json(brief, 201);
   });
