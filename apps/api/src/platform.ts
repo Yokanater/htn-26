@@ -21,7 +21,11 @@ import {
   fixtureReport,
 } from "../../../packages/contracts/src/fixtures";
 import { profileStorefront } from "./store-profiler";
-import { researchMarket } from "./market-research";
+import {
+  isCompatibleCandidate,
+  marketSegment,
+  researchMarket,
+} from "./market-research";
 
 export const LIVE_RESEARCH_LIMIT_MS = 5 * 60 * 1000;
 
@@ -181,6 +185,46 @@ export function createPlatform({
       report.status = "queued";
       report.phase = "queued";
       report.warning = null;
+      report.collaborators = [];
+      report.competitors = [];
+      report.themes = [];
+      report.actions = [];
+      report.evidence = [];
+      report.swot = {
+        strengths: [],
+        weaknesses: [],
+        opportunities: [],
+        threats: [],
+      };
+      report.updatedAt = new Date(0).toISOString();
+      saveReport(report);
+    }
+    if (
+      report.profile.mode === "browserbase" &&
+      terminal(report.status) &&
+      marketSegment(report.profile) === "activewear" &&
+      (report.swot.strengths.length < 2 ||
+        report.collaborators.some(
+          (candidate) =>
+            !isCompatibleCandidate(
+              report.profile,
+              `${candidate.name} ${candidate.category} ${candidate.tagline} ${candidate.description}`,
+              "collaborator",
+            ),
+        ) ||
+        report.competitors.some(
+          (candidate) =>
+            candidate.domain ===
+              new URL(report.profile.url).hostname.replace(/^www\./, "") ||
+            candidate.domain.endsWith(
+              `.${new URL(report.profile.url).hostname.replace(/^www\./, "")}`,
+            ),
+        ))
+    ) {
+      report.status = "queued";
+      report.phase = "queued";
+      report.warning =
+        "Refreshing this report with stricter activewear category matching.";
       report.collaborators = [];
       report.competitors = [];
       report.themes = [];

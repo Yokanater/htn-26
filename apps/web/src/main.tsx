@@ -491,6 +491,9 @@ function App() {
   const [confidence, setConfidence] = useState("all");
   const [saved, setSaved] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [viewMode, setViewMode] = useState<"grid" | "swipe">("grid");
+  const [swipeIndex, setSwipeIndex] = useState(0);
+  const [swipeMotion, setSwipeMotion] = useState<"use" | "throw" | "">("");
   const [drawer, setDrawer] = useState<Drawer | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [utility, setUtility] = useState("");
@@ -573,6 +576,40 @@ function App() {
       setToast((e as Error).message);
     }
   };
+  const decide = async (candidate: Candidate, decision: "use" | "throw") => {
+    setSwipeMotion(decision);
+    try {
+      await Promise.all([
+        api(`/report-items/${candidate.id}/feedback`, {
+          method: "POST",
+          body: JSON.stringify({
+            rating: decision === "use" ? "useful" : "not_useful",
+          }),
+        }),
+        ...(decision === "use" && !saved.includes(candidate.id)
+          ? [api(`/saved/${candidate.id}`, { method: "PUT" })]
+          : []),
+      ]);
+      setFeedback((prev) => ({
+        ...prev,
+        [candidate.id]: decision === "use" ? "useful" : "not_useful",
+      }));
+      if (decision === "use")
+        setSaved((prev) => [...new Set([...prev, candidate.id])]);
+      window.setTimeout(() => {
+        setSwipeIndex((index) => index + 1);
+        setSwipeMotion("");
+      }, 180);
+      setToast(
+        decision === "use"
+          ? `${candidate.name} saved to your shortlist.`
+          : `${candidate.name} removed from this pass.`,
+      );
+    } catch (e) {
+      setSwipeMotion("");
+      setToast((e as Error).message);
+    }
+  };
   const openEvidence = (
     title: string,
     evidenceIds: string[],
@@ -615,6 +652,27 @@ function App() {
     .sort((a, b) =>
       sort === "name" ? a.name.localeCompare(b.name) : b.score - a.score,
     );
+  const swipeCandidate = filtered[swipeIndex];
+  useEffect(
+    () => setSwipeIndex(0),
+    [report?.id, tab, nav, query, confidence, sort],
+  );
+  useEffect(() => {
+    if (viewMode !== "swipe" || !swipeCandidate) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        swipeMotion ||
+        event.repeat ||
+        target?.matches("input, select, textarea, button, a")
+      )
+        return;
+      if (event.key === "ArrowLeft") void decide(swipeCandidate, "throw");
+      if (event.key === "ArrowRight") void decide(swipeCandidate, "use");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [viewMode, swipeCandidate?.id, saved, swipeMotion]);
   const isRunning = report && !terminal(report.status);
 
   return (
@@ -1221,6 +1279,24 @@ function App() {
                         )}
                       </label>
                       <div className="filter-controls">
+                        <div className="view-switch" aria-label="Result view">
+                          <button
+                            aria-label="Grid view"
+                            aria-pressed={viewMode === "grid"}
+                            className={viewMode === "grid" ? "active" : ""}
+                            onClick={() => setViewMode("grid")}
+                          >
+                            <LayoutGrid size={14} /> Normal
+                          </button>
+                          <button
+                            aria-label="Swipe view"
+                            aria-pressed={viewMode === "swipe"}
+                            className={viewMode === "swipe" ? "active" : ""}
+                            onClick={() => setViewMode("swipe")}
+                          >
+                            <ArrowRight size={14} /> Swipe
+                          </button>
+                        </div>
                         <label className="filter-select">
                           <SlidersHorizontal size={14} />
                           <select
@@ -1249,88 +1325,219 @@ function App() {
                       </div>
                     </div>
                     {filtered.length ? (
-                      <div className="brand-grid">
-                        {filtered.map((c) => (
-                          <article className="brand-card" key={c.id}>
-                            <div
-                              className={`brand-visual ${c.imageUrl ? "has-website-image" : "fallback-visual"}`}
-                            >
-                              <span className="category-pill">
-                                {c.category}
+                      viewMode === "swipe" ? (
+                        swipeCandidate ? (
+                          <section
+                            className="swipe-stage"
+                            aria-label="Swipe through brands"
+                          >
+                            <div className="swipe-progress">
+                              <span>
+                                {swipeIndex + 1} of {filtered.length}
                               </span>
-                              <button
-                                aria-label={`${saved.includes(c.id) ? "Unsave" : "Save"} ${c.name}`}
-                                aria-pressed={saved.includes(c.id)}
-                                className={`save-button ${saved.includes(c.id) ? "is-saved" : ""}`}
-                                onClick={() => void toggleSave(c.id)}
-                              >
-                                <Bookmark
-                                  size={17}
-                                  fill={
-                                    saved.includes(c.id)
-                                      ? "currentColor"
-                                      : "none"
-                                  }
+                              <div aria-hidden="true">
+                                <i
+                                  style={{
+                                    width: `${((swipeIndex + 1) / filtered.length) * 100}%`,
+                                  }}
                                 />
-                              </button>
-                              <CandidateMedia candidate={c} />
+                              </div>
+                              <small>← Throw · Use →</small>
                             </div>
-                            <div className="brand-content">
-                              <div className="brand-title-row">
-                                <h3>{c.name}</h3>
-                                <span className="fit-score">
-                                  <span />
-                                  {c.score}
-                                  <small>fit</small>
+                            <article
+                              className={`swipe-card ${swipeMotion}`}
+                              key={swipeCandidate.id}
+                            >
+                              <div
+                                className={`swipe-visual ${swipeCandidate.imageUrl ? "has-website-image" : "fallback-visual"}`}
+                              >
+                                <span className="category-pill">
+                                  {swipeCandidate.category}
                                 </span>
+                                <CandidateMedia candidate={swipeCandidate} />
                               </div>
-                              <div className="brand-subline">
-                                {c.type
-                                  ? `${c.type[0].toUpperCase()}${c.type.slice(1)} competitor`
-                                  : "Complementary brand"}
-                                <span>·</span>
-                                {c.confidence} confidence
+                              <div className="swipe-copy">
+                                <div className="brand-title-row">
+                                  <div>
+                                    <p className="swipe-kicker">
+                                      {swipeCandidate.type
+                                        ? "COMPETITOR TO STUDY"
+                                        : "POTENTIAL COLLABORATOR"}
+                                    </p>
+                                    <h3>{swipeCandidate.name}</h3>
+                                  </div>
+                                  <span className="fit-score">
+                                    <span />
+                                    {swipeCandidate.score}
+                                    <small>fit</small>
+                                  </span>
+                                </div>
+                                <p className="swipe-reason">
+                                  {swipeCandidate.reason}
+                                </p>
+                                <button
+                                  className="swipe-idea"
+                                  onClick={() =>
+                                    openEvidence(
+                                      swipeCandidate.name,
+                                      swipeCandidate.evidenceIds,
+                                      swipeCandidate,
+                                    )
+                                  }
+                                >
+                                  <span>
+                                    <small>WHY IT COULD WORK</small>
+                                    <strong>{swipeCandidate.idea}</strong>
+                                  </span>
+                                  <ArrowUpRight size={18} />
+                                </button>
+                                <div className="swipe-source">
+                                  <Globe2 size={14} />
+                                  <span>
+                                    Visual and details captured from{" "}
+                                    <strong>{swipeCandidate.domain}</strong>
+                                  </span>
+                                </div>
                               </div>
-                              <p className="brand-reason">{c.reason}</p>
+                            </article>
+                            <div className="swipe-actions">
                               <button
-                                className="idea-box"
+                                className="throw-action"
+                                aria-label="Throw"
+                                disabled={Boolean(swipeMotion)}
                                 onClick={() =>
-                                  openEvidence(c.name, c.evidenceIds, c)
+                                  void decide(swipeCandidate, "throw")
                                 }
                               >
-                                <Sparkles size={16} />
+                                <X size={21} />{" "}
                                 <span>
-                                  <small>
-                                    {c.type
-                                      ? "A SPACE TO EXPLORE"
-                                      : "A LITTLE COLLAB INSPIRATION"}
-                                  </small>
-                                  <strong>{c.idea}</strong>
+                                  <strong>Throw</strong>
+                                  <small>Not a fit</small>
                                 </span>
-                                <ArrowUpRight size={16} />
                               </button>
-                              <div className="brand-footer">
-                                <button
-                                  onClick={() =>
-                                    openEvidence(c.name, c.evidenceIds, c)
-                                  }
-                                >
-                                  <Link2 size={14} />
-                                  {c.evidenceIds.length} sample sources
-                                </button>
-                                <button
-                                  className="view-match"
-                                  onClick={() =>
-                                    openEvidence(c.name, c.evidenceIds, c)
-                                  }
-                                >
-                                  Explore <ArrowRight size={14} />
-                                </button>
-                              </div>
+                              <button
+                                className="use-action"
+                                aria-label="Use"
+                                disabled={Boolean(swipeMotion)}
+                                onClick={() =>
+                                  void decide(swipeCandidate, "use")
+                                }
+                              >
+                                <Check size={21} />{" "}
+                                <span>
+                                  <strong>Use</strong>
+                                  <small>Save this one</small>
+                                </span>
+                              </button>
                             </div>
-                          </article>
-                        ))}
-                      </div>
+                          </section>
+                        ) : (
+                          <div className="swipe-complete">
+                            <span>
+                              <Check size={24} />
+                            </span>
+                            <h3>You cleared the stack.</h3>
+                            <p>Your “Use” picks are waiting in Saved brands.</p>
+                            <div>
+                              <button
+                                className="secondary-button"
+                                onClick={() => setSwipeIndex(0)}
+                              >
+                                Review again
+                              </button>
+                              <button
+                                className="primary-button"
+                                onClick={() => switchNav("saved")}
+                              >
+                                See saved brands
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="brand-grid">
+                          {filtered.map((c) => (
+                            <article className="brand-card" key={c.id}>
+                              <div
+                                className={`brand-visual ${c.imageUrl ? "has-website-image" : "fallback-visual"}`}
+                              >
+                                <span className="category-pill">
+                                  {c.category}
+                                </span>
+                                <button
+                                  aria-label={`${saved.includes(c.id) ? "Unsave" : "Save"} ${c.name}`}
+                                  aria-pressed={saved.includes(c.id)}
+                                  className={`save-button ${saved.includes(c.id) ? "is-saved" : ""}`}
+                                  onClick={() => void toggleSave(c.id)}
+                                >
+                                  <Bookmark
+                                    size={17}
+                                    fill={
+                                      saved.includes(c.id)
+                                        ? "currentColor"
+                                        : "none"
+                                    }
+                                  />
+                                </button>
+                                <CandidateMedia candidate={c} />
+                              </div>
+                              <div className="brand-content">
+                                <div className="brand-title-row">
+                                  <h3>{c.name}</h3>
+                                  <span className="fit-score">
+                                    <span />
+                                    {c.score}
+                                    <small>fit</small>
+                                  </span>
+                                </div>
+                                <div className="brand-subline">
+                                  {c.type
+                                    ? `${c.type[0].toUpperCase()}${c.type.slice(1)} competitor`
+                                    : "Complementary brand"}
+                                  <span>·</span>
+                                  {c.confidence} confidence
+                                </div>
+                                <p className="brand-reason">{c.reason}</p>
+                                <button
+                                  className="idea-box"
+                                  onClick={() =>
+                                    openEvidence(c.name, c.evidenceIds, c)
+                                  }
+                                >
+                                  <Sparkles size={16} />
+                                  <span>
+                                    <small>
+                                      {c.type
+                                        ? "A SPACE TO EXPLORE"
+                                        : "A LITTLE COLLAB INSPIRATION"}
+                                    </small>
+                                    <strong>{c.idea}</strong>
+                                  </span>
+                                  <ArrowUpRight size={16} />
+                                </button>
+                                <div className="brand-footer">
+                                  <button
+                                    onClick={() =>
+                                      openEvidence(c.name, c.evidenceIds, c)
+                                    }
+                                  >
+                                    <Link2 size={14} />
+                                    {c.evidenceIds.length} sample sources
+                                  </button>
+                                  <button
+                                    className="view-match"
+                                    onClick={() =>
+                                      openEvidence(c.name, c.evidenceIds, c)
+                                    }
+                                  >
+                                    Explore <ArrowRight size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )
                     ) : (
                       <Empty
                         title={

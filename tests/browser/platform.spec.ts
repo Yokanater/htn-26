@@ -68,6 +68,23 @@ test("explore, filter, save, inspect evidence, and read strategy", async ({
   expect(errors).toEqual([]);
 });
 
+test("swipe view lets people throw or use visual recommendations", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".brand-card")).toHaveCount(6);
+  await page.getByRole("button", { name: "Swipe view" }).click();
+  await expect(page.locator(".swipe-card")).toBeVisible();
+  const first = await page.locator(".swipe-card h3").textContent();
+  await page.getByRole("button", { name: "Throw", exact: true }).click();
+  await expect(page.locator(".swipe-card h3")).not.toHaveText(first!);
+  const kept = await page.locator(".swipe-card h3").textContent();
+  await page.getByRole("button", { name: "Use", exact: true }).click();
+  await expect(page.locator(".swipe-card h3")).not.toHaveText(kept!);
+  const saves = await page.request.get("/v1/saved");
+  expect(await saves.json()).toHaveLength(1);
+});
+
 test("new report confirms profile, streams to completion, and exports", async ({
   page,
 }) => {

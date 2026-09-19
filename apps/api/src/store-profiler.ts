@@ -53,6 +53,10 @@ function categoryFrom(pages: PageExtraction[], fallback: string) {
     .join(" ")
     .toLowerCase();
   const categories: [RegExp, string][] = [
+    [
+      /\b(activewear|gym wear|gymwear|workout|training (?:wear|clothes)|performance apparel|sportswear|fitness apparel|athleisure)\b/,
+      "Activewear & fitness apparel",
+    ],
     [/\b(shoes?|sneakers?|footwear)\b/, "Footwear & apparel"],
     [/\b(coffee|espresso|roast(?:er|ed)?)\b/, "Coffee & tea"],
     [/\b(skincare|cosmetics?|beauty|makeup)\b/, "Beauty & personal care"],

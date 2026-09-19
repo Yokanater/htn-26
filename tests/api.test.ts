@@ -12,8 +12,11 @@ import { type Report } from "../packages/contracts/src/index";
 import { demoProfile, fixtureReport } from "../packages/contracts/src/fixtures";
 import { assertPublicUrl } from "../apps/api/src/url-safety";
 import {
+  buildEvidenceLedStrategy,
   hasStorefrontCommerceEvidence,
+  isCompatibleCandidate,
   isValidFootwearCollaborator,
+  marketSegment,
 } from "../apps/api/src/market-research";
 
 const platform = createPlatform({ phaseMs: 10 });
@@ -369,6 +372,104 @@ test("footwear collaborators exclude other footwear assortments", () => {
     isValidFootwearCollaborator("Recycled bags for commuting and travel."),
     true,
   );
+});
+test("activewear discovery rejects random lifestyle brands and duplicate apparel", () => {
+  const profile = {
+    ...demoProfile,
+    name: "Gymshark",
+    category: "Apparel",
+    audience: "People who train in the gym",
+    research: {
+      sessionId: "activewear-profile",
+      shopifyConfidence: 80,
+      shopifySignals: ["Shopify runtime"],
+      pagesVisited: 2,
+      products: ["Training Leggings", "Sports Bra"],
+      sources: [],
+    },
+  };
+  assert.equal(marketSegment(profile), "activewear");
+  assert.equal(
+    isCompatibleCandidate(
+      profile,
+      "Hand-poured soy candles and home fragrance diffusers",
+      "collaborator",
+    ),
+    false,
+  );
+  assert.equal(
+    isCompatibleCandidate(
+      profile,
+      "Women's leggings and performance gymwear for every workout",
+      "collaborator",
+    ),
+    false,
+  );
+  assert.equal(
+    isCompatibleCandidate(
+      profile,
+      "Massage devices for workout recovery and mobility",
+      "collaborator",
+    ),
+    true,
+  );
+  assert.equal(
+    isCompatibleCandidate(
+      profile,
+      "Performance activewear, leggings and sports bras",
+      "competitor",
+    ),
+    true,
+  );
+});
+test("live SWOT contains evidenced observations, gaps, opportunities, and threats", () => {
+  const profile = {
+    ...demoProfile,
+    category: "Activewear & fitness apparel",
+    research: {
+      sessionId: "strategy-profile",
+      shopifyConfidence: 85,
+      shopifySignals: ["Product structured data"],
+      pagesVisited: 1,
+      products: ["Training Leggings"],
+      sources: [],
+    },
+  };
+  const evidence = {
+    id: "store_live_0",
+    title: "Store",
+    sourceType: "Live merchant storefront",
+    span: "Performance apparel for the conditioning community.",
+    publishedAt: "2026-09-19",
+    url: "https://example.com",
+    synthetic: false,
+  };
+  const collaborator = {
+    ...fixtureReport(profile).collaborators[0],
+    id: "recovery",
+    name: "Recovery Co",
+    category: "Recovery & mobility",
+    evidenceIds: ["recovery_source"],
+  };
+  const competitor = {
+    ...fixtureReport(profile).competitors[0],
+    id: "active-rival",
+    name: "Active Rival",
+    evidenceIds: ["rival_source"],
+  };
+  const strategy = buildEvidenceLedStrategy(
+    profile,
+    [collaborator],
+    [competitor],
+    [evidence],
+  );
+  assert.ok(strategy.swot.strengths.length >= 2);
+  assert.ok(strategy.swot.weaknesses.length >= 2);
+  assert.equal(strategy.swot.opportunities.length, 1);
+  assert.equal(strategy.swot.threats.length, 1);
+  for (const item of Object.values(strategy.swot).flat())
+    assert.ok(item.evidenceIds.length > 0);
+  assert.equal(strategy.actions.length, 3);
 });
 test("live Browserbase research is capped at five minutes", async () => {
   assert.equal(LIVE_RESEARCH_LIMIT_MS, 300_000);

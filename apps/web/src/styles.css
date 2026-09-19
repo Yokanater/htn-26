@@ -706,6 +706,29 @@ main {
   display: flex;
   gap: 10px;
 }
+.view-switch {
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid #dce5df;
+  border-radius: 7px;
+  background: #f3f7f4;
+}
+.view-switch button {
+  height: 27px;
+  padding: 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 5px;
+  color: #647169;
+  font-size: 9px;
+}
+.view-switch button.active {
+  color: #1f563f;
+  background: #fff;
+  box-shadow: 0 1px 4px #244a3820;
+}
 .filter-select {
   display: flex;
   align-items: center;
@@ -740,6 +763,228 @@ main {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
+}
+.swipe-stage {
+  width: min(100%, 780px);
+  margin: 2px auto 0;
+}
+.swipe-progress {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin: 0 auto 13px;
+  color: #5d6c64;
+  font-size: 10px;
+}
+.swipe-progress > div {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe9e3;
+}
+.swipe-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f7658;
+  transition: width 0.2s ease;
+}
+.swipe-progress small {
+  font-size: 9px;
+  color: #758078;
+}
+.swipe-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  min-height: 440px;
+  overflow: hidden;
+  border: 1px solid #dbe6df;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 55px #173f3312;
+  transform-origin: 50% 100%;
+}
+.swipe-card.throw {
+  animation: swipe-throw 0.2s ease-in forwards;
+}
+.swipe-card.use {
+  animation: swipe-use 0.2s ease-in forwards;
+}
+.swipe-visual {
+  min-height: 440px;
+  position: relative;
+  overflow: hidden;
+  background: #e7f0eb;
+}
+.swipe-visual .website-image,
+.swipe-visual .brand-fallback {
+  width: 100%;
+  height: 100%;
+  min-height: 440px;
+}
+.swipe-visual .brand-art {
+  width: 82%;
+  height: auto;
+}
+.swipe-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 34px 30px 25px;
+}
+.swipe-copy .brand-title-row {
+  align-items: flex-start;
+}
+.swipe-copy h3 {
+  margin-top: 5px;
+  font:
+    600 25px/1.12 "Manrope",
+    sans-serif;
+  letter-spacing: -0.8px;
+}
+.swipe-kicker {
+  color: #337155;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+}
+.swipe-reason {
+  margin: 25px 0;
+  color: #53645b;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.swipe-idea {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #d9e7de;
+  border-radius: 9px;
+  background: #f2f8f4;
+  color: #285d45;
+  text-align: left;
+}
+.swipe-idea span {
+  flex: 1;
+}
+.swipe-idea small,
+.swipe-idea strong {
+  display: block;
+}
+.swipe-idea small {
+  margin-bottom: 6px;
+  color: #688074;
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+.swipe-idea strong {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.swipe-source {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 22px;
+  color: #728079;
+  font-size: 9px;
+}
+.swipe-source strong {
+  color: #3c5d4d;
+  font-weight: 500;
+}
+.swipe-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 17px;
+}
+.swipe-actions button {
+  display: flex;
+  min-width: 150px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 18px;
+  border-radius: 10px;
+}
+.swipe-actions span,
+.swipe-actions strong,
+.swipe-actions small {
+  display: block;
+  text-align: left;
+}
+.swipe-actions strong {
+  font-size: 11px;
+}
+.swipe-actions small {
+  margin-top: 2px;
+  font-size: 8px;
+  font-weight: 400;
+}
+.throw-action {
+  border: 1px solid #cad9d1;
+  background: #fff;
+  color: #486157;
+}
+.use-action {
+  border: 1px solid #1f5c43;
+  background: #1f5c43;
+  color: #fff;
+}
+.swipe-actions button:disabled {
+  opacity: 0.65;
+}
+.swipe-complete {
+  width: min(100%, 620px);
+  margin: 35px auto;
+  padding: 65px 30px;
+  border: 1px solid #dce7e0;
+  border-radius: 14px;
+  background: #f5f9f6;
+  text-align: center;
+}
+.swipe-complete > span {
+  display: grid;
+  width: 49px;
+  height: 49px;
+  place-items: center;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: #dceee4;
+  color: #266246;
+}
+.swipe-complete h3 {
+  font:
+    600 22px "Manrope",
+    sans-serif;
+}
+.swipe-complete p {
+  margin: 8px 0 22px;
+  color: #637068;
+  font-size: 11px;
+}
+.swipe-complete > div {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+@keyframes swipe-throw {
+  to {
+    opacity: 0;
+    transform: translateX(-70px) rotate(-2deg);
+  }
+}
+@keyframes swipe-use {
+  to {
+    opacity: 0;
+    transform: translateX(70px) rotate(2deg);
+  }
 }
 .brand-card {
   border: 1px solid #e3e6dc;
@@ -1977,6 +2222,15 @@ main {
   }
 }
 @media (max-width: 950px) {
+  .swipe-card {
+    grid-template-columns: 1fr;
+  }
+  .swipe-visual,
+  .swipe-visual .website-image,
+  .swipe-visual .brand-fallback {
+    min-height: 320px;
+    max-height: 390px;
+  }
   .brand-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2089,6 +2343,38 @@ main {
   }
   .next-steps {
     padding: 20px;
+  }
+}
+@media (max-width: 680px) {
+  .filter-controls {
+    flex-wrap: wrap;
+  }
+  .view-switch {
+    width: 100%;
+  }
+  .view-switch button {
+    flex: 1;
+    justify-content: center;
+  }
+  .swipe-progress small {
+    display: none;
+  }
+  .swipe-progress {
+    grid-template-columns: auto 1fr;
+  }
+  .swipe-copy {
+    padding: 25px 20px 22px;
+  }
+  .swipe-actions button {
+    min-width: 0;
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .swipe-card.throw,
+  .swipe-card.use {
+    animation: none;
+    opacity: 0.35;
   }
 }
 @media (max-width: 760px) {
