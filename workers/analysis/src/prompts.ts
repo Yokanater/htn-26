@@ -11,7 +11,7 @@ export const CURRENT: Record<PromptName | "shared", string> = {
   shared: "v2",
   planner: "v1",
   collaboration: "v1",
-  competitor_discourse: "v2",
+  competitor_discourse: "v3",
   swot_actions: "v1",
 };
 

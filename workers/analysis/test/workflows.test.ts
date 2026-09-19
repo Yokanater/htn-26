@@ -34,6 +34,7 @@ describe("prompts", () => {
   it("every workflow prompt keeps a v1 baseline alongside the current version", () => {
     expect(loadPrompt("competitor_discourse", "v1", "v1").system).not.toContain("not competitors");
     expect(loadPrompt("competitor_discourse").system).toContain("Brands that sell complementary products are not competitors");
+    expect(loadPrompt("competitor_discourse").system).toContain("never support for a theme");
   });
   for (const name of ["planner", "collaboration", "competitor_discourse", "swot_actions"] as PromptName[])
     it(`${name} states every required rule and is versioned`, () => {
