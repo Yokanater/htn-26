@@ -124,12 +124,14 @@ describe.each(['outfit', 'setup'] as const)('S3 %s private demand API', (domain)
       body: JSON.stringify({ ...request, kind: 'offer_requested' }),
     });
     expect(conflict.status).toBe(409);
-    expect(
-      await state.demand.readWindow(
-        new Date('2026-09-19T00:00:00Z'),
-        new Date('2026-09-20T00:00:00Z'),
-      ),
-    ).toHaveLength(1);
+    const recorded = await state.demand.readWindow(
+      new Date('2026-09-19T00:00:00Z'),
+      new Date('2026-09-20T00:00:00Z'),
+    );
+    // Opting in records one confirmation observation; the retry and the conflicting
+    // request add no second decision.
+    expect(recorded.filter((event) => event.kind === 'brief_confirmed')).toHaveLength(1);
+    expect(recorded.filter((event) => event.kind !== 'brief_confirmed')).toHaveLength(1);
     await state.demand.deleteSession(state.ownerId);
     await expect(state.demand.append(created.event, `${domain}-late-write`)).rejects.toThrow(
       'deleted',
@@ -176,6 +178,33 @@ describe.each(['outfit', 'setup'] as const)('S3 %s private demand API', (domain)
         })
       ).status,
     ).toBe(422);
+  });
+
+  it('records brief confirmation as a consented observation on opt-in', async () => {
+    const { app, brief, cookie, demand } = await setup(domain);
+
+    // Opting in is the moment a confirmed brief becomes an eligible contribution (§6.1),
+    // so a shopper who confirms requirements but picks nothing still has a denominator entry.
+    const granted = await app.request('/api/consent', {
+      method: 'PUT',
+      headers: json(cookie),
+      body: JSON.stringify({ state: 'granted', expectedVersion: null }),
+    });
+    expect(granted.status).toBe(200);
+
+    const events = await demand.readWindow(
+      new Date('2000-01-01T00:00:00Z'),
+      new Date('2100-01-01T00:00:00Z'),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      briefId: brief.id,
+      briefRevision: brief.revision,
+      kind: 'brief_confirmed',
+      consentVersion: 1,
+      matchId: null,
+      selections: [],
+    });
   });
 
   it('versions consent, blocks stale writes, and erases all session demand', async () => {
