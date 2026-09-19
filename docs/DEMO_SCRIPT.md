@@ -21,3 +21,22 @@ Compare one example against simple per-item catalog search and explain the actua
 
 Before submission: both domain checks, deletion/withdrawal exercise, no exposed upload links,
 newcomer attribution check, backup video, verified deployment, measured latency/cost, actual assist log.
+
+## Current skeletal shopper demo (S2 integration)
+
+With `MILESTONES=s1,s2`, `OPENAI_API_KEY`, `OPENAI_MODEL_VISION`, and
+`OPENAI_MODEL_SEARCH` configured locally, enter an image or description, review the detected
+items, and confirm. Confirmation immediately starts a search with a three-minute overall limit.
+The current live adapter uses OpenAI web search to discover Shopify product pages, then reads
+public storefront product and cart JSON for actual variants, images, availability, and currency.
+Browserbase is not part of this new catalog path. Stores without compatible public data are skipped.
+
+Results expose requirements that could not be verified, plus the discovered product cards.
+Open the source evidence, shortlist a product, visit its merchant page, and download the shortlist.
+Shortlists last for the current visit; purchasing happens at the merchant. Shipping eligibility is
+unknown until independently verified, and different currencies are never added together.
+Edit requirements to invalidate the old search, or cancel and retry. Clothing sizes use full labels.
+
+This is a working shopper slice, not a completed S3–S5 release: persisted saves, consented demand
+aggregation, and live merchant opportunities still need integration. Merchant previews remain labeled
+synthetic. Offline S2 checks cover outfit and general-product fixtures, ownership, and revisions.

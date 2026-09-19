@@ -86,3 +86,16 @@ injected decoder. Owner sessions and assets remain in memory and expire on serve
 
 A user-authorized live browser check uploaded a synthetic red mug image and received one
 live item: a plain red coffee mug. Catalog matching remains a separate unfinished integration.
+
+### S2-L4-1 shopper demo integration
+
+The integration worktree now mounts owner-scoped confirmed-brief search routes and polls bounded
+collection runs. It wires the L2 matcher, L3 runner/workspace, L1 product/evidence components,
+and a live storefront discovery adapter. The UI continues from confirmation through product results,
+a visit-local shortlist, downloadable links, and merchant handoff. Cancellation and brief revision
+checks prevent outdated runs from continuing to update the workspace. Search ends within three
+minutes. Unknown shipping and unsupported currencies remain unresolved rather than passing checks.
+
+This implementation uses polling rather than SSE and in-memory run state; it is a skeletal demo,
+not durable job infrastructure. S3 demand persistence and live merchant opportunity integration remain
+pending. See DEMO_SCRIPT.md for configuration and the implemented demonstration sequence.

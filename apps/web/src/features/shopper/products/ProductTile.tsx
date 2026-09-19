@@ -40,7 +40,18 @@ export function ProductTile({
       isStaleEvidence({ capturedAt: ev.capturedAt, now, ttlMs: evidenceTtlMs }),
     );
 
-  const size = offer.attributes.size;
+  const rawSize = offer.attributes.size;
+  const labels: Record<string, string> = {
+    XS: 'Extra small',
+    S: 'Small',
+    M: 'Medium',
+    L: 'Large',
+    XL: 'Extra large',
+    XXL: '2XL',
+    XXXL: '3XL',
+  };
+  const size =
+    rawSize === undefined ? undefined : (labels[String(rawSize).toUpperCase()] ?? String(rawSize));
   const width = offer.attributes.width_cm;
   const ships =
     offer.shipsTo === null
@@ -102,7 +113,7 @@ export function ProductTile({
         </a>
         {onSelect ? (
           <button type="button" aria-pressed={selected} onClick={() => onSelect(offer.id)}>
-            {selected ? 'Selected' : 'Select'}
+            {selected ? 'Remove from shortlist' : 'Shortlist'}
           </button>
         ) : null}
         {onOpenEvidence ? (

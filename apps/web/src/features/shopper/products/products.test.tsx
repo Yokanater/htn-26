@@ -108,7 +108,7 @@ describe('AlternativePicker', () => {
     expect(screen.getByText(/does not create a unified cart/i)).toBeTruthy();
     expect(screen.getByText((_, el) => el?.textContent === 'A · a.example')).toBeTruthy();
     expect(screen.getByText((_, el) => el?.textContent === 'B · b.example')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Shortlist' }));
     expect(onSelect).toHaveBeenCalledWith('offer_b');
   });
 });

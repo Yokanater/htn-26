@@ -67,7 +67,7 @@ export const CollectionMatchSchema = z
     briefId: idSchema('brief_'),
     briefRevision: z.number().int().positive(),
     status: z.enum(['ready', 'partial', 'no_match']),
-    slots: z.array(SlotMatchSchema).min(2).max(6),
+    slots: z.array(SlotMatchSchema).min(1).max(6),
     itemSubtotal: PriceSchema.nullable(),
     excludesShippingAndTax: z.literal(true),
     warnings: z.array(z.string()),

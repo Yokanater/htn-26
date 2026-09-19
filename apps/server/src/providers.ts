@@ -1,3 +1,5 @@
+import type { IntentBrief } from '@sei/contracts';
+import type { ShoppingCatalog } from '@sei/core';
 import { createIntentInterpreter, createOpenAiIntentModel, FakeIntentModel } from '@sei/reason';
 import { SipsImageNormalizer } from './services/image-normalizer';
 import {
@@ -6,6 +8,7 @@ import {
   type IntentDraftService,
   InterpreterIntentDraftService,
 } from './services/intake';
+import { liveCatalog } from './services/live-catalog';
 import { OwnerSessions } from './services/session';
 
 export interface AppProviders {
@@ -14,6 +17,7 @@ export interface AppProviders {
   intent: IntentDraftService;
   imageNormalizer: ImageNormalizer | null;
   now: () => Date;
+  catalog?: (brief: IntentBrief) => Pick<ShoppingCatalog, 'search'>;
 }
 
 export function defaultProviders(): AppProviders {
@@ -32,6 +36,7 @@ export function defaultProviders(): AppProviders {
 /** Runtime uses actual inference; absent credentials never silently become demo results. */
 export function runtimeProviders(env: Record<string, string | undefined>): AppProviders {
   const providers = defaultProviders();
+  providers.catalog = (brief) => liveCatalog(brief, env);
   providers.imageNormalizer = process.platform === 'darwin' ? new SipsImageNormalizer() : null;
   if (env.OPENAI_API_KEY && env.OPENAI_MODEL_VISION) {
     providers.intent = new InterpreterIntentDraftService(

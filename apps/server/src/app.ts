@@ -11,6 +11,7 @@ import { Hono } from 'hono';
 import { type AppProviders, defaultProviders } from './providers';
 import { assetRoutes } from './routes/assets';
 import { briefRoutes } from './routes/briefs';
+import { matchRoutes } from './routes/matches';
 import { sessionRoutes } from './routes/session';
 
 /** Pure factory: no listeners, environment reads or provider calls. */
@@ -48,6 +49,7 @@ export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): 
     c.header('Cache-Control', 'no-store');
     await next();
   });
+  if (flags.FEATURE_COLLECTION_MATCHING) app.route('/api', matchRoutes(providers));
   app.get('/healthz', (c) => c.json({ ok: true }));
   app.get('/api/healthz', (c) => c.json({ ok: true }));
   app.get('/api/capabilities', (c) => c.json(capabilities));

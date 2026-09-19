@@ -32,7 +32,18 @@ function getTextConstraint(slot: IntentSlot, kind: 'size' | 'exclude_material') 
   const constraint = slot.constraints.find(
     (value): value is Extract<ItemConstraint, { kind: typeof kind }> => value.kind === kind,
   );
-  return constraint?.value ?? '';
+  const value = constraint?.value ?? '';
+  if (kind !== 'size') return value;
+  const labels: Record<string, string> = {
+    XS: 'Extra small',
+    S: 'Small',
+    M: 'Medium',
+    L: 'Large',
+    XL: 'Extra large',
+    XXL: 'Double extra large',
+    XXXL: 'Triple extra large',
+  };
+  return labels[value.toUpperCase()] ?? value;
 }
 
 function setTextConstraint(
@@ -81,6 +92,13 @@ export function BriefEditor({ brief, hints, onSave, onConfirm }: BriefEditorProp
         if (result.success) onSave(result.data);
       }}
     >
+      <datalist id="readable-clothing-sizes">
+        {['Extra small', 'Small', 'Medium', 'Large', 'Extra large', '2XL', '3XL', 'One size'].map(
+          (size) => (
+            <option key={size} value={size} />
+          ),
+        )}
+      </datalist>
       <p id="brief-photo-limit">
         A photo cannot establish fit or dimensions. Confirm those details yourself.
       </p>
@@ -166,6 +184,8 @@ export function BriefEditor({ brief, hints, onSave, onConfirm }: BriefEditorProp
                 <label>
                   Size
                   <input
+                    list="readable-clothing-sizes"
+                    placeholder="Medium, Large, Extra large, or a numeric size"
                     aria-label={`Item ${slotIndex + 1} size`}
                     value={getTextConstraint(slot, 'size')}
                     onChange={(event) =>

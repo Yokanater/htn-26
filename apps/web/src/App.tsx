@@ -22,6 +22,7 @@ import {
 import { useState } from 'react';
 import { BriefEditor, type DomainHint } from './features/shopper/brief';
 import { MediaIntake, type MediaSelection } from './features/shopper/media';
+import { ShoppingResults } from './shell/ShoppingResults';
 
 type Surface = 'home' | 'shopper' | 'merchant';
 
@@ -409,6 +410,11 @@ function ShopperWorkspace({ back }: { back: () => void }) {
             </p>
           </form>
         </section>
+      ) : brief.status === 'confirmed' ? (
+        <ShoppingResults
+          brief={brief}
+          onEdit={() => update.mutate({ edited: brief, status: 'draft' })}
+        />
       ) : (
         <BriefReview
           brief={brief}
