@@ -151,3 +151,32 @@ export function collectionDecision(
 export function selectionKey(selections: readonly DemandSelection[]): string {
   return selections.map((s) => `${s.slotId}=${s.offerId}`).join('|');
 }
+
+/**
+ * Body for POST /api/briefs/:id/decisions, mapped field by field.
+ *
+ * The server's schema is strict and derives identity, time, origin and each selection's
+ * merchant from the offer it actually displayed. Spreading the DTO would send `briefId` and
+ * a selection's `merchantId`, which the server rejects outright, so every decision would
+ * fail. `idempotencyKey` must be fresh per action: deriving it from the choice makes a
+ * later accept collide with an earlier one, leaving the ledger on the first outcome while
+ * the shopper is told the new one was recorded.
+ */
+export function decisionRequestBody(
+  dto: DemandDecisionDto,
+  runId: string | null,
+  idempotencyKey: string,
+) {
+  return {
+    idempotencyKey,
+    briefRevision: dto.briefRevision,
+    runId,
+    matchId: dto.matchId,
+    kind: dto.kind,
+    selections: dto.selections.map((selection) => ({
+      slotId: selection.slotId,
+      offerId: selection.offerId,
+    })),
+    rejectionReason: dto.rejectionReason,
+  };
+}

@@ -11,7 +11,8 @@ import { PackageSearch, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ConsentPanel } from '../features/shopper/brief';
 import type { CollectionRunEvent } from '../features/shopper/collection';
-import { selectionKey } from '../features/shopper/collection';
+import { decisionRequestBody } from '../features/shopper/collection/decisions';
+
 import { ApiError, json } from './api';
 import { ShoppingResults } from './ShoppingResults';
 
@@ -125,21 +126,16 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
           flags={flags}
           onDecision={async (dto) => {
             try {
-              // The server assigns identity, time and origin; the browser supplies only the
-              // displayed references and an idempotency key so a retry cannot double-count.
               await json(`/api/briefs/${brief.id}/decisions`, {
                 method: 'POST',
-                body: JSON.stringify({
-                  ...dto,
-                  runId,
-                  idempotencyKey: `${dto.kind}:${dto.matchId}:${selectionKey(dto.selections)}`,
-                }),
+                body: JSON.stringify(decisionRequestBody(dto, runId, crypto.randomUUID())),
               });
               return { ok: true };
             } catch (cause) {
+              // Only a stale brief is recoverable by reloading the current revision.
               return {
                 ok: false,
-                status: cause instanceof ApiError && cause.code === 'REVISION_CONFLICT' ? 409 : 400,
+                status: cause instanceof ApiError && cause.code === 'STALE_BRIEF' ? 409 : 400,
               };
             }
           }}

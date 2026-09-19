@@ -207,6 +207,40 @@ describe.each(['outfit', 'setup'] as const)('S3 %s private demand API', (domain)
     });
   });
 
+  it('records a confirmation made after opt-in, not only the one at opt-in', async () => {
+    const state = await setup(domain);
+    await state.app.request('/api/consent', {
+      method: 'PUT',
+      headers: json(state.cookie),
+      body: JSON.stringify({ state: 'granted', expectedVersion: null }),
+    });
+
+    // Confirming another revision while consent already stands is still a contribution.
+    const revised = await state.app.request(`/api/briefs/${state.brief.id}`, {
+      method: 'PATCH',
+      headers: json(state.cookie),
+      body: JSON.stringify({
+        expectedRevision: state.brief.revision,
+        status: 'confirmed',
+        slots: state.brief.slots,
+        country: state.brief.country,
+        currency: state.brief.currency,
+        itemBudget: state.brief.itemBudget,
+      }),
+    });
+    expect(revised.status).toBe(200);
+
+    const events = await state.demand.readWindow(
+      new Date('2000-01-01T00:00:00Z'),
+      new Date('2100-01-01T00:00:00Z'),
+    );
+    const revisions = events
+      .filter((event) => event.kind === 'brief_confirmed')
+      .map((event) => event.briefRevision)
+      .sort();
+    expect(revisions).toEqual([state.brief.revision, state.brief.revision + 1]);
+  });
+
   it('versions consent, blocks stale writes, and erases all session demand', async () => {
     const state = await setup(domain);
     state.demand.publishSnapshot('snapshot_test', { privateCount: 7 });
