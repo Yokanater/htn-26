@@ -275,6 +275,31 @@ describe.each(['outfit', 'setup'] as const)('%s demand projection', (domain) => 
     expect(() => DemandAggregateSchema.parse(aggregate)).not.toThrow();
   });
 
+  it('does not pair merchants that were never saved together', () => {
+    const base = input(domain, 1);
+    const aggregate = createDemandAggregator().aggregate({
+      ...base,
+      events: [
+        ...base.events,
+        // The shopper saved a collection holding merchants 1 and 2.
+        selected(1, 'collection_saved', [selection(1), selection(2, 'slot_2')], {
+          occurredAt: '2026-09-10T12:00:00Z',
+        }),
+        // Then swapped slot 2 to merchant 3 with a single item decision.
+        // Merchants 1 and 3 were never saved as a collection together.
+        selected(1, 'item_accepted', [selection(3, 'slot_2')], {
+          occurredAt: '2026-09-10T13:00:00Z',
+        }),
+      ],
+    })[0];
+
+    expect(aggregate.merchantSupport).toEqual([
+      { merchantId: 'mer_1', supportingSessions: 1 },
+      { merchantId: 'mer_3', supportingSessions: 1 },
+    ]);
+    expect(aggregate.pairs).toEqual([]);
+  });
+
   it('counts a repeated identical decision once', () => {
     const base = input(domain, 1);
     const twice = selected(1, 'item_accepted', [selection(1)]);

@@ -83,8 +83,13 @@ export function createDemandAggregator(): DemandAggregator {
         cohort: DemandCohort;
         /** sessionId -> slotId -> latest decision about that slot */
         slots: Map<string, Map<string, SlotState>>;
-        /** Sessions that explicitly saved or requested a collection. */
-        collected: Set<string>;
+        /**
+         * Merchants named by each session's latest saved or requested collection. A pair is
+         * evidence of an actual combination, so this is the event's own contents — not a
+         * standing "this session saved something once" marker, which would let a later
+         * single-item swap invent a combination nobody ever saved.
+         */
+        saved: Map<string, Set<string>>;
       };
       const cohorts = new Map<string, Bucket>();
 
@@ -113,11 +118,16 @@ export function createDemandAggregator(): DemandAggregator {
         const bucket: Bucket = cohorts.get(key) ?? {
           cohort,
           slots: new Map(),
-          collected: new Set(),
+          saved: new Map(),
         };
         const slots = bucket.slots.get(event.sessionId) ?? new Map<string, SlotState>();
         bucket.slots.set(event.sessionId, slots);
-        if (COLLECTION_KINDS.has(event.kind)) bucket.collected.add(event.sessionId);
+        if (COLLECTION_KINDS.has(event.kind)) {
+          bucket.saved.set(
+            event.sessionId,
+            new Set(event.selections.map((selected) => selected.merchantId)),
+          );
+        }
         for (const selected of event.selections) {
           slots.set(selected.slotId, {
             merchantId: selected.merchantId,
@@ -145,8 +155,10 @@ export function createDemandAggregator(): DemandAggregator {
           }
           // A pair needs both merchants still standing AND an explicit collection intent,
           // which keeps pair support at or below each merchant's own support.
-          if (bucket.collected.has(sessionId)) {
-            const sorted = [...accepted].sort();
+          const savedTogether = bucket.saved.get(sessionId);
+          if (savedTogether) {
+            // Only merchants that were in that saved collection and are still accepted.
+            const sorted = accepted.filter((merchantId) => savedTogether.has(merchantId)).sort();
             for (let i = 0; i < sorted.length; i += 1) {
               for (let j = i + 1; j < sorted.length; j += 1) {
                 const pairKey = `${sorted[i]}|${sorted[j]}`;

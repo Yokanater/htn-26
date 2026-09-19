@@ -133,7 +133,7 @@ describe.each([
   async function shopperSaves(
     app: ReturnType<typeof createApp>,
     seq: number,
-  ): Promise<{ cookie: string }> {
+  ): Promise<{ cookie: string; briefId: string; revision: number }> {
     const cookie = await getSession(app);
     const created = IntentBriefSchema.parse(
       await (
@@ -207,8 +207,58 @@ describe.each([
       body: JSON.stringify(body),
     });
     expect(retry.status).toBe(200);
-    return { cookie };
+    return { cookie, briefId: confirmed.id, revision: confirmed.revision };
   }
+
+  it('supersedes published evidence when a contributing brief is revised', async () => {
+    const demand = new PrivateDemandLedger();
+    const intake = new IntakeStore();
+    const projection = new DemandProjectionService({
+      ledger: demand,
+      briefs: (ids) => intake.findBriefs(ids),
+      aggregator: createDemandAggregator(),
+      minimumSessions: 5,
+      retentionDays: 30,
+      snapshotMinutes: 15,
+      now: () => new Date(),
+    });
+    const app = createApp(
+      { MILESTONES: 's1,s2,s3' },
+      { demand, intake, demandProjection: projection },
+    );
+
+    const shoppers = [];
+    for (let seq = 1; seq <= 6; seq += 1) shoppers.push(await shopperSaves(app, seq));
+    const [summary] = await projection.refresh('seed');
+    expect(projection.published(summary.aggregateId)).not.toBeNull();
+
+    // Revising a confirmed brief changes what the cohort means; the ledger cannot see it.
+    const owner = shoppers[0]!;
+    const revised = await app.request(`/api/briefs/${owner.briefId}`, {
+      method: 'PATCH',
+      headers: headers(owner.cookie),
+      body: JSON.stringify({
+        expectedRevision: owner.revision,
+        status: 'confirmed',
+        slots: [
+          {
+            id: 'slot_new',
+            category: 'something else entirely',
+            description: 'a different requirement',
+            required: true,
+            visualAttributes: [],
+            constraints: [],
+          },
+        ],
+        country: 'CA',
+        currency: 'CAD',
+        itemBudget: null,
+      }),
+    });
+    expect(revised.status).toBe(200);
+
+    expect(projection.published(summary.aggregateId)).toBeNull();
+  });
 
   it('publishes only a consent-gated, coarse cohort and drops it on withdrawal', async () => {
     const demand = new PrivateDemandLedger();

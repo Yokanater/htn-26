@@ -134,6 +134,9 @@ export function briefRoutes(providers: AppProviders): Hono {
       providers.intake.saveBrief(ownerId, next.data, expectedRevision);
       // A new revision supersedes any search still running for the old one.
       providers.runner.invalidate(next.data.id, next.data.revision);
+      // It also changes what any cohort built on the old revision meant. The ledger cannot
+      // observe a brief edit, so published evidence is dropped until it is recomputed.
+      providers.demandProjection.invalidate();
       return c.json(next.data);
     } catch (error) {
       if (error instanceof RevisionConflictError)

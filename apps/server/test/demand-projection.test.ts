@@ -68,7 +68,7 @@ function savedCollection(domain: ShoppingDomain, seq: number): DemandEvent {
   } as DemandEvent;
 }
 
-async function ledgerWith(domain: ShoppingDomain, sessions: number) {
+async function ledgerWith(domain: ShoppingDomain, sessions: number, clock: () => Date = () => NOW) {
   const ledger = new PrivateDemandLedger();
   const briefs = new Map<string, IntentBrief>();
   for (let seq = 1; seq <= sessions; seq += 1) {
@@ -87,7 +87,7 @@ async function ledgerWith(domain: ShoppingDomain, sessions: number) {
     minimumSessions: 5,
     retentionDays: 30,
     snapshotMinutes: 15,
-    now: () => NOW,
+    now: clock,
   });
   return { ledger, service };
 }
@@ -149,6 +149,49 @@ describe.each(['outfit', 'setup'] as const)('%s demand projection service', (dom
     expect(after.aggregateId).toBe(before.aggregateId);
     expect(after.status).toBe('insufficient_evidence');
     expect(after.eligibleSessions).toBeNull();
+  });
+
+  it('does not publish a contribution withdrawn while the projection was reading', async () => {
+    // Exactly at the threshold: losing one contributor must flip the verdict, so a stale
+    // publication is visible rather than hidden behind an identical band.
+    const { ledger, service } = await ledgerWith(domain, 5);
+    const readConsent = ledger.getConsent.bind(ledger);
+    let interleaved = false;
+    ledger.getConsent = async (sessionId: string) => {
+      const record = await readConsent(sessionId);
+      if (!interleaved) {
+        interleaved = true;
+        await ledger.setConsent(
+          {
+            sessionId: `sess_${domain}_1`,
+            version: 2,
+            state: 'withdrawn',
+            updatedAt: '2026-09-19T11:30:00Z',
+          },
+          1,
+        );
+      }
+      return record;
+    };
+
+    const summaries = await service.refresh('seed');
+
+    // Anything readable afterwards must already exclude the withdrawn contribution.
+    for (const summary of summaries) {
+      expect(summary.status).toBe('insufficient_evidence');
+      expect(service.published(summary.aggregateId)?.status).not.toBe('available');
+    }
+  });
+
+  it('stops serving a snapshot once its window has passed', async () => {
+    let now = NOW;
+    const { service } = await ledgerWith(domain, 6, () => now);
+    const [summary] = await service.refresh('seed');
+    expect(service.published(summary.aggregateId)).not.toBeNull();
+
+    now = new Date(NOW.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+    expect(service.published(summary.aggregateId)).toBeNull();
   });
 
   it('keeps seed observations out of a live projection', async () => {

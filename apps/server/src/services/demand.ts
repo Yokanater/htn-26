@@ -100,6 +100,19 @@ export class PrivateDemandLedger implements DemandStore {
     return event ? structuredClone(event) : null;
   }
 
+  /**
+   * Counts ledger mutations. A reader captures this before it starts and re-checks it before
+   * publishing, so a consent change that lands mid-read cannot be published as if it had not.
+   */
+  get generation(): number {
+    return this.#generation;
+  }
+
+  /** Invalidates every snapshot for a change this store cannot see, such as a brief revision. */
+  invalidateSnapshots(): void {
+    this.#invalidateSnapshots();
+  }
+
   /** Test/integration seam proving stale snapshots cannot survive a ledger mutation. */
   publishSnapshot(id: string, value: unknown): void {
     this.#snapshots.set(id, { generation: this.#generation, value: structuredClone(value) });

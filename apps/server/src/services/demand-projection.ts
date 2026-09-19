@@ -15,6 +15,9 @@ import type {
 import type { DemandAggregator } from '@sei/core';
 import type { PrivateDemandLedger } from './demand';
 
+/** Bounded retries when the ledger changes under a read; publishing nothing beats publishing stale. */
+const MAX_ATTEMPTS = 3;
+
 export interface DemandProjectionDeps {
   ledger: PrivateDemandLedger;
   /** Resolves the briefs an event referenced. Not owner-scoped: a cohort spans sessions. */
@@ -55,33 +58,54 @@ export class DemandProjectionService {
    */
   async refresh(origin: SampleOrigin): Promise<MerchantDemandSummary[]> {
     const { ledger, briefs, aggregator, minimumSessions } = this.#deps;
-    const window = this.#window();
-    const events = await ledger.readWindow(window.start, window.end);
 
-    const consents: ConsentRecord[] = [];
-    for (const sessionId of new Set(events.map((event) => event.sessionId))) {
-      const consent = await ledger.getConsent(sessionId);
-      if (consent) consents.push(consent);
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      // Reading the ledger is asynchronous, so a withdrawal can land between the first read
+      // and publication. Capturing the generation first and re-checking it before publishing
+      // means a contribution withdrawn mid-read is never published as though it still counted.
+      const generation = ledger.generation;
+      const window = this.#window();
+      const events = await ledger.readWindow(window.start, window.end);
+
+      const consents: ConsentRecord[] = [];
+      for (const sessionId of new Set(events.map((event) => event.sessionId))) {
+        const consent = await ledger.getConsent(sessionId);
+        if (consent) consents.push(consent);
+      }
+      if (ledger.generation !== generation) continue;
+
+      const aggregates = aggregator.aggregate({
+        events,
+        briefs: briefs([...new Set(events.map((event) => event.briefId))]),
+        consents,
+        window,
+        origin,
+        minimumSessions,
+      });
+
+      return aggregates.map((aggregate) => {
+        const summary = aggregator.summarize(aggregate, minimumSessions);
+        ledger.publishSnapshot(aggregate.id, summary);
+        return summary;
+      });
     }
-
-    const aggregates = aggregator.aggregate({
-      events,
-      briefs: briefs([...new Set(events.map((event) => event.briefId))]),
-      consents,
-      window,
-      origin,
-      minimumSessions,
-    });
-
-    return aggregates.map((aggregate) => {
-      const summary = aggregator.summarize(aggregate, minimumSessions);
-      ledger.publishSnapshot(aggregate.id, summary);
-      return summary;
-    });
+    // The ledger kept moving. Publishing nothing is correct: the next refresh recomputes,
+    // and a reader sees no snapshot rather than one that may already be wrong.
+    return [];
   }
 
-  /** Null when never published or invalidated by a later ledger change. */
+  /** Drops every published snapshot, for a change the ledger cannot observe itself. */
+  invalidate(): void {
+    this.#deps.ledger.invalidateSnapshots();
+  }
+
+  /**
+   * Null when never published, invalidated by a later ledger change, or left over from an
+   * earlier window: a snapshot describes one fixed period and must not outlive it.
+   */
   published(aggregateId: string): MerchantDemandSummary | null {
-    return (this.#deps.ledger.readSnapshot(aggregateId) as MerchantDemandSummary | null) ?? null;
+    const snapshot = this.#deps.ledger.readSnapshot(aggregateId) as MerchantDemandSummary | null;
+    if (!snapshot) return null;
+    return snapshot.windowEnd === this.#window().end.toISOString() ? snapshot : null;
   }
 }
