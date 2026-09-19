@@ -7,6 +7,11 @@ proposals. Both domains are equally required. Specs: [design v3](docs/SHOPIFY_EC
 [team split](docs/TEAM_WORK_SPLIT.md), [active S1–S5 cards](docs/milestones/README.md).
 Archived M1–M5 cards are historical only. Read your card's cited design sections before coding.
 
+Before implementation, read [the shared playbook](docs/AGENT_IMPLEMENTATION_GUIDE.md).
+[Dispatch prompts](docs/AGENT_DISPATCH.md) define bounded implementation and review assignments.
+Claude imports these rules through `CLAUDE.md`; Codex discovers this file directly. `CODEX.md` is
+a manual launch guide. Neither the lane table nor these files authorizes launching more agents.
+
 ## Commands (run from the repo root)
 
 | Command | What it does |
@@ -45,8 +50,10 @@ CI (`.github/workflows/ci.yml`) runs `install --frozen-lockfile`, `typecheck`, `
 - **Before saying "done"**, run your card's Accept commands plus `pnpm typecheck` and paste the
   output.
 
-**Definition of done:** Accept passes · `pnpm typecheck` passes · `git diff --stat main` touches
-only your card's Edit paths · new behavior is behind the milestone's flag · `pnpm format` was run.
+**Definition of done:** Accept passes · `pnpm typecheck` passes · the diff from your recorded
+card base SHA plus untracked files touches only your card's Edit paths · new behavior is behind
+the milestone's flag · `pnpm format` was run. Inspect the integration-target diff separately;
+until bootstrap merges, an old `main` diff includes foundation work outside your card.
 
 ## Lane ownership (team split §2, CODEOWNERS)
 

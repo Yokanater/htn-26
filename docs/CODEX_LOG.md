@@ -8,3 +8,4 @@ this into the Devpost "How Codex helped" section. Confirm current prize requirem
 | --- | --- | --- | --- | --- |
 
 | 2026-09-19 | All / L3 coordination | REVAMP-0 | Researched and rewrote the two-sided intent plan; balanced UI ownership; added equal-domain contracts, interfaces, fixtures, flags and bootstrap metadata. | Offline: 108 tests, typecheck, fixtures (66), bootstrap gate (3), format and web build passed; no live calls. S1–S5 implementation remains on cards. |
+| 2026-09-19 | All / coordination | GUIDE-0 | Added shared Claude/Codex implementation guidance, dispatch prompts and a pinned legacy-branch salvage review. | Documentation only; reviewed source and historical test cases without executing legacy branches or live providers. |
