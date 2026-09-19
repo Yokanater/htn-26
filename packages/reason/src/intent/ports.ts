@@ -34,7 +34,12 @@ export interface IntentModelCallContext {
 }
 
 export type IntentModelErrorKind =
-  | 'refusal' | 'incomplete' | 'invalid_output' | 'transport' | 'timeout' | 'aborted';
+  | 'refusal'
+  | 'incomplete'
+  | 'invalid_output'
+  | 'transport'
+  | 'timeout'
+  | 'aborted';
 
 export class IntentModelError extends Error {
   readonly kind: IntentModelErrorKind;

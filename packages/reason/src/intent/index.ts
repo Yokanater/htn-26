@@ -2,4 +2,6 @@
 export * from './fake';
 export * from './interpreter';
 export * from './mapper';
+export * from './openai';
 export * from './ports';
+export * from './prompt';
