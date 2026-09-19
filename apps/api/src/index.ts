@@ -1,13 +1,14 @@
+import "dotenv/config";
 import express from "express";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { createPlatform } from "./platform";
-if (process.env.PROVIDER_MODE && process.env.PROVIDER_MODE !== "demo")
-  throw new Error(
-    "Only demo providers are implemented. See docs/PLATFORM_HANDOFF.md.",
-  );
+const providerMode = process.env.PROVIDER_MODE ?? "demo";
+if (!["demo", "browserbase"].includes(providerMode))
+  throw new Error("PROVIDER_MODE must be either demo or browserbase.");
 const platform = createPlatform({
   databasePath: process.env.DATABASE_PATH ?? ".data/grove.sqlite",
+  providerMode: providerMode as "demo" | "browserbase",
 });
 const webRoot = resolve("dist/web");
 if (existsSync(webRoot)) {
@@ -23,7 +24,7 @@ const server = platform.app.listen(
   process.env.HOST ?? "127.0.0.1",
   () =>
     console.log(
-      `Grove demo API listening on http://${process.env.HOST ?? "127.0.0.1"}:${process.env.PORT ?? 3001}`,
+      `Grove API (${providerMode}) listening on http://${process.env.HOST ?? "127.0.0.1"}:${process.env.PORT ?? 3001}`,
     ),
 );
 for (const signal of ["SIGINT", "SIGTERM"])

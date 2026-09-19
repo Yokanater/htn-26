@@ -4,6 +4,7 @@ import {
   type Report,
   SCHEMA_VERSION,
 } from "./index";
+import { footwearFixtureReport } from "./fixtures-footwear";
 
 export const demoProfile: Profile = {
   id: "profile_demo",
@@ -197,6 +198,8 @@ export function fixtureReport(
   profile = demoProfile,
   id = "report_demo",
 ): Report {
+  if (/footwear|shoes?|sneakers?/i.test(profile.category))
+    return footwearFixtureReport(profile, id);
   const evidence = [...collaborators, ...competitors].flatMap((c) => [
     {
       id: `${c.id}_catalog`,

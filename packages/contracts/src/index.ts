@@ -38,11 +38,28 @@ export const profileInput = z.object({
     .default("Find complementary brand partnerships"),
 });
 export type ProfileInput = z.input<typeof profileInput>;
-export type Profile = z.output<typeof profileInput> & {
+export type ProfileFields = z.output<typeof profileInput>;
+export type ProfileResearch = {
+  sessionId: string;
+  shopifyConfidence: number;
+  shopifySignals: string[];
+  pagesVisited: number;
+  products: string[];
+  sources: {
+    url: string;
+    title: string;
+    span: string;
+    sourceType: string;
+    fetchedAt: string;
+    contentHash: string;
+  }[];
+};
+export type Profile = ProfileFields & {
   id: string;
   version: number;
   confirmed: boolean;
-  mode: "demo";
+  mode: "demo" | "browserbase";
+  research?: ProfileResearch;
 };
 export type Evidence = {
   id: string;

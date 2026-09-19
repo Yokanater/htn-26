@@ -34,6 +34,36 @@ npm run build
 npm start
 ```
 
+## Browserbase
+
+Put `BROWSERBASE_API_KEY` in `.env`. If the account contains multiple projects,
+also set `BROWSERBASE_PROJECT_ID`. Verify the cloud browser connection with:
+
+```sh
+npm run browserbase:smoke
+# Or browse a specific public page:
+npm run browserbase:smoke -- https://example.com
+```
+
+The smoke command creates a short-lived Browserbase session, connects over CDP,
+loads the page, prints a small text preview, and closes the session. The reusable
+adapter is `apps/api/src/browserbase.ts`.
+
+To exercise the bounded storefront profiler directly:
+
+```sh
+npm run browserbase:profile -- https://your-store.example
+```
+
+Set `PROVIDER_MODE=browserbase` to use it from the new-report flow. This live mode
+checks DNS and redirects, reads `robots.txt`, restricts browser navigation to the
+store domain, visits a small homepage/About/collection/product sample, and records
+source excerpts and content hashes. Store profiles are live; the downstream market
+report research also runs live in Browserbase mode. Candidate brands are accepted
+only after their public storefront is captured; evidence links point to those
+pages. Results become partial instead of falling back to fictional brands when
+too few supported candidates are available. Demo mode remains deterministic.
+
 `npm start` serves the production web build and API together at **http://127.0.0.1:3001**. Run it after stopping the dev API, or choose another `PORT`.
 
 The integration tests cover profile confirmation, idempotency, cancellation, partial results, evidence references, persistence, workspace isolation, and input validation. Browser tests cover desktop and mobile workflows and produce screenshots in `test-results/`.

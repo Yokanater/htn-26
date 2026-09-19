@@ -792,7 +792,11 @@ function App() {
                     }}
                   >
                     <span className="report-icon">
-                      <Coffee size={23} />
+                      {r.profile.mode === "browserbase" ? (
+                        <Compass size={23} />
+                      ) : (
+                        <Coffee size={23} />
+                      )}
                     </span>
                     <span className="report-row-title">
                       <strong>{r.profile.name}</strong>
@@ -807,7 +811,9 @@ function App() {
                     <span className={`status-pill ${r.status}`}>
                       {r.status}
                     </span>
-                    <span className="demo-label">Demo</span>
+                    <span className="demo-label">
+                      {r.profile.mode === "browserbase" ? "Live" : "Demo"}
+                    </span>
                     <ArrowUpRight size={18} />
                   </button>
                 ))}
@@ -842,12 +848,20 @@ function App() {
                     <section className="current-report">
                       <div className="report-context">
                         <div className="store-emblem">
-                          <Coffee size={22} />
+                          {report.profile.mode === "browserbase" ? (
+                            <Compass size={22} />
+                          ) : (
+                            <Coffee size={22} />
+                          )}
                         </div>
                         <div>
                           <div className="store-name">
                             {report.profile.name}
-                            <span className="demo-label">Demo report</span>
+                            <span className="demo-label">
+                              {report.profile.mode === "browserbase"
+                                ? "Live research"
+                                : "Demo report"}
+                            </span>
                           </div>
                           <div className="store-meta">
                             {report.profile.category}
@@ -873,10 +887,15 @@ function App() {
                     </section>
                   )}
                   <div className="demo-notice">
-                    <FlaskConical size={14} />
+                    {report?.profile.mode === "browserbase" ? (
+                      <Globe2 size={14} />
+                    ) : (
+                      <FlaskConical size={14} />
+                    )}
                     <span>
-                      Meet the possibilities. This sample uses fictional brands
-                      and illustrative evidence.
+                      {report?.profile.mode === "browserbase"
+                        ? "Candidates and evidence were captured from live public storefronts. Rankings are research leads, not verified relationships."
+                        : "Meet the possibilities. This sample uses fictional brands and illustrative evidence."}
                     </span>
                     <button onClick={() => setUtility("demo")}>
                       About this data <ArrowUpRight size={12} />
@@ -887,7 +906,9 @@ function App() {
                       <div className="progress-heading">
                         <div>
                           <span className="eyebrow">
-                            DEMO RESEARCH IN PROGRESS
+                            {report.profile.mode === "browserbase"
+                              ? "LIVE RESEARCH IN PROGRESS"
+                              : "DEMO RESEARCH IN PROGRESS"}
                           </span>
                           <h2>{phaseLabels[phases.indexOf(report.phase)]}</h2>
                           <p>{phaseDetails[phases.indexOf(report.phase)]}</p>
@@ -1383,7 +1404,11 @@ function App() {
           className="drawer-backdrop"
         >
           <div className="drawer-content">
-            <span className="demo-label">Illustrative demo evidence</span>
+            <span className="demo-label">
+              {report?.profile.mode === "browserbase"
+                ? "Live captured evidence"
+                : "Illustrative demo evidence"}
+            </span>
             {drawer.candidate && (
               <>
                 <div className={`drawer-art ${drawer.candidate.tone}`}>
@@ -1397,8 +1422,8 @@ function App() {
                 <div className="drawer-section">
                   <h3>What goes into the fit?</h3>
                   <p className="muted">
-                    Ranking aid, not a probability. All values are demo
-                    examples.
+                    Ranking aid, not a probability. Values prioritize research
+                    leads and do not establish a relationship.
                   </p>
                   {drawer.candidate.components.map((c) => (
                     <div className="score-component" key={c.label}>
@@ -1668,6 +1693,14 @@ function NewReport({
           body: JSON.stringify(values),
         });
         setProfile(next);
+        setValues({
+          name: next.name,
+          url: next.url,
+          category: next.category,
+          audience: next.audience,
+          geography: next.geography,
+          goal: next.goal,
+        });
         setStep(1);
       } else {
         await api(`/store-profiles/${profile!.id}`, {
@@ -1711,10 +1744,17 @@ function NewReport({
             : "Review your brand context before the demo research begins. You can edit every field below."}
         </p>
         <div className="form-demo-note">
-          <FlaskConical size={18} />
+          {profile?.mode === "browserbase" ? (
+            <ShieldCheck size={18} />
+          ) : (
+            <FlaskConical size={18} />
+          )}
           <span>
-            This demo uses a fictional coffee-market report. Your URL will not
-            be crawled, and no store facts are inferred.
+            {profile?.mode === "browserbase"
+              ? `Browserbase visited ${profile.research?.pagesVisited ?? 0} storefront pages and found ${profile.research?.shopifyConfidence ?? 0}% Shopify confidence. Review every suggested field before continuing.`
+              : profile
+                ? "This demo uses a fictional coffee-market report. In demo mode, your URL is not crawled and no store facts are inferred."
+                : "Your configured provider will prepare an editable brand profile after you submit the store URL."}
           </span>
         </div>
         {step === 0 ? (
@@ -1814,20 +1854,22 @@ function NewReport({
                 onChange={(e) => setValues({ ...values, goal: e.target.value })}
               />
             </label>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={partial}
-                onChange={(e) => setPartial(e.target.checked)}
-              />
-              <span>
-                Try a partial report
-                <small>
-                  Simulate a source failure to see how completed results are
-                  preserved.
-                </small>
-              </span>
-            </label>
+            {profile?.mode === "demo" && (
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={partial}
+                  onChange={(e) => setPartial(e.target.checked)}
+                />
+                <span>
+                  Try a partial report
+                  <small>
+                    Simulate a source failure to see how completed results are
+                    preserved.
+                  </small>
+                </span>
+              </label>
+            )}
           </>
         )}
         {error && (
@@ -1857,7 +1899,11 @@ function NewReport({
           )}
           <button className="button primary" disabled={busy} type="submit">
             {busy ? <LoaderCircle className="spin" size={16} /> : null}
-            {step === 0 ? "Review brand profile" : "Confirm & start demo"}
+            {step === 0
+              ? "Review brand profile"
+              : profile?.mode === "browserbase"
+                ? "Confirm & start live research"
+                : "Confirm & start demo"}
             {!busy && <ArrowRight size={15} />}
           </button>
         </div>

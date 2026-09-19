@@ -20,6 +20,8 @@ import {
   demoProfile,
   fixtureReport,
 } from "../../../packages/contracts/src/fixtures";
+import { profileStorefront } from "./store-profiler";
+import { researchMarket } from "./market-research";
 
 type Row = {
   id: string;
@@ -32,6 +34,15 @@ type Row = {
 export function createPlatform({
   databasePath = ":memory:",
   phaseMs = 1500,
+  providerMode = "demo",
+  profiler = profileStorefront,
+  marketResearch = researchMarket,
+}: {
+  databasePath?: string;
+  phaseMs?: number;
+  providerMode?: "demo" | "browserbase";
+  profiler?: typeof profileStorefront;
+  marketResearch?: typeof researchMarket;
 } = {}) {
   if (databasePath !== ":memory:")
     mkdirSync(dirname(databasePath), { recursive: true });
@@ -102,6 +113,86 @@ export function createPlatform({
     db
       .prepare("UPDATE reports SET payload=? WHERE id=?")
       .run(JSON.stringify(report), report.id);
+  // Repair reports created before category-aware fixtures were introduced.
+  for (const row of db
+    .prepare("SELECT * FROM reports")
+    .all() as unknown as Row[]) {
+    const report: Report = JSON.parse(row.payload);
+    const footwearProfile = /footwear|shoes?|sneakers?/i.test(
+      report.profile.category,
+    );
+    const coffeeResults = [...report.collaborators, ...report.competitors].some(
+      (candidate) =>
+        /coffee|brewing|tea/i.test(`${candidate.category} ${candidate.reason}`),
+    );
+    if (footwearProfile && coffeeResults && terminal(report.status)) {
+      const repaired = fixtureReport(report.profile, report.id);
+      repaired.createdAt = report.createdAt;
+      repaired.updatedAt = new Date().toISOString();
+      saveReport(repaired);
+    }
+    if (
+      report.profile.mode === "browserbase" &&
+      terminal(report.status) &&
+      report.evidence.some((evidence) => evidence.synthetic)
+    ) {
+      report.status = "queued";
+      report.phase = "queued";
+      report.warning = null;
+      report.collaborators = [];
+      report.competitors = [];
+      report.themes = [];
+      report.actions = [];
+      report.evidence = [];
+      report.swot = {
+        strengths: [],
+        weaknesses: [],
+        opportunities: [],
+        threats: [],
+      };
+      report.updatedAt = new Date(0).toISOString();
+      saveReport(report);
+    }
+    if (
+      report.profile.mode === "browserbase" &&
+      terminal(report.status) &&
+      [...report.collaborators, ...report.competitors].some((candidate) =>
+        /all american made|rankred|popular brands|zanniee/i.test(
+          candidate.name,
+        ),
+      )
+    ) {
+      report.status = "queued";
+      report.phase = "queued";
+      report.warning =
+        "Replacing editorial search results with verified storefronts.";
+      report.collaborators = [];
+      report.competitors = [];
+      report.themes = [];
+      report.actions = [];
+      report.evidence = [];
+      report.swot = {
+        strengths: [],
+        weaknesses: [],
+        opportunities: [],
+        threats: [],
+      };
+      report.updatedAt = new Date(0).toISOString();
+      saveReport(report);
+    }
+    if (
+      report.profile.mode === "browserbase" &&
+      report.status === "partial" &&
+      /429|burst rate limit/i.test(report.warning ?? "")
+    ) {
+      report.status = "queued";
+      report.phase = "queued";
+      report.warning =
+        "Waiting to retry live research after provider rate limiting.";
+      report.updatedAt = new Date(0).toISOString();
+      saveReport(report);
+    }
+  }
   const ownsItem = (workspace: string, id: string) =>
     reportRows(workspace).some((row) => {
       const r: Report = JSON.parse(row.payload);
@@ -113,7 +204,7 @@ export function createPlatform({
     });
   app.get("/v1/session", (_req, res) =>
     res.json({
-      mode: "demo",
+      mode: providerMode,
       workspace: "Sunday studio",
       schemaVersion: "1.0.0",
     }),
@@ -129,14 +220,14 @@ export function createPlatform({
     );
     res.json({
       status: "ok",
-      providerMode: "demo",
+      providerMode,
       storage: "sqlite",
       running: reports.filter((r) => !terminal(r.status)).length,
       completed: reports.filter((r) => r.status === "completed").length,
       partial: reports.filter((r) => r.status === "partial").length,
     });
   });
-  app.post("/v1/store-profiles", (req, res) => {
+  app.post("/v1/store-profiles", async (req, res) => {
     const parsed = profileInput.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({
@@ -155,12 +246,24 @@ export function createPlatform({
       return res.status(400).json({
         error: "Enter a public HTTP or HTTPS store URL without credentials.",
       });
+    let details = parsed.data;
+    if (providerMode === "browserbase") {
+      try {
+        details = await profiler(parsed.data);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Storefront research failed.";
+        return res.status(422).json({ error: message });
+      }
+    }
     const profile: Profile = {
-      ...parsed.data,
+      ...details,
       id: randomUUID(),
       version: 1,
       confirmed: false,
-      mode: "demo",
+      mode: providerMode,
     };
     db.prepare("INSERT INTO profiles VALUES (?,?,?)").run(
       profile.id,
@@ -372,10 +475,61 @@ export function createPlatform({
     },
   );
   // A restart resumes persisted jobs. One process owns the demo queue; production uses leased Postgres jobs.
+  const liveJobs = new Map<string, Promise<void>>();
+  const startLiveResearch = (report: Report) => {
+    if (liveJobs.has(report.id)) return;
+    report.status = "collecting";
+    report.phase = "collecting";
+    report.updatedAt = new Date().toISOString();
+    saveReport(report);
+    const job = marketResearch(report.profile)
+      .then((result) => {
+        const currentRow = db
+          .prepare("SELECT payload FROM reports WHERE id=?")
+          .get(report.id) as { payload: string } | undefined;
+        if (!currentRow) return;
+        const current: Report = JSON.parse(currentRow.payload);
+        if (current.status === "cancelled") return;
+        current.collaborators = result.collaborators;
+        current.competitors = result.competitors;
+        current.themes = result.themes;
+        current.swot = result.swot;
+        current.actions = result.actions;
+        current.evidence = result.evidence;
+        current.warning = result.warning;
+        current.phase = "synthesizing";
+        current.status =
+          result.collaborators.length >= 2 && result.competitors.length >= 2
+            ? "completed"
+            : "partial";
+        current.updatedAt = new Date().toISOString();
+        saveReport(current);
+      })
+      .catch((error: unknown) => {
+        const currentRow = db
+          .prepare("SELECT payload FROM reports WHERE id=?")
+          .get(report.id) as { payload: string } | undefined;
+        if (!currentRow) return;
+        const current: Report = JSON.parse(currentRow.payload);
+        if (current.status === "cancelled") return;
+        current.status = "partial";
+        current.warning = `Live market research failed without substituting fictional data: ${
+          error instanceof Error ? error.message : "unknown provider error"
+        }`;
+        current.updatedAt = new Date().toISOString();
+        saveReport(current);
+      })
+      .finally(() => liveJobs.delete(report.id));
+    liveJobs.set(report.id, job);
+  };
   const tick = () => {
     const rows = db.prepare("SELECT * FROM reports").all() as unknown as Row[];
     for (const row of rows) {
       const report: Report = JSON.parse(row.payload);
+      if (report.profile.mode === "browserbase") {
+        if (!terminal(report.status)) startLiveResearch(report);
+        continue;
+      }
       if (
         terminal(report.status) ||
         Date.now() - Date.parse(report.updatedAt) < phaseMs

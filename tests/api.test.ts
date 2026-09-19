@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPlatform } from "../apps/api/src/platform";
 import { type Report } from "../packages/contracts/src/index";
+import { demoProfile, fixtureReport } from "../packages/contracts/src/fixtures";
+import { assertPublicUrl } from "../apps/api/src/url-safety";
+import { hasStorefrontCommerceEvidence } from "../apps/api/src/market-research";
 
 const platform = createPlatform({ phaseMs: 10 });
 const server = platform.app.listen(0, "127.0.0.1");
@@ -233,6 +236,199 @@ test("public URL validation and same-origin mutations reject invalid requests", 
     body: "{",
   });
   assert.equal(malformed.status, 400);
+});
+test("network URL validation rejects literal private and reserved addresses", async () => {
+  for (const url of [
+    "http://10.0.0.1",
+    "http://100.64.0.1",
+    "http://169.254.169.254",
+    "http://172.31.0.1",
+    "http://192.168.0.1",
+    "http://224.0.0.1",
+  ])
+    await assert.rejects(() => assertPublicUrl(url));
+});
+test("browserbase mode stores profiler suggestions and provenance", async () => {
+  const live = createPlatform({
+    providerMode: "browserbase",
+    profiler: async (input) => ({
+      ...input,
+      name: "Extracted Store",
+      category: "Outdoor footwear",
+      research: {
+        sessionId: "session-test",
+        shopifyConfidence: 85,
+        shopifySignals: ["Shopify browser runtime or CDN assets"],
+        pagesVisited: 2,
+        products: ["Trail Runner"],
+        sources: [
+          {
+            url: input.url,
+            title: "Extracted Store",
+            span: "Outdoor shoes for everyday adventures.",
+            sourceType: "storefront",
+            fetchedAt: "2026-09-19T00:00:00.000Z",
+            contentHash: "abc123",
+          },
+        ],
+      },
+    }),
+  });
+  const liveServer = live.app.listen(0, "127.0.0.1");
+  try {
+    if (!liveServer.listening)
+      await new Promise<void>((resolve) =>
+        liveServer.once("listening", resolve),
+      );
+    const liveBase = `http://127.0.0.1:${(liveServer.address() as { port: number }).port}`;
+    const response = await fetch(`${liveBase}/v1/store-profiles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Submitted Store",
+        url: "https://example.com",
+      }),
+    });
+    assert.equal(response.status, 201);
+    const profile = await response.json();
+    assert.equal(profile.mode, "browserbase");
+    assert.equal(profile.name, "Extracted Store");
+    assert.equal(profile.research.sessionId, "session-test");
+    assert.equal(profile.research.sources.length, 1);
+  } finally {
+    await new Promise<void>((resolve) => liveServer.close(() => resolve()));
+    live.close();
+  }
+});
+test("a footwear profile never receives the coffee fixture", () => {
+  const report = fixtureReport({
+    ...demoProfile,
+    mode: "browserbase",
+    name: "Allbirds",
+    category: "Footwear & apparel",
+    audience: "People looking for comfortable natural-material shoes",
+  });
+  const rendered = JSON.stringify(report).toLowerCase();
+  assert.equal(report.collaborators.length, 6);
+  assert.equal(report.competitors.length, 5);
+  assert.match(rendered, /footwear|shoe/);
+  assert.doesNotMatch(
+    rendered,
+    /home brewer|coffee subscription|specialty coffee/,
+  );
+});
+test("editorial brand lists cannot pass as candidate storefronts", () => {
+  assert.equal(
+    hasStorefrontCommerceEvidence({
+      title: "100+ Clothing Brands Worth Your Money",
+      description: "Our master list of leading American clothing brands.",
+      productLinks: 0,
+      productSchema: false,
+      addToCart: false,
+    }),
+    false,
+  );
+  assert.equal(
+    hasStorefrontCommerceEvidence({
+      title: "Independent Clothing Brand",
+      description: "Vintage-inspired dresses made in small batches.",
+      productLinks: 8,
+      productSchema: true,
+      addToCart: true,
+    }),
+    true,
+  );
+});
+test("browserbase reports use live research instead of fixture progression", async () => {
+  const live = createPlatform({
+    phaseMs: 5,
+    providerMode: "browserbase",
+    profiler: async (input) => ({
+      ...input,
+      name: "Live Shoe Store",
+      category: "Footwear & apparel",
+      research: {
+        sessionId: "profile-session",
+        shopifyConfidence: 80,
+        shopifySignals: ["Shopify browser runtime or CDN assets"],
+        pagesVisited: 1,
+        products: ["Leather loafer"],
+        sources: [],
+      },
+    }),
+    marketResearch: async (profile) => {
+      const fixture = fixtureReport(profile);
+      return {
+        collaborators: fixture.collaborators.slice(0, 2).map((candidate) => ({
+          ...candidate,
+          name: `Live ${candidate.name}`,
+          domain: `${candidate.id}.com`,
+        })),
+        competitors: fixture.competitors.slice(0, 2).map((candidate) => ({
+          ...candidate,
+          name: `Live ${candidate.name}`,
+          domain: `${candidate.id}.com`,
+        })),
+        evidence: fixture.evidence.slice(0, 4).map((evidence) => ({
+          ...evidence,
+          url: "https://example.com",
+          synthetic: false,
+        })),
+        themes: [],
+        swot: fixture.swot,
+        actions: [],
+        warning: "Captured live.",
+      };
+    },
+  });
+  const liveServer = live.app.listen(0, "127.0.0.1");
+  try {
+    if (!liveServer.listening)
+      await new Promise<void>((resolve) =>
+        liveServer.once("listening", resolve),
+      );
+    const liveBase = `http://127.0.0.1:${(liveServer.address() as { port: number }).port}`;
+    const sessionResponse = await fetch(`${liveBase}/v1/session`);
+    const liveCookie = sessionResponse.headers.get("set-cookie")!.split(";")[0];
+    const call = (path: string, method = "GET", body?: unknown, headers = {}) =>
+      fetch(`${liveBase}/v1${path}`, {
+        method,
+        headers: {
+          cookie: liveCookie,
+          "Content-Type": "application/json",
+          ...headers,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    const profile = await (
+      await call("/store-profiles", "POST", {
+        name: "Submitted",
+        url: "https://example.com",
+      })
+    ).json();
+    await call(`/store-profiles/${profile.id}`, "PATCH", {});
+    const report = await (
+      await call(
+        "/reports",
+        "POST",
+        { profileId: profile.id },
+        { "Idempotency-Key": "live-market-research" },
+      )
+    ).json();
+    live.tick();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const completed = await (await call(`/reports/${report.id}`)).json();
+    assert.equal(completed.status, "completed");
+    assert.match(completed.collaborators[0].name, /^Live /);
+    assert.ok(
+      completed.evidence.every(
+        (item: { synthetic: boolean }) => !item.synthetic,
+      ),
+    );
+  } finally {
+    await new Promise<void>((resolve) => liveServer.close(() => resolve()));
+    live.close();
+  }
 });
 test("SSE resolves a completed report and closes the stream", async () => {
   const reports: Report[] = await (await request("/reports")).json();

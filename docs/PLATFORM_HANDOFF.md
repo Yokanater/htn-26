@@ -6,7 +6,9 @@ Grove is a complete **local demo loop**, not a production launch. The UI and API
 
 Implemented: store context capture/confirmation, report snapshots, idempotency, persisted phase progression, SSE, restart recovery, cancellation, useful partial results, report library, collaborators, competitor themes, SWOT/actions, source drawers, saves, feedback, JSON export, and workspace-specific health counters.
 
-Not implemented: actual storefront extraction, Shopify verification, vendor orchestration, production identity, invitations, Redis/Postgres queue execution, live evidence validation pipeline, deployment, distributed tracing, or quality-benchmark gates. The Postgres migration is a **proposal** and has not been run against Postgres.
+Implemented behind `PROVIDER_MODE=browserbase`: bounded Browserbase storefront extraction for editable profile suggestions; real candidate storefront capture for collaborators and competitors; public-DNS and redirect checks; `robots.txt` policy; domain-restricted sessions; Shopify signals; source excerpts, URLs, and content hashes; three-session global concurrency; and session cleanup. Live runs never fall back to fictional candidates.
+
+Not implemented: independent customer-discourse collection, full Shopify verification, Stagehand fallback extraction, production identity, invitations, Redis/Postgres queue execution, deployment, distributed tracing, or quality-benchmark gates. Candidate discovery uses category/geography query plans and verified storefront seeds for footwear; fit scores prioritize research leads and are not verified relationships. The Postgres migration is a **proposal** and has not been run against Postgres.
 
 ## Visual direction
 
@@ -48,7 +50,7 @@ SSE sends complete snapshots every 500 ms; the demo advances approximately every
 
 `packages/contracts/src/index.ts` defines the rendering contract. `fixtures.ts` is a deterministic **fictional** success provider; `simulatePartial` is the failure fixture. The only current orchestration integration point is `createPlatform`'s worker in `apps/api/src/platform.ts`. It deliberately performs no vendor calls.
 
-1. **Teammate 1**: replace context-only profiling with extracted and normalized profile data. Supply canonical evidence URLs, exact spans, dates, and provenance. Add real `shopify_confidence` and supporting signals before showing verification in the UI. The existing URL check is syntactic; live fetching must additionally implement DNS/redirect validation, policy checks, and budgets from the design document.
+1. **Teammate 1**: live Browserbase profiling and candidate storefront capture are implemented in `apps/api/src/store-profiler.ts` and `apps/api/src/market-research.ts`. Next, add Stagehand as a fallback for pages without usable structured data, replace category seed pools with a search/index provider at broader scale, collect independent discourse, improve taxonomy normalization, persist raw artifacts with retention, and extend redirect/DNS defenses with production network controls. Do not treat Shopify confidence or candidate fit scores as verified relationships.
 2. **Teammate 2**: supply decomposed fit scores and enriched evidence, with deployment versions. Current fit values and confidence labels are illustrative ranking aids, not probabilities. Canonical domain identities should replace fixture IDs for cross-report saves.
 3. **Teammate 3**: supply cited collaborators, competitors, discourse, SWOT, and actions. Every material claim must resolve to run-owned evidence. Themes without evidence are currently rendered as explicit gaps. Replace the simplified UI payload with a reviewed adapter from the full analysis schema; do not drop provenance or infer sources.
 4. **Platform follow-up**: add authenticated workspace membership, a Postgres repository, leased queue workers, server-side provider clients, retries/timeouts/cancellation hooks, and telemetry. Keep vendor keys out of the web bundle.
@@ -63,7 +65,7 @@ The demo trusts its compiled fixtures. Runtime validation of live report payload
 
 - Start: `npm install && npm run dev`; web 5173, API 3001. Requires Node 22.15+.
 - Build: `npm run build`; run `npm start` to serve compiled web and API together.
-- Configuration: set `PORT`, `HOST`, `DATABASE_PATH` as process environment variables. `.env.example` is a reference; no automatic `.env` loader is configured. Non-demo `PROVIDER_MODE` fails startup.
+- Configuration: `.env` is loaded automatically. Set `PROVIDER_MODE=browserbase` and `BROWSERBASE_API_KEY` for live store profiling; `BROWSERBASE_PROJECT_ID` is optional for single-project keys. Omit these or use `PROVIDER_MODE=demo` for deterministic profiles.
 - Source failure: select **Try a partial report** in profile confirmation. Collaborators survive; unsupported sections remain empty with a clear message.
 - Cancellation: click **Cancel report** during progress. It is persisted, repeatable, and does not resume after restart.
 - Recovery: restart the API with the same `DATABASE_PATH`; nonterminal jobs resume from their persisted phase. Run only one API process against a demo database. This is not a distributed queue.
