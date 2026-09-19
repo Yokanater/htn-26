@@ -1,7 +1,7 @@
 import { CompetitorDiscourseOutput, type CompetitorProfile, type DiscourseTheme, type EntitySeed } from "../contracts.js";
 import { renderEvidence, type EvidenceBundle } from "../evidence.js";
 import { validateReport } from "../validator.js";
-import { isLowEvidence, sampleStats, scoreFor } from "./finalize.js";
+import { cleanExplanation, isLowEvidence, sampleStats, scoreFor } from "./finalize.js";
 import { runWorkflow, type WorkflowCtx } from "./run.js";
 
 export async function analyzeCompetitors(
@@ -24,11 +24,12 @@ export async function analyzeCompetitors(
       }),
   });
   return {
-    competitors: [...out.competitors]
+    competitors: out.competitors
+      .map(cleanExplanation)
       .map((c) => ({ ...c, score_components: scoreFor(c.entity_key, "competitor", seeds), low_evidence: isLowEvidence(c.evidence_ids, bundle) }))
       .sort((a, b) => a.rank - b.rank || (b.score_components?.total ?? 0) - (a.score_components?.total ?? 0))
       .map((c, i) => ({ ...c, rank: i + 1 })),
-    themes: out.themes.map((t) => ({
+    themes: out.themes.map(cleanExplanation).map((t) => ({
       ...t,
       sample: sampleStats(t.evidence_ids, t.contradicting_evidence_ids, bundle),
       low_evidence: isLowEvidence(t.evidence_ids, bundle),

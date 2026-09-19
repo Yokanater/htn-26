@@ -28,6 +28,7 @@ export interface Metrics {
   citation_coverage: number; // claims with >=1 evidence id, or explicitly insufficient_evidence
   unknown_id_rate: number; // cited ids not in the bundle / all cited ids
   duplicate_rate: number; // duplicate SWOT items / entities / ids per claim
+  explanation_leak_rate: number; // observed claims whose explanation is not null (model scratch text); cleaned in code
 }
 
 type ClaimLike = { evidence_ids: string[]; contradicting_evidence_ids?: string[]; insufficient_evidence: boolean };
@@ -49,6 +50,7 @@ export function measure(sections: ReportSections, bundle: ReturnType<typeof sele
     citation_coverage: claims.filter((c) => c.evidence_ids.length > 0 || c.insufficient_evidence).length / n,
     unknown_id_rate: unknown / Math.max(1, cited.length),
     duplicate_rate: dup / n,
+    explanation_leak_rate: claims.filter((c) => (c as { claim_type?: string; explanation?: string | null }).claim_type === "observed" && (c as { explanation?: string | null }).explanation != null).length / n,
   };
 }
 
@@ -108,6 +110,7 @@ export function format(r: Awaited<ReturnType<typeof evaluate>>, label: string): 
     row("citation coverage", (m) => pct(m.citation_coverage).padStart(10)),
     row("unknown-ID rate", (m) => pct(m.unknown_id_rate).padStart(10)),
     row("duplicate rate", (m) => pct(m.duplicate_rate).padStart(10)),
+    row("explanation leak rate", (m) => pct(m.explanation_leak_rate).padStart(10)),
     `  claims measured        ${String(r.first_pass.claims).padStart(10)}${String(r.shipped.claims).padStart(10)}`,
     `  workflow retries used: ${r.retries}`,
     `  low_evidence items:    ${r.low_evidence.count}/${r.low_evidence.total}  (${Object.entries(r.low_evidence.by_kind).map(([k, v]) => `${k} ${v.low}/${v.total}`).join(", ")})`,

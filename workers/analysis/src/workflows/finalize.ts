@@ -41,3 +41,12 @@ export function rankActions(actions: RecommendedAction[]): RecommendedAction[] {
     )
     .map(({ a }, i) => ({ ...a, rank: i + 1 }));
 }
+
+/**
+ * Observed claims must have explanation === null. Live runs showed the model leaking scratch text into that field
+ * ("/", ")", "Need null.", even "oops. Need clean output") on ~20 of ~35 items per report, so enforce it in code.
+ * Inference explanations are left alone (validator requires them to be real sentences).
+ */
+export function cleanExplanation<T extends { claim_type: "observed" | "inference"; explanation: string | null }>(item: T): T {
+  return item.claim_type === "observed" && item.explanation !== null ? { ...item, explanation: null } : item;
+}

@@ -1,7 +1,7 @@
 import { SwotActionsOutput, type CollaborationCandidate, type CompetitorProfile, type DiscourseTheme } from "../contracts.js";
 import { renderEvidence, type EvidenceBundle } from "../evidence.js";
 import { validateReport } from "../validator.js";
-import { rankActions } from "./finalize.js";
+import { cleanExplanation, rankActions } from "./finalize.js";
 import { runWorkflow, type WorkflowCtx } from "./run.js";
 
 export interface Upstream {
@@ -38,5 +38,9 @@ export async function synthesizeSwot(bundle: EvidenceBundle, up: Upstream, ctx: 
     ].join("\n\n"),
     validate: (o) => validateReport({ swot: o.swot, actions: o.actions }, scoped),
   });
-  return { swot: out.swot, actions: rankActions(out.actions) };
+  const q = (items: typeof out.swot.strengths) => items.map(cleanExplanation);
+  return {
+    swot: { strengths: q(out.swot.strengths), weaknesses: q(out.swot.weaknesses), opportunities: q(out.swot.opportunities), threats: q(out.swot.threats) },
+    actions: rankActions(out.actions.map(cleanExplanation)),
+  };
 }

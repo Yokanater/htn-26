@@ -148,8 +148,8 @@ export function validateReport(output: ReportSections, bundle: EvidenceBundle, o
     for (const id of new Set(cited))
       if (!docs.has(id)) push("UNKNOWN_EVIDENCE_ID", path, `Evidence id "${id}" is not in the evidence bundle. Cite only ids you were given.`, id);
 
-    if (item.claim_type === "inference" && !item.explanation?.trim())
-      push("MISSING_EXPLANATION", path, "claim_type is 'inference' but explanation is empty. Explain the reasoning from the cited evidence.");
+    if (item.claim_type === "inference" && (item.explanation?.trim().split(/\s+/).filter(Boolean).length ?? 0) < 3)
+      push("MISSING_EXPLANATION", path, "claim_type is 'inference' but explanation is empty or not a real sentence. Explain the reasoning from the cited evidence.");
 
     if (item.insufficient_evidence && item.confidence !== "low")
       push("INSUFFICIENT_BUT_CONFIDENT", path, "insufficient_evidence=true requires confidence 'low'.");

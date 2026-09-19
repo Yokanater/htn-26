@@ -1,7 +1,7 @@
 import { CollaborationOutput, type CollaborationCandidate, type EntitySeed } from "../contracts.js";
 import { renderEvidence, type EvidenceBundle } from "../evidence.js";
 import { validateReport } from "../validator.js";
-import { isLowEvidence, scoreFor } from "./finalize.js";
+import { cleanExplanation, isLowEvidence, scoreFor } from "./finalize.js";
 import { runWorkflow, type WorkflowCtx } from "./run.js";
 
 export async function scoutCollaborators(bundle: EvidenceBundle, seeds: EntitySeed[], ctx: WorkflowCtx): Promise<CollaborationCandidate[]> {
@@ -16,7 +16,8 @@ export async function scoutCollaborators(bundle: EvidenceBundle, seeds: EntitySe
     ].join("\n\n"),
     validate: (o) => validateReport({ collaboration: o.candidates }, bundle),
   });
-  return [...out.candidates]
+  return out.candidates
+    .map(cleanExplanation)
     .map((c) => ({ ...c, score_components: scoreFor(c.entity_key, "collaboration", seeds), low_evidence: isLowEvidence(c.evidence_ids, bundle) }))
     .sort((a, b) => a.rank - b.rank || (b.score_components?.total ?? 0) - (a.score_components?.total ?? 0))
     .map((c, i) => ({ ...c, rank: i + 1 }));

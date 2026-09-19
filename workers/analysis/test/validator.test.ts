@@ -54,7 +54,7 @@ describe("validateReport", () => {
   });
 
   it("rejects inferences without an explanation (null, empty, whitespace)", () => {
-    for (const explanation of [null, "", "   "]) {
+    for (const explanation of [null, "", "   ", "Need null.", "oops"]) { // last two: scratch text seen leaking in live runs
       const r = good();
       r.swot!.opportunities[0]!.explanation = explanation;
       expect(codes(r)).toEqual(["MISSING_EXPLANATION"]);

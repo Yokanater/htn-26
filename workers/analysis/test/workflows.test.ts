@@ -43,6 +43,21 @@ describe("prompts", () => {
     });
 });
 
+describe("explanation cleaning (live finding: model leaks scratch text into explanation of observed claims)", () => {
+  const leaky = () => {
+    const o = clone(fakeCollaboration);
+    o.candidates.forEach((c, i) => (c.explanation = ["/", ")", "Need null.", "oops. Need clean output.", "n/a"][i]!));
+    return o;
+  };
+  it("nulls explanation on observed claims and keeps real inference explanations", async () => {
+    const { ctx } = setup({ CollaborationOutput: [leaky()] });
+    const out = await scoutCollaborators(bundle, coffeeSeeds, ctx);
+    expect(out.every((c) => c.claim_type === "inference" || c.explanation === null)).toBe(true);
+    const { ctx: ctx2 } = setup({ SwotActionsOutput: [(() => { const o = clone(fakeSwotActions); o.swot.strengths[0]!.explanation = "oops"; return o; })()] });
+    return synthesizeSwot(bundle, { collaboration: [], competitors: [], themes: [] }, ctx2).then((r) => expect(r.swot.strengths[0]!.explanation).toBeNull());
+  });
+});
+
 describe("planner", () => {
   it("returns the plan", async () => {
     const { ctx } = setup();
