@@ -4,7 +4,7 @@ export interface LlmRequest<T> {
   task: string; // workflow name, e.g. "collaboration"
   run_id: string;
   task_id: string;
-  promptVersion: string; // e.g. "collaboration.v1"
+  promptVersion: string; // e.g. "collaboration.v1+shared.v2"
   system: string;
   user: string;
   schema: z.ZodType<T>;

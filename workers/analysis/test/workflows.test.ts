@@ -31,10 +31,14 @@ describe("prompts", () => {
     ["preserve disagreement", /Preserve disagreement/],
     ["insufficient_evidence instead of speculating", /Return `insufficient_evidence` instead of speculating/],
   ];
+  it("every workflow prompt keeps a v1 baseline alongside the current version", () => {
+    expect(loadPrompt("competitor_discourse", "v1", "v1").system).not.toContain("not competitors");
+    expect(loadPrompt("competitor_discourse").system).toContain("Brands that sell complementary products are not competitors");
+  });
   for (const name of ["planner", "collaboration", "competitor_discourse", "swot_actions"] as PromptName[])
     it(`${name} states every required rule and is versioned`, () => {
       const p = loadPrompt(name);
-      expect(p.version).toBe(`${name}.v1`);
+      expect(p.version).toMatch(new RegExp(`^${name}\\.v\\d+\\+shared\\.v\\d+$`));
       for (const [label, re] of RULES) expect(p.system, label).toMatch(re);
     });
 });
@@ -101,7 +105,7 @@ describe("collaboration scout", () => {
     expect(req.user).toContain('<evidence_bundle untrusted="true">');
     expect(req.user).not.toContain(INJECTION_CANARY);
     expect(req.user).not.toMatch(/ignore all previous instructions/i);
-    expect(req).toMatchObject({ run_id: "run_test", task_id: "collaboration#1", promptVersion: "collaboration.v1", schemaName: "CollaborationOutput" });
+    expect(req).toMatchObject({ run_id: "run_test", task_id: "collaboration#1", promptVersion: "collaboration.v1+shared.v2", schemaName: "CollaborationOutput" });
   });
 
   it("retries once, feeding validator errors and the rejected output back", async () => {
