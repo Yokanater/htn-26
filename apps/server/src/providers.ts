@@ -23,6 +23,7 @@ import {
   type OpenAiIntentModelOptions,
 } from '@sei/reason';
 import { loadSeedOffers } from './replay';
+import { PrivateDemandLedger } from './services/demand';
 import { ContainerImageNormalizer } from './services/image';
 import { SipsImageNormalizer } from './services/image-normalizer';
 import {
@@ -45,6 +46,7 @@ export interface AppProviders {
   checkpoints: PrivateCheckpointStore;
   runs: RunRegistry;
   runner: CollectionRunner;
+  demand: PrivateDemandLedger;
   now: () => Date;
 }
 
@@ -149,6 +151,7 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
     matcher,
     checkpoints,
     runs,
+    demand: overrides.demand ?? new PrivateDemandLedger(),
     runner:
       overrides.runner ??
       createCollectionRunner({
