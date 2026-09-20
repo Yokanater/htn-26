@@ -52,7 +52,7 @@ const STAGE_LABEL: Record<RunStage, string> = {
 
 const STATUS_TEXT: Record<CollectionRunResult['status'], string> = {
   ready: 'Collection ready. Every required item is covered and checked.',
-  partial: 'Partial collection. Some items are missing or still need verification.',
+  partial: 'Here are the closest products we found for your collection.',
   failed: 'No collection could be assembled.',
   cancelled: 'Search cancelled.',
   superseded: 'This search was replaced by a newer version of your brief.',
@@ -129,6 +129,7 @@ export function CollectionWorkspace({
   const view = deriveRunView(brief, runId, events);
   const result = view.result;
   const offers = new Map(result?.offers.map((offer) => [offer.id, offer]));
+  const candidates = new Map(result?.candidates.map((candidate) => [candidate.slotId, candidate]));
   const collection = result?.collection ?? null;
   const slotMatches = new Map(collection?.match.slots.map((slot) => [slot.slotId, slot]));
   const explanations = new Map(
@@ -193,11 +194,21 @@ export function CollectionWorkspace({
               const selected = matched?.selectedOfferId
                 ? offers.get(matched.selectedOfferId)
                 : undefined;
-              const explanation = explanations.get(slot.id);
-              const slotMissing = missing.filter((item) => item.slotId === slot.id);
-              const alternatives = (matched?.alternativeOfferIds ?? [])
+              const rankedCandidates = (candidates.get(slot.id)?.offerIds ?? [])
                 .map((id) => offers.get(id))
                 .filter((offer): offer is ProductOffer => offer !== undefined);
+              const closest = selected ?? rankedCandidates[0];
+              const explanation = explanations.get(slot.id);
+              const slotMissing = missing.filter((item) => item.slotId === slot.id);
+              const alternativeIds = [
+                ...(matched?.alternativeOfferIds ?? []),
+                ...rankedCandidates.map((offer) => offer.id),
+              ];
+              const alternatives = [...new Set(alternativeIds)]
+                .map((id) => offers.get(id))
+                .filter(
+                  (offer): offer is ProductOffer => offer !== undefined && offer.id !== closest?.id,
+                );
               const headingId = `slot-${slot.id}`;
               return (
                 <section
@@ -207,16 +218,10 @@ export function CollectionWorkspace({
                   key={slot.id}
                 >
                   <h3 id={headingId}>{slot.category}</h3>
-                  {selected ? (
-                    renderOffer(selected, { slotId: slot.id, selected: true })
+                  {closest ? (
+                    renderOffer(closest, { slotId: slot.id, selected: selected !== undefined })
                   ) : (
-                    <p className="missing-product">
-                      {slotMissing.some(
-                        (item) => item.kind === 'slot' && item.reason === 'no_eligible_offer',
-                      )
-                        ? 'Options found · verification needed.'
-                        : 'Not found.'}
-                    </p>
+                    <p className="missing-product">Not found.</p>
                   )}
                   <SlotDecisionControls
                     category={slot.category}
@@ -224,7 +229,7 @@ export function CollectionWorkspace({
                     key={`${shown?.matchId}:${shown?.briefRevision}`}
                     slotId={slot.id}
                   />
-                  {slotMissing.length > 0 && (
+                  {!closest && slotMissing.length > 0 && (
                     <ul className="match-gaps" aria-label={`${slot.category} gaps`}>
                       {slotMissing.map((item) => (
                         <li key={item.kind === 'slot' ? item.reason : item.key}>

@@ -185,18 +185,62 @@ describe.each(['outfit', 'setup'] as const)('%s collection workspace', (domain) 
     render(
       <CollectionWorkspace
         brief={brief}
-        events={[resultEvent(result(brief, offers, partialMatch, { status: 'partial', missing }))]}
+        events={[
+          resultEvent(
+            result(brief, offers, partialMatch, {
+              status: 'partial',
+              missing,
+              candidates: brief.slots.map((slot, index) => ({
+                slotId: slot.id,
+                offerIds: index === 1 ? [] : [offers[index]!.id],
+              })),
+            }),
+          ),
+        ]}
         runId="run_1"
       />,
     );
-    expect(screen.getByRole('status').textContent).toMatch(/Partial collection/);
-    expect(screen.getByRole('list', { name: `${brief.slots[0]!.category} gaps` }).textContent).toBe(
-      'size: needs verification with the store',
-    );
+    expect(screen.getByRole('status').textContent).toMatch(/closest products/);
+    expect(screen.queryByRole('list', { name: `${brief.slots[0]!.category} gaps` })).toBeNull();
     expect(
       screen.getByRole('list', { name: `${brief.slots[1]!.category} gaps` }).textContent,
     ).toMatch(/product search failed/);
     expect(screen.getByText('Not found.')).toBeTruthy();
+  });
+
+  it('shows the closest ranked candidate instead of a verification placeholder', () => {
+    const { brief, offers, match } = seed(domain);
+    const emptySelection: CollectionMatch = {
+      ...match,
+      status: 'partial',
+      slots: match.slots.map((slot, index) =>
+        index === 0 ? { ...slot, selectedOfferId: null, alternativeOfferIds: [] } : slot,
+      ),
+    };
+    const renderOffer = vi.fn<OfferTileRenderer>((offer) => <p>tile:{offer.id}</p>);
+    const missing: MissingItem[] = [
+      {
+        kind: 'slot',
+        slotId: brief.slots[0]!.id,
+        category: brief.slots[0]!.category,
+        required: true,
+        reason: 'no_eligible_offer',
+      },
+    ];
+    render(
+      <CollectionWorkspace
+        brief={brief}
+        events={[
+          resultEvent(result(brief, offers, emptySelection, { status: 'partial', missing })),
+        ]}
+        renderOffer={renderOffer}
+        runId="run_1"
+      />,
+    );
+
+    expect(screen.getByText(`tile:${offers[0]!.id}`)).toBeTruthy();
+    expect(screen.queryByText(/verification needed/i)).toBeNull();
+    expect(screen.queryByText(/not every requirement/i)).toBeNull();
   });
 
   it('shows progress and cancels while running', () => {

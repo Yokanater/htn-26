@@ -34,9 +34,17 @@ export function ShoppingResults({
     current && current.status !== 'superseded' && current.status !== 'cancelled'
       ? { type: 'result' as const, result: current }
       : null;
-  const selectedIds = new Set(
-    result?.result.collection?.match.slots.map((slot) => slot.selectedOfferId),
-  );
+  const selectedIds = new Set<string>();
+  if (result) {
+    const selectedBySlot = new Map(
+      result.result.collection?.match.slots.map((slot) => [slot.slotId, slot.selectedOfferId]) ??
+        [],
+    );
+    for (const candidate of result.result.candidates) {
+      const displayed = selectedBySlot.get(candidate.slotId) ?? candidate.offerIds[0];
+      if (displayed) selectedIds.add(displayed);
+    }
+  }
   const moreOffers = result?.result.offers.filter((offer) => !selectedIds.has(offer.id)) ?? [];
   const toggle = (offer: ProductOffer) =>
     setSaved((items) =>
