@@ -7,11 +7,16 @@ import {
   MerchantOpportunitySchema,
   type MerchantWorkspaceProfile,
   MerchantWorkspaceProfileSchema,
+  type ProductOffer,
+  ProductOfferSchema,
 } from '@sei/contracts';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Copy, RefreshCw, ShieldCheck, Store } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Copy, RefreshCw, Store } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError, json } from '../../shell/api';
+import { BrandResearch } from './BrandResearch';
+import { CatalogInsights } from './CatalogInsights';
+import './merchant.css';
 
 function bandLabel(band: { min: number; max: number } | null): string {
   if (!band) return 'Not observed for this pairing';
@@ -19,16 +24,20 @@ function bandLabel(band: { min: number; max: number } | null): string {
 }
 
 export function MerchantWorkspace({ back }: { back: () => void }) {
-  const [url, setUrl] = useState('https://outfit-brand-1.example/');
+  const [url, setUrl] = useState('');
   const [proposalText, setProposalText] = useState('');
   const [uncertaintiesText, setUncertaintiesText] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const [offers, setOffers] = useState<ProductOffer[]>([]);
   const [profile, setProfile] = useState<MerchantWorkspaceProfile | null>(null);
   const [opportunities, setOpportunities] = useState<MerchantOpportunity[]>([]);
   const [draft, setDraft] = useState<MerchantCollaborationDraft | null>(null);
 
   const clearWorkspace = () => {
     setProfile(null);
+    setOffers([]);
+    setCopyError('');
     setOpportunities([]);
     setDraft(null);
     setProposalText('');
@@ -51,6 +60,9 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
       );
       return {
         profile: created,
+        offers: ProductOfferSchema.array().parse(
+          await json<unknown>(`/api/merchants/${created.merchant.id}/catalog`),
+        ),
         opportunities: listed.opportunities.map((item) => MerchantOpportunitySchema.parse(item)),
       };
     },
@@ -58,6 +70,7 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
     onError: clearWorkspace,
     onSuccess: (result) => {
       setProfile(result.profile);
+      setOffers(result.offers);
       setOpportunities(result.opportunities);
       setDraft(null);
       setProposalText('');
@@ -127,117 +140,117 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
       </button>
       <section className="merchant-hero">
         <div>
-          <p className="eyebrow">SYNTHETIC/DEMO MERCHANT WORKSPACE</p>
+          <p className="eyebrow">MERCHANT INTELLIGENCE</p>
           <h1>
-            See the demand between <em>categories.</em>
+            Bundles, partners <em>and competitors.</em>
           </h1>
           <p>
-            Claiming a URL opens a labeled demo workspace for this session. It does not verify
-            ownership or connect a live store.
+            Enter your store URL to find bundle products, potential partners and competing brands.
           </p>
           <form
             className="merchant-url-form"
             onSubmit={(event) => {
               event.preventDefault();
+              createDraft.reset();
+              saveDraft.reset();
+              reloadDraft.reset();
               profileStore.mutate(url);
             }}
           >
             <label>
-              <span>PUBLIC HTTPS STORE URL</span>
+              <span>STORE URL</span>
               <input
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://outfit-brand-1.example/"
+                placeholder="https://your-store.com"
+                required
                 autoComplete="url"
                 aria-label="Public HTTPS store URL"
               />
             </label>
-            <button className="primary" type="submit" disabled={profileStore.isPending}>
+            <button
+              className="primary"
+              type="submit"
+              disabled={
+                profileStore.isPending ||
+                createDraft.isPending ||
+                saveDraft.isPending ||
+                reloadDraft.isPending
+              }
+            >
               {profileStore.isPending ? (
                 <RefreshCw className="spin" aria-hidden />
               ) : (
                 <Store aria-hidden />
               )}{' '}
-              Profile demo store <ArrowRight aria-hidden />
+              {profileStore.isPending ? 'Inspecting catalog…' : 'Analyze store'}{' '}
+              <ArrowRight aria-hidden />
             </button>
           </form>
+          <div className="merchant-demo-actions">
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setUrl('https://outfit-brand-1.example/')}
+            >
+              Try outfit demo
+            </button>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setUrl('https://setup-brand-1.example/')}
+            >
+              Try setup demo
+            </button>
+          </div>
+          {profileStore.isPending && (
+            <p className="merchant-research-status" role="status">
+              Loading your store. This can take up to a minute.
+            </p>
+          )}
           {profileStore.error && (
             <p className="form-error" role="alert">
               {profileStore.error.message}
             </p>
           )}
           <p className="coming-note">
-            Seed `.example` stores stay in-memory. A live public catalog profile is opt-in and does
-            not turn seed cohort bands into live demand. Counts are coarse bands from synthetic
-            aggregates, not live shopper histories.
+            Demo stores use sample data. No store connection or login required.
           </p>
         </div>
         {profile ? (
-          <section className="signal-preview" aria-label="Profiled synthetic merchant">
-            <div className="preview-top">
-              <span>
-                {profile.sampleOrigin === 'live'
-                  ? 'Live public catalog profile'
-                  : 'SYNTHETIC DEMO MERCHANT'}
-              </span>
-              <Store aria-hidden />
-            </div>
-            <p>{profile.merchant.domain.toUpperCase()}</p>
-            <h2>{profile.merchant.name}</h2>
-            <div className="signal-count">
-              <strong>{profile.categories.length}</strong>
-              <span>
-                public categories
-                <br />
-                in this demo catalog
-              </span>
-            </div>
-            <div className="signal-row">
-              <span>Workspace</span>
-              <strong>Synthetic/demo</strong>
-            </div>
-            <div className="signal-row">
-              <span>Sample origin</span>
-              <strong>{profile.sampleOrigin}</strong>
-            </div>
-            <div className="signal-foot">
-              <ShieldCheck aria-hidden /> No shopper images, briefs, or individual histories
-            </div>
-          </section>
+          <div className="merchant-profile-chart">
+            <p className="merchant-store-name">{profile.merchant.name}</p>
+            <CatalogInsights offers={offers} />
+          </div>
         ) : (
-          <section
-            className="signal-preview"
-            aria-label="Example merchant opportunity, synthetic preview"
-          >
-            <div className="preview-top">
-              <span>SYNTHETIC PREVIEW</span>
-              <Store aria-hidden />
-            </div>
-            <p>OUTFIT · CANADA · LAST 30 DAYS</p>
-            <h2>Structured layers + everyday bags</h2>
-            <div className="signal-count">
-              <strong>5–9</strong>
-              <span>
-                eligible sessions
-                <br />
-                in this coarse cohort
-              </span>
+          <section className="signal-preview" aria-label="Research overview">
+            <p className="eyebrow">STORE RESEARCH</p>
+            <h2>Find products and brands</h2>
+            <div className="signal-row">
+              <span>01</span>
+              <strong>Bundle products</strong>
             </div>
             <div className="signal-row">
-              <span>Observed pair support</span>
-              <strong>5–9</strong>
+              <span>02</span>
+              <strong>Complementary brands</strong>
             </div>
-            <div className="signal-foot">
-              <ShieldCheck aria-hidden /> No shopper images or individual histories
+            <div className="signal-row">
+              <span>03</span>
+              <strong>Competitor comparison</strong>
             </div>
           </section>
         )}
       </section>
-
+      {profile && (
+        <BrandResearch
+          key={profile.merchant.id + offers[0]?.evidence[0]?.capturedAt}
+          profile={profile}
+        />
+      )}
       {opportunities.length > 0 && (
         <section className="merchant-opportunity-list" aria-label="Synthetic opportunities">
           <p className="eyebrow">DEMO OPPORTUNITIES</p>
-          <h2>Labeled cohort evidence, not ownership.</h2>
+          <h2>Demo collaboration</h2>
           <div className="opportunity-grid">
             {opportunities.map((opportunity) => (
               <article className="opportunity-card" key={opportunity.id}>
@@ -261,7 +274,27 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
                     <dd>{bandLabel(opportunity.observedPairSupport)}</dd>
                   </div>
                 </dl>
-                <p className="opportunity-unknowns">{opportunity.uncertainties[0]}</p>
+                <p>{opportunity.proposedExperiment}</p>
+                <details>
+                  <summary>Evidence and limitations</summary>
+                  <p>
+                    {opportunity.demand.cohort.country} · {opportunity.demand.cohort.currency} ·{' '}
+                    {opportunity.demand.cohort.domain}
+                  </p>
+                  <p>
+                    {opportunity.demand.windowStart.slice(0, 10)} to{' '}
+                    {opportunity.demand.windowEnd.slice(0, 10)}
+                  </p>
+                  <p>
+                    Aggregate {opportunity.demand.aggregateId} · revision{' '}
+                    {opportunity.demand.aggregateVersion}
+                  </p>
+                  <ul>
+                    {opportunity.uncertainties.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
                 <button
                   className="primary"
                   type="button"
@@ -286,12 +319,15 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
           <p className="eyebrow">
             DRAFT · VERSION {draft.version} · NOT APPROVED · Synthetic demand opportunity
           </p>
-          <h2>Editable outreach. Unknowns stay unknown.</h2>
+          <h2>Edit collaboration draft</h2>
           <label>
             Proposal
             <textarea
               value={proposalText}
-              onChange={(event) => setProposalText(event.target.value)}
+              onChange={(event) => {
+                setProposalText(event.target.value);
+                setCopied(false);
+              }}
               rows={6}
             />
           </label>
@@ -324,6 +360,8 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
               {reloadDraft.error.message}
             </p>
           )}
+          {copyError && <p role="alert">{copyError}</p>}
+          {saveDraft.isSuccess && <p role="status">Draft saved.</p>}
           <div className="draft-actions">
             <button
               className="primary"
@@ -337,8 +375,13 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
               className="text-button"
               type="button"
               onClick={async () => {
-                await navigator.clipboard.writeText(proposalText);
-                setCopied(true);
+                try {
+                  await navigator.clipboard.writeText(proposalText);
+                  setCopied(true);
+                  setCopyError('');
+                } catch {
+                  setCopyError('Copy failed. Select the proposal text and copy it manually.');
+                }
               }}
             >
               <Copy aria-hidden /> {copied ? 'Copied proposal' : 'Copy proposal'}

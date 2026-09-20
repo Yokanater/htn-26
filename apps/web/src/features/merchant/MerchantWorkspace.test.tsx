@@ -74,6 +74,26 @@ function draftFor(
 }
 
 describe('MerchantWorkspace', () => {
+  it('shows an honest empty state for a public catalog without live demand', async () => {
+    const profile = { ...profileFor('setup'), sampleOrigin: 'live' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const path = String(input);
+        if (path === '/api/merchants/profile') return Response.json(profile);
+        if (path.endsWith('/catalog')) return Response.json([]);
+        return Response.json({ opportunities: [] });
+      }),
+    );
+    renderWithClient(<MerchantWorkspace back={() => undefined} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+      target: { value: 'https://public-store.shop/' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
+    expect(await screen.findByRole('heading', { name: 'Products and brands' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Create collaboration draft/ })).toBeNull();
+    expect(screen.queryByText('5–9')).toBeNull();
+  });
   it.each(['outfit', 'setup'] as const)(
     'profiles a synthetic %s store, shows banded counts, and PATCHes a draft',
     async (domain) => {
@@ -83,6 +103,7 @@ describe('MerchantWorkspace', () => {
       const profile = profileFor(domain);
       const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const path = String(input);
+        if (path.endsWith('/catalog')) return Response.json([]);
         if (path === '/api/merchants/profile' && init?.method === 'POST') {
           return Response.json(profile, { status: 201 });
         }
@@ -107,15 +128,15 @@ describe('MerchantWorkspace', () => {
       renderWithClient(<MerchantWorkspace back={() => undefined} />);
 
       expect(
-        screen.getByRole('heading', { name: /See the demand between categories/ }),
+        screen.getByRole('heading', { name: /Bundles, partners and competitors/ }),
       ).toBeTruthy();
-      expect(screen.getByText(/Synthetic\/demo merchant workspace/i)).toBeTruthy();
+      expect(screen.getByText(/Merchant intelligence/i)).toBeTruthy();
       expect(fetchMock).not.toHaveBeenCalled();
 
       fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
         target: { value: `https://${profile.merchant.domain}/` },
       });
-      fireEvent.click(screen.getByRole('button', { name: /Profile demo store/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
 
       expect(await screen.findByText(profile.merchant.name)).toBeTruthy();
       expect(screen.getAllByText('5–9').length).toBeGreaterThan(0);
@@ -151,13 +172,17 @@ describe('MerchantWorkspace', () => {
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const path = String(input);
+        if (path.endsWith('/catalog')) return Response.json([]);
         if (path === '/api/merchants/profile') return Response.json(profile, { status: 201 });
         if (path.includes('/opportunities')) return Response.json({ opportunities: [opportunity] });
         return new Response('not found', { status: 404 });
       }),
     );
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
-    fireEvent.click(screen.getByRole('button', { name: /Profile demo store/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+      target: { value: 'https://outfit-brand-1.example/' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
     expect(await screen.findByText(/Inferred supply fit · synthetic/i)).toBeTruthy();
     expect(screen.getByText('Not observed for this pairing')).toBeTruthy();
   });
@@ -175,14 +200,18 @@ describe('MerchantWorkspace', () => {
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const path = String(input);
+        if (path.endsWith('/catalog')) return Response.json([]);
         if (path === '/api/merchants/profile') return Response.json(profile, { status: 201 });
         if (path.includes('/opportunities')) return Response.json({ opportunities: [opportunity] });
         return new Response('not found', { status: 404 });
       }),
     );
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
-    fireEvent.click(screen.getByRole('button', { name: /Profile demo store/ }));
-    expect(await screen.findByText(/Live public catalog profile/i)).toBeTruthy();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+      target: { value: 'https://outfit-brand-1.example/' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
+    expect(await screen.findByRole('heading', { name: 'Products and brands' })).toBeTruthy();
     expect(screen.getAllByText(/Synthetic demand opportunity/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/verified owner/i)).toBeNull();
   });
@@ -192,6 +221,7 @@ describe('MerchantWorkspace', () => {
     const opportunity = outfitOpportunity as MerchantOpportunity;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
+      if (path.endsWith('/catalog')) return Response.json([]);
       if (path === '/api/merchants/profile' && init?.method === 'POST') {
         const body = JSON.parse(String(init.body)) as { url?: string };
         if (body.url?.includes('outfit-brand-1.example')) {
@@ -216,7 +246,7 @@ describe('MerchantWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
       target: { value: `https://${outfit.merchant.domain}/` },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Profile demo store/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
     expect(await screen.findByText(outfit.merchant.name)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Create collaboration draft/ }));
     expect(await screen.findByDisplayValue(opportunity.proposedExperiment)).toBeTruthy();
@@ -224,7 +254,7 @@ describe('MerchantWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
       target: { value: 'https://not-a-seed.com/' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Profile demo store/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
 
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.queryByText(outfit.merchant.name)).toBeNull();
@@ -252,6 +282,7 @@ describe('MerchantWorkspace', () => {
     };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
+      if (path.endsWith('/catalog')) return Response.json([]);
       if (path === '/api/merchants/profile' && init?.method === 'POST') {
         return Response.json(outfit, { status: 201 });
       }
@@ -284,7 +315,10 @@ describe('MerchantWorkspace', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Profile demo store/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+      target: { value: 'https://outfit-brand-1.example/' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
     fireEvent.click(await screen.findByRole('button', { name: /Create collaboration draft/ }));
     expect(await screen.findByText(/DRAFT · VERSION 1/)).toBeTruthy();
     fireEvent.change(screen.getByDisplayValue(opportunity.proposedExperiment), {
@@ -320,6 +354,7 @@ describe('merchant surface gating', () => {
   it('does not call merchant APIs until FEATURE_MERCHANT_OPPORTUNITIES is explicitly true', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
+      if (path.endsWith('/catalog')) return Response.json([]);
       if (path === '/api/session') return Response.json({ owner: true });
       if (path === '/api/capabilities') {
         return Response.json({ flags: { FEATURE_MERCHANT_OPPORTUNITIES: false } });

@@ -15,6 +15,7 @@ import {
   type SafeFetchDeps,
   UrlSafetyError,
 } from '../url-safety';
+import { readStorefrontCatalog } from './catalog';
 
 export type MerchantProfileResult = {
   merchant: MerchantIdentity;
@@ -29,7 +30,7 @@ export type MerchantProfileResult = {
 };
 
 export type MerchantProfileDeps = SafeFetchDeps & {
-  /** Optional page→hits mapper for tests; production can parse products.json / JSON-LD. */
+  /** Optional page→hits mapper for tests; production requires storefront inventory. */
   extractOffers?: (input: { domain: string; bodyText: string; finalUrl: string }) => CatalogHit[];
 };
 
@@ -39,33 +40,6 @@ function hasShopifySignals(text: string): boolean {
     /Shopify\.theme/i.test(text) ||
     /<meta[^>]+name=["']shopify["']/i.test(text)
   );
-}
-
-function defaultExtractOffers(input: {
-  domain: string;
-  bodyText: string;
-  finalUrl: string;
-}): CatalogHit[] {
-  const jsonLd = extractJsonLdBlocks(input.bodyText);
-  const names = [...new Set(jsonLd.flatMap(productNamesFromJsonLd))].slice(0, 8);
-  // Generic Product JSON-LD is a claim about products, not proof of Shopify or demand.
-  return names.map((name, index) => ({
-    merchant: {
-      name: input.domain,
-      domain: input.domain,
-    },
-    productId: `jsonld-product-${index + 1}`,
-    variantId: `jsonld-variant-${index + 1}`,
-    title: name,
-    category: 'unknown',
-    productUrl: input.finalUrl,
-    imageUrl: null,
-    price: null,
-    availability: 'unknown' as const,
-    shipsTo: null,
-    attributes: {},
-    evidenceMethod: 'fetch' as const,
-  }));
 }
 
 export async function profileMerchantCatalog(
@@ -83,19 +57,38 @@ export async function profileMerchantCatalog(
   const fetched = await fetchPublicHttps(initial.href, deps, {
     signal: context.signal,
     acceptContentTypes: ['text/html', 'application/json', 'text/plain'],
-    maxBytes: 512_000,
+    // Shopify theme HTML can exceed 512 KB after decompression even when the transfer is small.
+    // Keep a decoded-body cap, aligned with catalog pages, rather than trusting Content-Length.
+    maxBytes: 2_000_000,
   });
 
   const domain = fetched.url.hostname.toLowerCase();
   const bodyText = new TextDecoder().decode(fetched.body);
   const captureHash = createHash('sha256').update(fetched.body).digest('hex');
-  const shopifySignalsPresent = hasShopifySignals(bodyText);
-  const extract = deps.extractOffers ?? defaultExtractOffers;
-  const hits = extract({ domain, bodyText, finalUrl: fetched.url.href });
-  const { offers } = normalizeCatalogHits(hits, {
-    sampleOrigin: options?.sampleOrigin ?? 'live',
-    capturedAt: new Date().toISOString(),
-  });
+  const hits = deps.extractOffers
+    ? deps.extractOffers({ domain, bodyText, finalUrl: fetched.url.href })
+    : await readStorefrontCatalog(fetched.url.origin, bodyText, context, deps);
+  const shopifySignalsPresent =
+    hasShopifySignals(bodyText) || (!deps.extractOffers && hits.length > 0);
+  const { offers } = normalizeCatalogHits(
+    hits.filter((hit) => {
+      try {
+        const product = new URL(hit.productUrl);
+        return (
+          hit.merchant.domain.toLowerCase() === domain &&
+          product.origin === fetched.url.origin &&
+          /^\/products\/[^/]+$/.test(product.pathname)
+        );
+      } catch {
+        return false;
+      }
+    }),
+    {
+      sampleOrigin: options?.sampleOrigin ?? 'live',
+      capturedAt: new Date().toISOString(),
+      limit: 300,
+    },
+  );
 
   const merchant: MerchantIdentity = offers[0]?.merchant ?? {
     id: newId('mer_'),
@@ -104,11 +97,6 @@ export async function profileMerchantCatalog(
   };
 
   const merchantClaims = productNamesFromJsonLd(extractJsonLdBlocks(bodyText)).slice(0, 12);
-
-  if (offers.length === 0 && !deps.extractOffers) {
-    // Unavailable catalog — still return identity with empty offers only when extractor finds nothing
-    // Callers treat empty offers as unavailable catalog for matching.
-  }
 
   if (offers.length === 0) {
     throw new UrlSafetyError(

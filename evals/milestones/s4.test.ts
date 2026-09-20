@@ -237,7 +237,7 @@ describe.each([
     partner: 'mer_setup_2',
   },
 ])('S4 $domain live public catalog is not live demand', (c) => {
-  it('keeps inferred seed demand when the catalog profile is live', async () => {
+  it('keeps public inventory inspectable without inventing demand or partners', async () => {
     const lookup = vi.fn(async () => [{ address: '93.184.216.34', family: 4 }]);
     const fetch = vi.fn(
       async () =>
@@ -284,22 +284,27 @@ describe.each([
         })
       ).json(),
     );
-    const opportunity = MerchantOpportunitySchema.parse(listed.opportunities[0]);
-    expect(opportunity.basis).toBe('inferred_supply_fit');
-    expect(opportunity.observedPairSupport).toBeNull();
-    expect(opportunity.demand.sampleOrigin).toBe('seed');
-    expect(opportunity.merchants[1]?.id).toBe(c.partner);
-    const draft = MerchantCollaborationDraftSchema.parse(
-      await (
-        await app.request(
-          `/api/merchants/${profiled.merchant.id}/opportunities/${opportunity.id}/drafts`,
-          { method: 'POST', headers: json(cookie), body: '{}' },
-        )
-      ).json(),
+    expect(listed.opportunities).toEqual([]);
+    const catalogResponse = await app.request(`/api/merchants/${profiled.merchant.id}/catalog`, {
+      headers: { cookie },
+    });
+    expect(catalogResponse.status).toBe(200);
+    const catalog = await catalogResponse.json();
+    assertNoPrivateIds(catalog);
+    expect(catalog).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          productUrl: `https://${c.host}/products/${c.category}`,
+          sampleOrigin: 'live',
+        }),
+      ]),
     );
-    expect(draft.sampleOrigin).toBe('seed');
+    const inventedDraft = await app.request(
+      `/api/merchants/${profiled.merchant.id}/opportunities/opp_invented/drafts`,
+      { method: 'POST', headers: json(cookie), body: '{}' },
+    );
+    expect(inventedDraft.status).toBe(404);
     expect(lookup).toHaveBeenCalled();
-    assertNoPrivateIds(opportunity);
   });
 });
 

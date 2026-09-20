@@ -771,3 +771,41 @@ it('requires explicit credentials for live catalog composition', () => {
     }).catalog,
   ).toBe('function');
 });
+
+it.each(['footwear', 'desk'])(
+  'merchant research keeps verifying several brands for %s in one session',
+  async (category) => {
+    const brief = briefWithSlots(
+      [{ category, description: category }],
+      category === 'desk' ? 'setup' : 'outfit',
+    );
+    const { openBrowser, readPage, close } = fakeBrowser((url) => ({
+      html: jsonLdPage({
+        title: category === 'desk' ? 'Oak desk' : 'Leather shoes',
+        sku: new URL(url).hostname,
+        price: '100',
+        currency: 'CAD',
+      }),
+    }));
+    const searchProducts = vi.fn(async () =>
+      ['one', 'two', 'three'].map((name) => ({
+        title: category,
+        url: `https://${name}.example/products/${category}`,
+      })),
+    );
+    const catalog = liveCatalog(
+      brief,
+      { BROWSERBASE_API_KEY: 'test-only' },
+      { openBrowser, searchProducts, minimumBrands: 3, fetchBudget: 24 },
+    );
+    const offers = await catalog.search(
+      { slotId: brief.slots[0]!.id, text: category, country: 'CA', currency: 'CAD', limit: 8 },
+      liveContext(),
+    );
+    expect(new Set(offers.map((offer) => offer.merchant.domain)).size).toBe(3);
+    expect(openBrowser).toHaveBeenCalledOnce();
+    expect(readPage.mock.calls.length).toBeLessThanOrEqual(24);
+    await catalog.close();
+    expect(close).toHaveBeenCalledOnce();
+  },
+);

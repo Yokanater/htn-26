@@ -1,0 +1,179 @@
+{
+  "merchantId": "mer_outfit_1",
+  "sampleOrigin": "seed",
+  "country": "CA",
+  "currency": "CAD",
+  "createdAt": "2026-09-20T00:00:00Z",
+  "status": "partial",
+  "category": "top",
+  "complementaryCategories": [
+    "bag"
+  ],
+  "bundles": [
+    {
+      "ownProduct": {
+        "id": "offer_outfit_1",
+        "merchant": {
+          "id": "mer_outfit_1",
+          "name": "Synthetic outfit brand 1",
+          "domain": "outfit-brand-1.example"
+        },
+        "productId": "product-top",
+        "variantId": "variant-top-1",
+        "title": "Synthetic top",
+        "category": "top",
+        "productUrl": "https://outfit-brand-1.example/products/top",
+        "imageUrl": null,
+        "price": {
+          "amount": 10000,
+          "currency": "CAD"
+        },
+        "availability": "available",
+        "shipsTo": [
+          "CA"
+        ],
+        "attributes": {
+          "size": "M"
+        },
+        "evidence": [
+          {
+            "id": "ev_outfit_1",
+            "field": "product_record",
+            "value": "Synthetic fixture: top, CAD 100, available to CA",
+            "url": "https://outfit-brand-1.example/products/top",
+            "capturedAt": "2026-09-19T12:00:00Z",
+            "method": "catalog"
+          }
+        ],
+        "sampleOrigin": "seed"
+      },
+      "complementaryProduct": {
+        "id": "offer_outfit_2",
+        "merchant": {
+          "id": "mer_outfit_2",
+          "name": "Synthetic outfit brand 2",
+          "domain": "outfit-brand-2.example"
+        },
+        "productId": "product-bag",
+        "variantId": "variant-bag-1",
+        "title": "Synthetic bag",
+        "category": "bag",
+        "productUrl": "https://outfit-brand-2.example/products/bag",
+        "imageUrl": null,
+        "price": {
+          "amount": 20000,
+          "currency": "CAD"
+        },
+        "availability": "available",
+        "shipsTo": [
+          "CA"
+        ],
+        "attributes": {},
+        "evidence": [
+          {
+            "id": "ev_outfit_2",
+            "field": "product_record",
+            "value": "Synthetic fixture: bag, CAD 200, available to CA",
+            "url": "https://outfit-brand-2.example/products/bag",
+            "capturedAt": "2026-09-19T12:00:00Z",
+            "method": "catalog"
+          }
+        ],
+        "sampleOrigin": "seed"
+      },
+      "reason": "Example combination for the synthetic demo.",
+      "itemSubtotal": {
+        "amount": 30000,
+        "currency": "CAD"
+      }
+    }
+  ],
+  "partners": [
+    {
+      "merchant": {
+        "id": "mer_outfit_2",
+        "name": "Synthetic outfit brand 2",
+        "domain": "outfit-brand-2.example"
+      },
+      "products": [
+        {
+          "id": "offer_outfit_2",
+          "merchant": {
+            "id": "mer_outfit_2",
+            "name": "Synthetic outfit brand 2",
+            "domain": "outfit-brand-2.example"
+          },
+          "productId": "product-bag",
+          "variantId": "variant-bag-1",
+          "title": "Synthetic bag",
+          "category": "bag",
+          "productUrl": "https://outfit-brand-2.example/products/bag",
+          "imageUrl": null,
+          "price": {
+            "amount": 20000,
+            "currency": "CAD"
+          },
+          "availability": "available",
+          "shipsTo": [
+            "CA"
+          ],
+          "attributes": {},
+          "evidence": [
+            {
+              "id": "ev_outfit_2",
+              "field": "product_record",
+              "value": "Synthetic fixture: bag, CAD 200, available to CA",
+              "url": "https://outfit-brand-2.example/products/bag",
+              "capturedAt": "2026-09-19T12:00:00Z",
+              "method": "catalog"
+            }
+          ],
+          "sampleOrigin": "seed"
+        }
+      ],
+      "reason": "Carries a complementary category."
+    }
+  ],
+  "competitors": [],
+  "gaps": [
+    "No competing brand in this demo sample."
+  ],
+  "comparisonProducts": [
+    {
+      "id": "offer_outfit_1",
+      "merchant": {
+        "id": "mer_outfit_1",
+        "name": "Synthetic outfit brand 1",
+        "domain": "outfit-brand-1.example"
+      },
+      "productId": "product-top",
+      "variantId": "variant-top-1",
+      "title": "Synthetic top",
+      "category": "top",
+      "productUrl": "https://outfit-brand-1.example/products/top",
+      "imageUrl": null,
+      "price": {
+        "amount": 10000,
+        "currency": "CAD"
+      },
+      "availability": "available",
+      "shipsTo": [
+        "CA"
+      ],
+      "attributes": {
+        "size": "M"
+      },
+      "evidence": [
+        {
+          "id": "ev_outfit_1",
+          "field": "product_record",
+          "value": "Synthetic fixture: top, CAD 100, available to CA",
+          "url": "https://outfit-brand-1.example/products/top",
+          "capturedAt": "2026-09-19T12:00:00Z",
+          "method": "catalog"
+        }
+      ],
+      "sampleOrigin": "seed"
+    }
+  ]
+}

@@ -52,8 +52,29 @@ same in-memory merchant catalog: inferred complementary supply fit, public produ
 catalogs, and no inherited pair support. Drafts are versioned prose, not approved actions. Shopper
 Browserbase search, if enabled, does not profile merchants.
 
-Live public catalog profiling is opt-in (`MERCHANT_CATALOG_PROVIDER=live`) and DI-tested with
-injected fetch/DNS. It labels the profile **Live public catalog profile**. Opportunities and drafts
-stay **Synthetic demand opportunity** — seed bands, not observed pair support. Do not present a live
-store URL as live demand. Humans spike real fetch/dns separately; agents never call public internet
-providers.
+Live public catalog profiling is opt-in (`MERCHANT_CATALOG_PROVIDER=live`). Runtime wiring uses
+public HTTPS fetch and DNS; offline tests inject both. No private `.env` is edited by agents.
+The profiler requires actual same-store `/products.json` inventory, not Product metadata from
+an article. It samples at most three pages of 50 products, up to 20 variants per product and 300
+normalized variants total. Repeated pages stop early. Overall timeout is 60 seconds; individual
+catalog reads get 15 seconds. Unstated currency, shipping and availability remain unknown.
+
+The merchant workspace keeps a product category graph and offers three research tabs: bundle
+products, complementary brands, and competitors. Choose a catalog category and market, then select
+**Find products and brands**. Live research uses the established Browserbase search and product
+verification API (`BROWSERBASE_API_KEY`), one shared session, at most six searches and 24 page reads,
+and a 150-second research deadline. It targets product pages and attempts several stores before
+stopping. Cancel aborts the request and closes its session. Seed demos use local offers only.
+
+Bundle suggestions are category-based proposals, not evidence of demand or partnership interest.
+Product links, stated prices and stock status support the suggestions. Totals never mix currencies.
+Competitor comparison covers up to three selected stores and shows the category, sampled price
+range and number of products found; it does not claim market share or full-catalog coverage. Partial
+searches keep useful results and list gaps. Public profiles never inherit fictional seed partners,
+demand bands or drafts. Both `.example` demos retain explicitly synthetic demand and editable drafts.
+
+Human smoke check: with S1-S4 and live merchant mode enabled, enter one outfit and one setup
+Shopify URL. Check categories, bundle links, brand tabs and comparison selection. An editorial site
+must not become a merchant based on Product JSON-LD. Stores that block their public JSON catalog
+remain unsupported. Browserbase research requires actual product pages and can return partial or
+empty results. Live checks by agents require an explicit user exception to AGENTS.md.

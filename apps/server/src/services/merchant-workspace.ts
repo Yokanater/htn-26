@@ -25,6 +25,7 @@ import {
 } from './merchant-opportunities';
 import {
   classifyMerchantHost,
+  MerchantCatalogDisabledError,
   type MerchantCatalogMode,
   MerchantUrlError,
   parseMerchantUrl,
@@ -151,7 +152,11 @@ export class MerchantWorkspaceStore {
       this.#newcomerHosts,
       this.#mode,
     );
-    if (kind === 'rejected') throw new MerchantUrlError();
+    if (kind === 'rejected') {
+      if (this.#mode === 'fake' && !parsed.host.endsWith('.example'))
+        throw new MerchantCatalogDisabledError();
+      throw new MerchantUrlError();
+    }
     this.#assertWritable(ownerId);
     const sampleOrigin: SampleOrigin = kind === 'public' ? 'live' : 'seed';
     const resolved =
@@ -170,9 +175,12 @@ export class MerchantWorkspaceStore {
       const merchant = { ...resolved.merchant, id: merchantId };
       const observed =
         kind === 'seed' ? observedOpportunityFor(merchant.id, this.#seedPairs) : null;
-      const opportunities = [
-        observed ?? inferOpportunity(merchant, resolved.offers, this.#seedPairs),
-      ].map(validateOpportunity);
+      // A public catalog cannot inherit a fictional partner or synthetic demand.
+      const inferred =
+        kind === 'public' ? null : inferOpportunity(merchant, resolved.offers, this.#seedPairs);
+      const opportunities = [observed ?? inferred]
+        .filter((item): item is MerchantOpportunity => item !== null)
+        .map(validateOpportunity);
       const access: MerchantWorkspaceAccess = {
         ownerId,
         merchantId,
@@ -196,6 +204,13 @@ export class MerchantWorkspaceStore {
     const profile = this.#profiles.get(this.#profileKey(ownerId, merchantId));
     if (!profile) throw new MerchantNotFoundError();
     return profile.opportunities.map((opportunity) => validateOpportunity(opportunity));
+  }
+
+  catalogOffers(ownerId: string, merchantId: string): ProductOffer[] {
+    this.#assertWritable(ownerId);
+    const profile = this.#profiles.get(this.#profileKey(ownerId, merchantId));
+    if (!profile) throw new MerchantNotFoundError();
+    return structuredClone(profile.offers);
   }
 
   getDraft(ownerId: string, draftId: string): MerchantCollaborationDraft {

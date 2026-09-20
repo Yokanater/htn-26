@@ -14,7 +14,7 @@ import type { EnvLike, ShoppingContext } from '@sei/core';
 import { loadMerchantCatalogOffers } from '../replay';
 import type { MerchantCatalogMode } from './merchant-url';
 
-export const MERCHANT_PROFILE_TIMEOUT_MS = 8_000;
+export const MERCHANT_PROFILE_TIMEOUT_MS = 60_000;
 const LIVE_FETCH_CAP = 4;
 
 export type { MerchantCatalogMode };
@@ -77,6 +77,15 @@ export function createLiveMerchantCatalog(
         );
         return { merchant: result.merchant, offers: result.offers };
       } catch (error) {
+        // Record only fixed error categories, never page content, URLs or provider messages.
+        console.warn(
+          '[merchant-profile]',
+          JSON.stringify({
+            code:
+              error instanceof UrlSafetyError ? error.code : (networkErrorCode(error) ?? 'unknown'),
+            timedOut: timeout.aborted,
+          }),
+        );
         throw mapLiveProfilerError(error, {
           timedOut: timeout.aborted && !context.signal.aborted,
           callerAborted: context.signal.aborted,
@@ -127,6 +136,28 @@ function mapLiveProfilerError(
   }
   if (flags.callerAborted || isAbort(error)) return error;
   if (error instanceof UrlSafetyError) {
+    if (error.code === 'body_too_large') {
+      return new MerchantProfilerError(
+        422,
+        'MERCHANT_RESPONSE_TOO_LARGE',
+        'The store responded, but its page exceeded the inspection size limit.',
+      );
+    }
+    if (error.code === 'http_error') {
+      const status = /HTTP (\d{3})/.exec(error.message)?.[1];
+      return new MerchantProfilerError(
+        502,
+        'MERCHANT_STORE_HTTP_ERROR',
+        `The store returned HTTP ${status ?? 'error'} while reading its public catalog.`,
+      );
+    }
+    if (error.code === 'redirect_limit') {
+      return new MerchantProfilerError(
+        502,
+        'MERCHANT_REDIRECT_ERROR',
+        'The store redirected too many times during catalog inspection.',
+      );
+    }
     if (
       error.code === 'invalid_url' ||
       error.code === 'https_required' ||
@@ -162,11 +193,37 @@ function mapLiveProfilerError(
       'The catalog provider is unreachable. Try again.',
     );
   }
+  const networkCode = networkErrorCode(error);
+  if (networkCode === 'ENOTFOUND' || networkCode === 'EAI_AGAIN') {
+    return new MerchantProfilerError(
+      502,
+      'MERCHANT_DNS_ERROR',
+      'The server could not resolve the store domain.',
+    );
+  }
+  if (
+    networkCode === 'CERT_HAS_EXPIRED' ||
+    networkCode === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+    networkCode === 'DEPTH_ZERO_SELF_SIGNED_CERT'
+  ) {
+    return new MerchantProfilerError(
+      502,
+      'MERCHANT_TLS_ERROR',
+      'The server could not verify the store’s HTTPS certificate.',
+    );
+  }
   return new MerchantProfilerError(
     502,
     'MERCHANT_PROVIDER_ERROR',
     'The catalog provider is unreachable. Try again.',
   );
+}
+
+function networkErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const value = error as { code?: unknown; cause?: { code?: unknown } };
+  const code = value.code ?? value.cause?.code;
+  return typeof code === 'string' && /^[A-Z_0-9]{1,64}$/.test(code) ? code : null;
 }
 
 function isTimeout(error: unknown): boolean {

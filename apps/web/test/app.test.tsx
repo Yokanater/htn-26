@@ -29,7 +29,7 @@ it('presents shopper and merchant paths without claiming unfinished merchant act
   expect(screen.getByRole('heading', { name: /See the demand between categories/ })).toBeTruthy();
   expect(screen.getByText(/Merchant profiling unlocks with S4/)).toBeTruthy();
   expect(screen.getByText('SYNTHETIC PREVIEW')).toBeTruthy();
-  expect(await screen.findByText('Private session')).toBeTruthy();
+  expect(screen.queryByText('Private session')).toBeNull();
 });
 
 it('creates a private text brief and stops at the confirmation barrier', async () => {

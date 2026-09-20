@@ -18,6 +18,15 @@ export class MerchantUrlError extends Error {
 
 export type MerchantHostKind = 'seed' | 'synthetic_example' | 'public' | 'rejected';
 
+export class MerchantCatalogDisabledError extends Error {
+  constructor() {
+    super(
+      'Live store analysis is disabled on this server. Enable the live merchant catalog or use a demo store.',
+    );
+    this.name = 'MerchantCatalogDisabledError';
+  }
+}
+
 export function parseMerchantUrl(raw: string): { href: string; host: string } {
   const href = raw.trim();
   let url: URL;

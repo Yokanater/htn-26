@@ -9,6 +9,7 @@ export * from './common';
 export * from './demand';
 export * from './enrich';
 export * from './intent';
+export * from './merchant-research';
 export * from './opportunity';
 export * from './plan';
 export * from './profile';

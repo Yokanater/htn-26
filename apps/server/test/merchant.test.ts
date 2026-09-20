@@ -224,7 +224,8 @@ describe('S4 merchant isolation and safety', () => {
     const app = createApp(S4, { merchantCatalog });
     const cookie = await session(app);
     const created = await profile(app, cookie, 'https://not-a-seed.com/');
-    expect(created.response.status).toBe(400);
+    expect(created.response.status).toBe(503);
+    expect(created.body).toMatchObject({ error: { code: 'MERCHANT_CATALOG_DISABLED' } });
     expect(merchantCatalog.profileMerchant).not.toHaveBeenCalled();
   });
 
@@ -543,7 +544,7 @@ describe.each([
     partnerEvidence: 'ev_setup_2',
   },
 ])('S4 $domain live public merchant profiler', (c) => {
-  it('profiles the original URL through the composed live wrapper and keeps demand/drafts seed', async () => {
+  it('profiles the original URL and never fabricates a seed partner for a live store', async () => {
     const deps = liveProfileDeps(c.domain);
     const providers = defaultProviders(LIVE, { merchantProfile: deps });
     const spy = vi.spyOn(providers.merchantCatalog, 'profileMerchant');
@@ -559,32 +560,67 @@ describe.each([
     expect(deps.fetch).toHaveBeenCalled();
 
     const listed = await listOpportunities(app, cookie, created.profile!.merchant.id);
-    const opportunity = MerchantOpportunitySchema.parse(listed.list!.opportunities[0]);
-    expect(opportunity.basis).toBe('inferred_supply_fit');
-    expect(opportunity.observedPairSupport).toBeNull();
-    expect(opportunity.demand.sampleOrigin).toBe('seed');
-    expect(opportunity.merchants[1]?.id).toBe(c.partner);
-    expect(opportunity.productEvidenceIds).toEqual(expect.arrayContaining([c.partnerEvidence]));
-
-    const minted = await createDraft(app, cookie, created.profile!.merchant.id, opportunity.id);
-    expect(minted.response.status).toBe(201);
-    expect(minted.draft?.sampleOrigin).toBe('seed');
+    expect(listed.list!.opportunities).toEqual([]);
+    const catalog = await app.request(`/api/merchants/${created.profile!.merchant.id}/catalog`, {
+      headers: { cookie },
+    });
+    expect(catalog.status).toBe(200);
+    expect(await catalog.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: `Live ${c.domain === 'outfit' ? 'top' : 'desk'}` }),
+      ]),
+    );
+    const otherCookie = await session(app);
+    expect(
+      (
+        await app.request(`/api/merchants/${created.profile!.merchant.id}/catalog`, {
+          headers: { cookie: otherCookie },
+        })
+      ).status,
+    ).toBe(404);
   });
 
-  it('rejects the same public host in fake mode without invoking L1', async () => {
+  it('reports disabled live analysis for a valid URL in fake mode without invoking L1', async () => {
     const deps = liveProfileDeps(c.domain);
     const app = createApp(S4, undefined, { merchantProfile: deps });
     const cookie = await session(app);
     const created = await profile(app, cookie, c.url);
-    expect(created.response.status).toBe(400);
+    expect(created.response.status).toBe(503);
     expect(deps.lookup).not.toHaveBeenCalled();
     expect(deps.fetch).not.toHaveBeenCalled();
   });
 });
 
 describe('S4 live merchant profiler failures', () => {
-  it('fails fast when live mode has no merchantProfile seam', () => {
-    expect(() => createApp(LIVE)).toThrow(/merchantProfile/);
+  it('reports an oversized page separately from an unreachable provider', async () => {
+    const deps = liveProfileDeps('outfit', {
+      fetch: async () =>
+        new Response('page', {
+          headers: { 'content-type': 'text/html', 'content-length': '2000001' },
+        }),
+    });
+    const app = createApp(LIVE, undefined, { merchantProfile: deps });
+    const cookie = await session(app);
+    const created = await profile(app, cookie, PUBLIC_URLS.outfit);
+    expect(created.response.status).toBe(422);
+    expect(created.body).toMatchObject({ error: { code: 'MERCHANT_RESPONSE_TOO_LARGE' } });
+  });
+
+  it('reports the store HTTP status without exposing its response body', async () => {
+    const deps = liveProfileDeps('outfit', {
+      fetch: async () => new Response('private upstream details', { status: 403 }),
+    });
+    const app = createApp(LIVE, undefined, { merchantProfile: deps });
+    const cookie = await session(app);
+    const created = await profile(app, cookie, PUBLIC_URLS.outfit);
+    expect(created.response.status).toBe(502);
+    expect(created.body).toMatchObject({
+      error: { code: 'MERCHANT_STORE_HTTP_ERROR', message: expect.stringContaining('HTTP 403') },
+    });
+    expect(JSON.stringify(created.body)).not.toContain('private upstream details');
+  });
+  it('constructs opt-in live mode without making a provider call', () => {
+    expect(() => createApp(LIVE)).not.toThrow();
   });
 
   it('rejects syntax-unsafe URLs before L1 and leaves lookup uncalled', async () => {

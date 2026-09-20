@@ -11,6 +11,7 @@ import {
   DemandEventSchema,
   IntentBriefSchema,
   MerchantOpportunitySchema,
+  MerchantResearchSchema,
   ProductOfferSchema,
 } from '../src/index';
 
@@ -24,6 +25,7 @@ const SCHEMAS: Record<string, ZodType> = {
   'demand-events.json': z.array(DemandEventSchema).min(1),
   'aggregate.json': DemandAggregateSchema,
   'opportunity.json': MerchantOpportunitySchema,
+  'merchant-research.json': MerchantResearchSchema,
 };
 
 function walk(dir: string): string[] {

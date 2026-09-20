@@ -235,6 +235,8 @@ export type LiveCatalogDeps = {
   now?: () => Date;
   /** The run's `fetch` cap, shared out per slot. Defaults to the pipeline's documented cap. */
   fetchBudget?: number;
+  /** Merchant comparisons need several stores; shopper matching retains its single strong result. */
+  minimumBrands?: number;
   /** Page reads in flight at once; stays at or below the runner's configured concurrency. */
   verifyConcurrency?: number;
 };
@@ -778,6 +780,11 @@ export function liveCatalog(
       );
     });
 
+  const enoughBrands = (slot: IntentSlot, offers: readonly ProductOffer[]) =>
+    hasStrongOffer(slot, offers) &&
+    new Set(rank(slot, [...offers]).map((offer) => offer.merchant.domain.replace(/^www\./, '')))
+      .size >= (deps.minimumBrands ?? 1);
+
   const runSearch = async (
     query: ProductQuery,
     context: ShoppingContext,
@@ -794,7 +801,7 @@ export function liveCatalog(
 
     for (const fallback of [false, true] as const) {
       if (fallback) {
-        if (hasStrongOffer(slot, collected) || fallbackUsed.has(slot.id)) break;
+        if (enoughBrands(slot, collected) || fallbackUsed.has(slot.id)) break;
         try {
           context.consume('catalog_query', 1);
         } catch {
@@ -843,7 +850,7 @@ export function liveCatalog(
       for (const candidate of candidates) {
         context.signal.throwIfAborted();
         if (attemptedCandidates.has(candidate)) continue;
-        if (hasStrongOffer(slot, collected)) break;
+        if (enoughBrands(slot, collected)) break;
         if (!fallback && attemptedCandidates.size >= Math.max(1, share.perSlot - 1)) break;
         attemptedCandidates.add(candidate);
         if (collected.length >= OFFERS_PER_SLOT) break;

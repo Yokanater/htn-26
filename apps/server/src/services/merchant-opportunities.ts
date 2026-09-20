@@ -60,11 +60,26 @@ export function inferOpportunity(
   newcomer: MerchantIdentity,
   newcomerOffers: readonly ProductOffer[],
   pairs: readonly SeedPair[],
-): MerchantOpportunity {
+): MerchantOpportunity | null {
   const categories = [...new Set(newcomerOffers.map((offer) => offer.category))];
+  if (
+    !categories.some(
+      (category) => OUTFIT_CATEGORIES.has(category) || SETUP_CATEGORIES.has(category),
+    )
+  )
+    return null;
   const domain = selectDomain(categories);
-  const pair = pairs.find((item) => item.domain === domain) ?? pairs[0]!;
+  const pair = pairs.find((item) => item.domain === domain);
+  if (!pair) return null;
+  if (!categories.some((category) => pair.opportunity.demand.cohort.categories.includes(category)))
+    return null;
   const partner = selectPartner(newcomer, categories, pair);
+  if (
+    !pair.merchants.some(
+      (item) => item.identity.id === partner.id && !categories.includes(item.category),
+    )
+  )
+    return null;
   const partnerOffers =
     pair.merchants.find((item) => item.identity.id === partner.id)?.offers ?? [];
   const evidenceIds = [

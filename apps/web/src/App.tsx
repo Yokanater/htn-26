@@ -545,7 +545,7 @@ export function App() {
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const session = useQuery({
+  useQuery({
     queryKey: ['private-session'],
     queryFn: () => json<{ owner: boolean }>('/api/session'),
     retry: false,
@@ -570,14 +570,6 @@ export function App() {
             Merchant
           </button>
         </nav>
-        <span className={`session-status ${session.data?.owner ? 'ready' : ''}`}>
-          <LockKeyhole aria-hidden />
-          {session.isPending
-            ? 'Securing session'
-            : session.data?.owner
-              ? 'Private session'
-              : 'Session unavailable'}
-        </span>
       </header>
       {surface === 'home' && <Home enter={setSurface} />}
       {surface === 'shopper' &&

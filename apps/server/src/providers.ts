@@ -1,4 +1,5 @@
 /** Composition root: providers are wired here once, in dependency order. Owner: L4. */
+import { lookup } from 'node:dns/promises';
 import { createInjectedShoppingCatalog, type MerchantProfileDeps } from '@sei/collect';
 import type { IntentBrief } from '@sei/contracts';
 import {
@@ -40,6 +41,11 @@ import {
   type MerchantProfiler,
   merchantCatalogMode,
 } from './services/merchant-catalog';
+import {
+  createMerchantResearch,
+  type MerchantResearchService,
+  type ResearchCatalogFactory,
+} from './services/merchant-research';
 import { MerchantWorkspaceStore } from './services/merchant-workspace';
 import { PrivateCheckpointStore, RunRegistry } from './services/runs';
 import { OwnerSessions } from './services/session';
@@ -53,6 +59,7 @@ export interface AppProviders {
     | ShoppingCatalog
     | ((brief: IntentBrief) => Pick<ShoppingCatalog, 'search'> & { close?(): Promise<void> });
   merchantCatalog: MerchantProfiler;
+  merchantResearch: MerchantResearchService;
   matcher: CollectionMatcher;
   checkpoints: PrivateCheckpointStore;
   runs: RunRegistry;
@@ -73,12 +80,13 @@ export interface ProviderOptions {
   >;
   /**
    * Construction-time L1 merchant profiler deps (fetch + DNS lookup + optional extractOffers).
-   * Required when MERCHANT_CATALOG_PROVIDER=live unless `overrides.merchantCatalog` is set.
-   * Tests inject fakes; do not fall back to global fetch.
+   * Optional override for offline tests; live mode otherwise uses public HTTPS fetch and DNS.
+   * Tests that profile public stores must inject fakes; construction performs no I/O.
    */
   merchantProfile?: MerchantProfileDeps;
   /** Live public-profile cap; defaults to L1 fetch timeout (8s). */
   merchantProfileTimeoutMs?: number;
+  merchantResearchCatalog?: ResearchCatalogFactory;
   /** Replace individual providers; everything else is still built from the environment. */
   overrides?: Partial<AppProviders>;
 }
@@ -150,14 +158,15 @@ function createCatalog(env: EnvLike, fetchBudget = LIVE_FETCH_BUDGET): AppProvid
 function createMerchantCatalog(env: EnvLike, options: ProviderOptions): MerchantProfiler {
   const mode = merchantCatalogMode(env);
   if (mode === 'fake') return createFakeMerchantCatalog();
-  if (!options.merchantProfile) {
-    throw new Error(
-      'MERCHANT_CATALOG_PROVIDER=live requires merchantProfile (injected fetch and DNS lookup)',
-    );
-  }
-  return createLiveMerchantCatalog(options.merchantProfile, {
-    timeoutMs: options.merchantProfileTimeoutMs,
-  });
+  return createLiveMerchantCatalog(
+    options.merchantProfile ?? {
+      fetch: globalThis.fetch,
+      lookup: (hostname) => lookup(hostname, { all: true }),
+    },
+    {
+      timeoutMs: options.merchantProfileTimeoutMs,
+    },
+  );
 }
 
 export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {}): AppProviders {
@@ -183,6 +192,9 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
         : overrides.imageNormalizer,
     catalog,
     merchantCatalog,
+    merchantResearch:
+      overrides.merchantResearch ??
+      createMerchantResearch(env, { openCatalog: options.merchantResearchCatalog, now }),
     matcher,
     checkpoints,
     runs,
