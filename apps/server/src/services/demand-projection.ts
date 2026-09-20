@@ -8,11 +8,12 @@
  */
 import type {
   ConsentRecord,
+  DemandAggregate,
   IntentBrief,
   MerchantDemandSummary,
   SampleOrigin,
 } from '@sei/contracts';
-import type { DemandAggregator } from '@sei/core';
+import type { DemandAggregator, OpportunityMapper } from '@sei/core';
 import type { PrivateDemandLedger } from './demand';
 
 /** Bounded retries when the ledger changes under a read; publishing nothing beats publishing stale. */
@@ -32,6 +33,8 @@ export interface DemandProjectionDeps {
 
 export class DemandProjectionService {
   readonly #deps: DemandProjectionDeps;
+  #aggregates: DemandAggregate[] = [];
+  #generation = -1;
 
   constructor(deps: DemandProjectionDeps) {
     this.#deps = deps;
@@ -82,6 +85,8 @@ export class DemandProjectionService {
         origin,
         minimumSessions,
       });
+      this.#aggregates = aggregates;
+      this.#generation = generation;
 
       return aggregates.map((aggregate) => {
         const summary = aggregator.summarize(aggregate, minimumSessions);
@@ -97,6 +102,19 @@ export class DemandProjectionService {
   /** Drops every published snapshot, for a change the ledger cannot observe itself. */
   invalidate(): void {
     this.#deps.ledger.invalidateSnapshots();
+  }
+
+  /** Private aggregates remain inside the service; only validated opportunity DTOs leave. */
+  mapOpportunities(
+    mapper: OpportunityMapper,
+    input: Omit<Parameters<OpportunityMapper['map']>[0], 'aggregates' | 'minimumSessions'>,
+  ) {
+    if (this.#generation !== this.#deps.ledger.generation) return [];
+    return mapper.map({
+      ...input,
+      aggregates: this.#aggregates.filter((aggregate) => this.published(aggregate.id)),
+      minimumSessions: this.#deps.minimumSessions,
+    });
   }
 
   /**

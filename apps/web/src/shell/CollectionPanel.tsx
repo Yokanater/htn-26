@@ -1,6 +1,6 @@
 /**
  * Mounts the shopper collection workspace for a confirmed brief. Owner: L4 (S2-L4-1).
- * Capability-gated: nothing renders unless the server advertises FEATURE_COLLECTION_MATCHING.
+ * Available for every confirmed brief; milestone settings do not gate product features.
  * The run streams over SSE; the workspace ignores events from any other run or brief revision,
  * so a superseded search can never change what is shown. The stream is closed on the result, on
  * `closed`, and when the shopper leaves.
@@ -23,12 +23,6 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
   const [events, setEvents] = useState<CollectionRunEvent[]>([]);
   const [streamError, setStreamError] = useState<string | null>(null);
 
-  const capabilities = useQuery({
-    queryKey: ['capabilities'],
-    queryFn: () => json<{ flags?: Record<string, boolean> }>('/api/capabilities'),
-    retry: false,
-    staleTime: Number.POSITIVE_INFINITY,
-  });
   const start = useMutation({
     mutationFn: () =>
       json<{ runId: string }>(`/api/briefs/${brief.id}/matches`, { method: 'POST', body: '{}' }),
@@ -88,9 +82,6 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
     return () => source.close();
   }, [runId]);
 
-  if (capabilities.data?.flags?.FEATURE_COLLECTION_MATCHING !== true) return null;
-
-  const flags = capabilities.data?.flags ?? null;
   const error = start.error ?? cancel.error ?? (streamError ? new Error(streamError) : null);
   return (
     <section className="collection-panel" aria-label="Product search">
@@ -123,7 +114,6 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
           onCancel={() => cancel.mutate(runId)}
           onRetry={() => start.mutate()}
           onEdit={onEdit}
-          flags={flags}
           onDecision={async (dto) => {
             try {
               await json(`/api/briefs/${brief.id}/decisions`, {
@@ -144,7 +134,6 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
       )}
       <ConsentPanel
         consent={current}
-        flags={flags}
         onGrant={() => setConsentState('granted')}
         onWithdraw={() => setConsentState('withdrawn')}
         onDeleteSession={async () => {

@@ -1,5 +1,11 @@
 # S4 — Demand-backed merchant collaborations
 
+The user-assigned integrated continuation is tracked in [MERCHANT_IMPLEMENTATION.md](../MERCHANT_IMPLEMENTATION.md).
+Browserbase catalog capture/progress and Baseten evidence extraction/experiment selection are part
+of this increment. S4 acceptance includes `packages/collect/test/merchant-providers.test.ts`,
+`packages/collect/test/merchant-browser.test.ts` and the full `evals/milestones/s4.test.ts` loop.
+Configuration is explicit; no agent makes live provider calls.
+
 Requires S3. Preset `s1,s2,s3,s4`. Flag `FEATURE_MERCHANT_OPPORTUNITIES`.
 This completes the intended two-sided product. Exit: existing and newly profiled stores can inspect
 safe eligible cohort evidence and generate a supported proposal in each domain. New supply matches

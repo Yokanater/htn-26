@@ -27,7 +27,7 @@ describe('S0 equal-domain contract wiring', () => {
       'opportunities',
     ]);
     const flags = featureFlags({ MILESTONES: 's1,s2,s3,s4' });
-    expect(flags.FEATURE_MERCHANT_OPPORTUNITIES).toBe(true);
+    expect(flags).not.toHaveProperty('FEATURE_MERCHANT_OPPORTUNITIES');
     expect(flags.FEATURE_DRAFT_ACTIVATION).toBe(false);
     expect(Object.keys(SHOPPING_DOMAINS).sort()).toEqual(['outfit', 'setup']);
   });

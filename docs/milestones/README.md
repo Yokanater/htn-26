@@ -10,10 +10,10 @@ plan from archived `m1`–`m5`; legacy IDs remain compatible, not active build i
 | ID | Product increment | Requires | Feature flags | Definition of useful |
 | --- | --- | --- | --- | --- |
 | S0 | contracts, fixtures, provider spikes | — | — | both-domain offline foundation; not a shipped product |
-| [S1](S1_INTENT_CAPTURE.md) | Inspiration to confirmed intent | — | FEATURE_INTENT_CAPTURE | image/text -> corrected brief in both domains |
-| [S2](S2_COLLECTION_MATCHING.md) | Shoppable collections | S1 | FEATURE_COLLECTION_MATCHING | real sourced alternatives and honest constraints |
-| [S3](S3_DEMAND_LEDGER.md) | Confirmed demand | S2 | FEATURE_DEMAND_LEDGER | explicit choices + consent + correct private aggregates |
-| [S4](S4_MERCHANT_OPPORTUNITIES.md) | Demand-backed collaborations | S3 | FEATURE_MERCHANT_OPPORTUNITIES | merchant/newcomer query -> supported editable proposal |
+| [S1](S1_INTENT_CAPTURE.md) | Inspiration to confirmed intent | — | Always available | image/text -> corrected brief in both domains |
+| [S2](S2_COLLECTION_MATCHING.md) | Shoppable collections | S1 | Always available | real sourced alternatives and honest constraints |
+| [S3](S3_DEMAND_LEDGER.md) | Confirmed demand | S2 | Always available | explicit choices + consent + correct private aggregates |
+| [S4](S4_MERCHANT_OPPORTUNITIES.md) | Demand-backed collaborations | S3 | Always available | merchant/newcomer query -> supported editable proposal |
 | [S5](S5_DRAFT_ACTIVATION.md) | Draft activation (optional) | S4 | FEATURE_DRAFT_ACTIVATION | approved concept saved to owned Shopify store |
 
 The intended hackathon submission is **S1–S4**. S2 is independently useful to shoppers but does
@@ -21,12 +21,7 @@ not demonstrate the whole thesis. S3 without S4 is not a completed two-sided pro
 
 ## 2. Presets, sections and guardrails
 
-`MILESTONES=s1,s2,s3,s4` resolves in canonical order. Required milestones must be explicit.
-Default is `s1`. Sections: `intent`, `collections`, `demand`, `opportunities`; S5 adds an action,
-not a new report. Flags can turn a capability off, but cannot enable a feature without its effective
-prerequisite flag. A process fails fast on inconsistent overrides. Routes and UI consult effective
-flags, not just requested sections. Legacy combinations retain their original semantics and
-cannot be mixed with s-presets. An existing `.env` must be migrated by its owner.
+S1–S4 are planning labels, not runtime switches. The app always exposes intent, collections, demand and opportunities. `MILESTONES` and their four `FEATURE_*` settings no longer restrict routes, matching or UI. Existing environment values are ignored; no private environment migration is required. Provider selection, explicit consent, brief confirmation and session ownership still apply. S5 activation remains outside this change.
 
 Fake providers are the example default. Real adapters are enabled only after human spikes.
 Synthetic seeds/replay stay labeled and separate from live demand regardless of feature flags.
@@ -83,6 +78,10 @@ an honest fake/replay fallback and known failures. Required schema fixture files
 S0 checks `evals/milestones/bootstrap.test.ts`; it must not masquerade as S1–S5 acceptance.
 
 ## 6. Optional work
+
+Browserbase capture/progress and Baseten extraction/experiment selection are required parts of the
+merchant S4 workflow, scoped in [merchant implementation](../MERCHANT_IMPLEMENTATION.md). They are
+not deferred cosmetic sponsor integrations. External Shopify activation remains optional S5.
 
 Only after S4: more categories, formal merchant onboarding, measured ranking improvements,
 transactional storage, richer evidence rendering. No sponsor integration solely to add a logo.

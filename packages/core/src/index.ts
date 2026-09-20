@@ -8,6 +8,7 @@ export * from './collect';
 export * from './context';
 export * from './demand';
 export * from './enrich';
+export * from './merchant';
 export * from './milestones';
 export * from './pipeline';
 export * from './reason';

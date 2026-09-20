@@ -1,5 +1,5 @@
 /** Accept / replace / reject, save and request-offer controls. Owner: L3 (S3-L3-1a). Design v3 §2, §6.1, §8.
- * Rendered only when FEATURE_DEMAND_LEDGER is effective and a handler is wired. One request is in
+ * Rendered only when a decision handler is wired. One request is in
  * flight at a time and repeating the recorded choice sends nothing. The latest explicit choice per
  * slot wins; a rejected item stays listed and can be undone. A stale-revision 409 keeps the choice
  * so the shopper can re-apply it once the latest revision's collection is shown, and only if that

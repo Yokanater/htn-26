@@ -1,13 +1,19 @@
 /** Composition root: providers are wired here once, in dependency order. Owner: L4. */
-import { createInjectedShoppingCatalog } from '@sei/collect';
-import type { IntentBrief } from '@sei/contracts';
+import { lookup } from 'node:dns/promises';
 import {
-  type CollectionMatcher,
-  type EnvLike,
-  featureFlags,
-  type ShoppingCatalog,
-} from '@sei/core';
-import { createCollectionMatcher, createDemandAggregator } from '@sei/enrich';
+  createBasetenCatalogExtractor,
+  createInjectedShoppingCatalog,
+  createLiveMerchantProfiler,
+  createMerchantBrowser,
+  createMerchantDiscovery,
+} from '@sei/collect';
+import type { IntentBrief } from '@sei/contracts';
+import type { CollectionMatcher, EnvLike, ShoppingCatalog } from '@sei/core';
+import {
+  createCollectionMatcher,
+  createDemandAggregator,
+  createOpportunityMapper,
+} from '@sei/enrich';
 import {
   type CollectionRunner,
   type CollectionRunnerOptions,
@@ -15,6 +21,7 @@ import {
   staticCatalog,
 } from '@sei/pipeline';
 import {
+  createCollaborationComposer,
   createIntentInterpreter,
   createOpenAiIntentModel,
   fakeVisionDraft,
@@ -34,6 +41,7 @@ import {
   InterpreterIntentDraftService,
 } from './services/intake';
 import { liveCatalog } from './services/live-catalog';
+import { createSeedMerchantProfiler, MerchantWorkspaceService } from './services/merchant';
 import { PrivateCheckpointStore, RunRegistry } from './services/runs';
 import { OwnerSessions } from './services/session';
 
@@ -50,16 +58,15 @@ export interface AppProviders {
   demand: PrivateDemandLedger;
   /** Projects the private ledger into consent-gated published snapshots (S3). */
   demandProjection: DemandProjectionService;
+  merchants: MerchantWorkspaceService;
   now: () => Date;
 }
 
 export interface ProviderOptions {
   /** Test seam: inject the OpenAI client/logger/sleep. Never used to reach a live provider. */
   intentModel?: OpenAiIntentModelOptions;
-  /** Runner tuning (caps, timeouts). `enabled`, catalog, matcher and events stay wired here. */
-  runner?: Partial<
-    Omit<CollectionRunnerOptions, 'enabled' | 'openCatalog' | 'matcher' | 'onEvent'>
-  >;
+  /** Runner tuning (caps, timeouts). Catalog, matcher and events stay wired here. */
+  runner?: Partial<Omit<CollectionRunnerOptions, 'openCatalog' | 'matcher' | 'onEvent'>>;
   /** Replace individual providers; everything else is still built from the environment. */
   overrides?: Partial<AppProviders>;
 }
@@ -142,8 +149,82 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
   const matcher = overrides.matcher ?? createCollectionMatcher();
   const intake = overrides.intake ?? new IntakeStore();
   const demand = overrides.demand ?? new PrivateDemandLedger();
+  const sessions = overrides.sessions ?? new OwnerSessions();
+  const demandProjection =
+    overrides.demandProjection ??
+    new DemandProjectionService({
+      ledger: demand,
+      briefs: (ids) => intake.findBriefs(ids),
+      aggregator: createDemandAggregator(),
+      minimumSessions: Math.max(5, positiveInt(env.DEMAND_MIN_SESSIONS, 5)),
+      snapshotMinutes: positiveInt(env.DEMAND_SNAPSHOT_MINUTES, 15),
+      retentionDays: positiveInt(env.DEMAND_RETENTION_DAYS, 30),
+      now,
+    });
+  const merchantLive = env.MERCHANT_PROVIDER === 'browserbase_baseten';
+  if (
+    merchantLive &&
+    !overrides.merchants &&
+    (!env.BROWSERBASE_API_KEY ||
+      !env.BROWSERBASE_PROJECT_ID ||
+      !env.BASETEN_API_KEY ||
+      !env.BASETEN_TAGGER_MODEL)
+  )
+    throw new Error(
+      'MERCHANT_PROVIDER=browserbase_baseten requires BROWSERBASE_API_KEY, BROWSERBASE_PROJECT_ID, BASETEN_API_KEY and BASETEN_TAGGER_MODEL',
+    );
+  const dns = (host: string) => lookup(host, { all: true });
+  const merchants =
+    overrides.merchants ??
+    new MerchantWorkspaceService({
+      profiler: merchantLive
+        ? createLiveMerchantProfiler({
+            fetch,
+            lookup: dns,
+            now,
+            browser: createMerchantBrowser({
+              apiKey: env.BROWSERBASE_API_KEY ?? '',
+              projectId: env.BROWSERBASE_PROJECT_ID ?? '',
+              lookup: dns,
+            }),
+            extract: createBasetenCatalogExtractor({
+              apiKey: env.BASETEN_API_KEY ?? '',
+              model: env.BASETEN_TAGGER_MODEL ?? '',
+            }),
+          })
+        : createSeedMerchantProfiler(),
+      composer: createCollaborationComposer(
+        merchantLive
+          ? {
+              apiKey: env.BASETEN_API_KEY ?? '',
+              model: env.BASETEN_REASONING_MODEL || env.BASETEN_TAGGER_MODEL || '',
+            }
+          : undefined,
+      ),
+      mapper: createOpportunityMapper(),
+      projection: demandProjection,
+      ledger: demand,
+      sessions,
+      discovery: merchantLive
+        ? createMerchantDiscovery({ apiKey: env.BROWSERBASE_API_KEY ?? '', lookup: dns })
+        : {
+            discover: async (profile) => [
+              ...new Set(
+                loadSeedOffers()
+                  .filter(
+                    (offer) =>
+                      offer.id.includes(`_${profile.domain}_`) &&
+                      offer.merchant.domain !== profile.merchant.domain,
+                  )
+                  .map((offer) => `https://${offer.merchant.domain}`),
+              ),
+            ],
+          },
+      now,
+    });
   return {
-    sessions: overrides.sessions ?? new OwnerSessions(),
+    sessions,
+    merchants,
     intake,
     intent: overrides.intent ?? createIntentService(env, options.intentModel, now),
     imageNormalizer:
@@ -157,23 +238,12 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
     checkpoints,
     runs,
     demand,
-    demandProjection:
-      overrides.demandProjection ??
-      new DemandProjectionService({
-        ledger: demand,
-        briefs: (ids) => intake.findBriefs(ids),
-        aggregator: createDemandAggregator(),
-        minimumSessions: positiveInt(env.DEMAND_MIN_SESSIONS, 5),
-        snapshotMinutes: positiveInt(env.DEMAND_SNAPSHOT_MINUTES, 15),
-        retentionDays: positiveInt(env.DEMAND_RETENTION_DAYS, 30),
-        now,
-      }),
+    demandProjection,
     runner:
       overrides.runner ??
       createCollectionRunner({
         clock: now,
         ...options.runner,
-        enabled: featureFlags(env).FEATURE_COLLECTION_MATCHING === true,
         openCatalog:
           typeof catalog === 'function'
             ? async (_signal, brief) => ({ ...catalog(brief), close: async () => {} })

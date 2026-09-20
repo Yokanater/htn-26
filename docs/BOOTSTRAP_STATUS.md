@@ -1,5 +1,14 @@
 # Bootstrap migration — REVAMP-0
 
+## Latest continuation: S4 merchant providers and workspace
+
+The isolated `codex/merchant-provider-workflow` implementation builds on integrated S3, with
+Browserbase capture/live progress, Baseten fact extraction and experiment selection, confirmed
+catalogs, privacy-safe opportunity comparisons and editable saved/exportable proposals. Both-domain
+offline tests pass, including withdrawal invalidation and newcomer support isolation. This is not
+merged into main and is not live-provider certified. See [implementation and exact acceptance](MERCHANT_IMPLEMENTATION.md).
+Workspace state remains in memory; S5 external activation is not implemented by this continuation.
+
 The user authorized revising the product plan first, then updating the existing bootstrap. This
 is a one-time cross-lane migration on the existing bootstrap branch; no dependency manifest,
 lockfile, private environment file, external service, or store is changed.

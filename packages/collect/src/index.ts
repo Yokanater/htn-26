@@ -33,11 +33,15 @@ export {
   createInjectedShoppingCatalog,
   MAX_OFFERS_PER_SLOT,
 } from './injected-catalog';
+export * from './merchant/baseten';
+export * from './merchant/browserbase';
+export * from './merchant/discovery';
 export {
   type MerchantProfileDeps,
   type MerchantProfileResult,
   profileMerchantCatalog,
 } from './merchant/profile';
+export * from './merchant/workflow';
 export {
   assertSnippetDoesNotProveHardFacts,
   buildProductEvidence,

@@ -33,7 +33,6 @@ const SEEDS = {
   outfit: { brief: outfitBrief, offers: outfitOffers, matches: outfitMatches },
   setup: { brief: setupBrief, offers: setupOffers, matches: setupMatches },
 };
-const ON = { FEATURE_DEMAND_LEDGER: true };
 
 /** Seed brief, offers and first match, plus one synthetic alternative for the second slot. */
 function seed(domain: keyof typeof SEEDS) {
@@ -113,7 +112,6 @@ function setup(
     <CollectionWorkspace
       brief={data.brief}
       events={[resultEvent(data.brief, data.offers, data.match)]}
-      flags={ON}
       onDecision={onDecision}
       renderOffer={tile}
       runId="run_1"
@@ -238,7 +236,6 @@ describe.each(['outfit', 'setup'] as const)('%s collection decisions', (domain) 
       <CollectionWorkspace
         brief={revised}
         events={[resultEvent(revised, offers, revisedMatch, 'run_2')]}
-        flags={ON}
         onDecision={onDecision}
         onRefreshBrief={onRefreshBrief}
         renderOffer={tile}
@@ -286,7 +283,6 @@ describe.each(['outfit', 'setup'] as const)('%s collection decisions', (domain) 
             'run_2',
           ),
         ]}
-        flags={ON}
         onDecision={onDecision}
         renderOffer={tile}
         runId="run_2"
@@ -334,13 +330,8 @@ describe.each(['outfit', 'setup'] as const)('%s collection decisions', (domain) 
     expect(sent()).toHaveLength(2);
   });
 
-  it('renders no decision control and sends nothing when the ledger flag is off', () => {
-    const cases: Partial<CollectionWorkspaceProps>[] = [
-      { flags: { FEATURE_DEMAND_LEDGER: false } },
-      { flags: undefined },
-      { flags: {} },
-      { onDecision: undefined },
-    ];
+  it('renders no decision control without a wired handler', () => {
+    const cases: Partial<CollectionWorkspaceProps>[] = [{ onDecision: undefined }];
     for (const props of cases) {
       const { onDecision, offers } = setup(domain, undefined, props);
       expect(screen.getByText(`tile:${offers[0]!.id}`)).toBeTruthy();

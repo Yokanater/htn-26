@@ -17,18 +17,24 @@ function renderApp() {
   );
 }
 
-it('presents shopper and merchant paths without claiming unfinished merchant actions work', async () => {
+it('opens the complete merchant workspace without milestone capability flags', async () => {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => Response.json({ owner: true })),
+    vi.fn(async (input) =>
+      String(input).endsWith('/profiles') || String(input) === '/api/drafts'
+        ? Response.json([])
+        : String(input).endsWith('/settings')
+          ? Response.json({ provider: 'synthetic', stores: [], retention: '' })
+          : Response.json({ owner: true }),
+    ),
   );
   renderApp();
   expect(screen.getByRole('heading', { name: /Find what belongs together/ })).toBeTruthy();
   expect(screen.getByRole('button', { name: /I’m building a look or space/ })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /I run a Shopify store/ }));
-  expect(screen.getByRole('heading', { name: /See the demand between categories/ })).toBeTruthy();
-  expect(screen.getByText(/Merchant profiling unlocks with S4/)).toBeTruthy();
-  expect(screen.getByText('SYNTHETIC PREVIEW')).toBeTruthy();
+  expect(screen.getByRole('heading', { name: /Find your next good fit/ })).toBeTruthy();
+  expect(screen.queryByText(/unlocks with S4/)).toBeNull();
+  expect(await screen.findByText('SYNTHETIC DEMONSTRATION')).toBeTruthy();
   expect(await screen.findByText('Private session')).toBeTruthy();
 });
 

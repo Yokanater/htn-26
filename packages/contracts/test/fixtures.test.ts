@@ -5,12 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { type ZodType, z } from 'zod';
 import {
+  CollaborationDraftSchema,
   CollectionMatchSchema,
   ConsentRecordSchema,
   DemandAggregateSchema,
   DemandEventSchema,
   IntentBriefSchema,
   MerchantOpportunitySchema,
+  MerchantProfileSchema,
+  MerchantRunSchema,
   ProductOfferSchema,
 } from '../src/index';
 
@@ -24,6 +27,9 @@ const SCHEMAS: Record<string, ZodType> = {
   'demand-events.json': z.array(DemandEventSchema).min(1),
   'aggregate.json': DemandAggregateSchema,
   'opportunity.json': MerchantOpportunitySchema,
+  'merchant-profile.json': MerchantProfileSchema,
+  'merchant-run.json': MerchantRunSchema,
+  'collaboration-draft.json': CollaborationDraftSchema,
 };
 
 function walk(dir: string): string[] {

@@ -1,0 +1,53 @@
+{
+  "id": "prof_outfit_1",
+  "merchant": {
+    "id": "mer_outfit_1",
+    "name": "Synthetic outfit brand 1",
+    "domain": "outfit-brand-1.example"
+  },
+  "domain": "outfit",
+  "sampleOrigin": "seed",
+  "offers": [
+    {
+      "id": "offer_outfit_1",
+      "merchant": {
+        "id": "mer_outfit_1",
+        "name": "Synthetic outfit brand 1",
+        "domain": "outfit-brand-1.example"
+      },
+      "productId": "product-top",
+      "variantId": "variant-top-1",
+      "title": "Synthetic top",
+      "category": "top",
+      "productUrl": "https://outfit-brand-1.example/products/top",
+      "imageUrl": null,
+      "price": {
+        "amount": 10000,
+        "currency": "CAD"
+      },
+      "availability": "available",
+      "shipsTo": [
+        "CA"
+      ],
+      "attributes": {
+        "size": "M"
+      },
+      "evidence": [
+        {
+          "id": "ev_outfit_1",
+          "field": "product_record",
+          "value": "Synthetic fixture: top, CAD 100, available to CA",
+          "url": "https://outfit-brand-1.example/products/top",
+          "capturedAt": "2026-09-19T12:00:00Z",
+          "method": "catalog"
+        }
+      ],
+      "sampleOrigin": "seed"
+    }
+  ],
+  "confirmed": false,
+  "capturedAt": "2026-09-19T12:00:00Z",
+  "warnings": [
+    "Synthetic demonstration; not observed market demand."
+  ]
+}

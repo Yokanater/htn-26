@@ -18,14 +18,9 @@ import {
 } from './run';
 import type { BudgetResource, CollectionRunEvent, CollectionRunResult } from './types';
 
-export type CollectionRunErrorKind =
-  | 'feature_disabled'
-  | 'invalid_brief'
-  | 'not_confirmed'
-  | 'stale_revision';
+export type CollectionRunErrorKind = 'invalid_brief' | 'not_confirmed' | 'stale_revision';
 
 const RUN_ERROR_MESSAGES: Record<CollectionRunErrorKind, string> = {
-  feature_disabled: 'Collection matching is disabled',
   invalid_brief: 'Brief is invalid',
   not_confirmed: 'Brief must be confirmed before matching',
   stale_revision: 'Brief revision is older than the current revision',
@@ -42,8 +37,6 @@ export class CollectionRunError extends Error {
 }
 
 export interface CollectionRunnerOptions {
-  /** Effective FEATURE_COLLECTION_MATCHING; when false, `start` rejects and nothing runs. */
-  enabled: boolean;
   openCatalog: OpenCatalog;
   matcher: CollectionMatcher;
   explainer?: CollectionExplainer;
@@ -109,7 +102,6 @@ export function createCollectionRunner(options: CollectionRunnerOptions): Collec
 
   return {
     start(brief, startOptions = {}) {
-      if (!options.enabled) throw new CollectionRunError('feature_disabled');
       const parsed = IntentBriefSchema.safeParse(brief);
       if (!parsed.success) throw new CollectionRunError('invalid_brief');
       const current = parsed.data;

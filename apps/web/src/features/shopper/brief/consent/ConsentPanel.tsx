@@ -10,8 +10,6 @@ export type ConsentPanelProps = {
   onGrant: () => Promise<Result>;
   onWithdraw: () => Promise<Result>;
   onDeleteSession: () => Promise<Result>;
-  /** Capability flags; panel renders only when FEATURE_DEMAND_LEDGER === true. */
-  flags?: Record<string, boolean> | undefined | null;
 };
 
 function currentState(consent: ConsentRecord | null) {
@@ -19,19 +17,11 @@ function currentState(consent: ConsentRecord | null) {
   return consent.state;
 }
 
-export function ConsentPanel({
-  consent,
-  onGrant,
-  onWithdraw,
-  onDeleteSession,
-  flags,
-}: ConsentPanelProps) {
+export function ConsentPanel({ consent, onGrant, onWithdraw, onDeleteSession }: ConsentPanelProps) {
   const [optedIn, setOptedIn] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pending, setPending] = useState<'grant' | 'withdraw' | 'delete' | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  if (flags?.FEATURE_DEMAND_LEDGER !== true) return null;
 
   async function run(action: typeof pending, callback: () => Promise<Result>) {
     setPending(action);

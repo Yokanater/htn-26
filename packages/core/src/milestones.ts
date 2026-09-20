@@ -1,4 +1,4 @@
-/** Active S1–S5 presets (design v3); legacy M1–M5 meanings are preserved. Owner: L4. */
+/** Historical planning metadata; never gates app routes or UI. Owner: L4. */
 
 export type MilestoneId = 'm1' | 'm2' | 'm3' | 'm4' | 'm5' | 's1' | 's2' | 's3' | 's4' | 's5';
 
@@ -25,11 +25,11 @@ export const MILESTONE_PRESETS: Record<MilestoneId, MilestonePreset> = {
   },
   m4: { sections: [], flags: ['FEATURE_ACTIONS', 'FEATURE_BUNDLE_STUDIO'], requires: ['m1'] },
   m5: { sections: [], flags: ['FEATURE_SHOPIFY_WRITEBACK'], requires: ['m4'] },
-  s1: { sections: ['intent'], flags: ['FEATURE_INTENT_CAPTURE'], requires: [] },
-  s2: { sections: ['collections'], flags: ['FEATURE_COLLECTION_MATCHING'], requires: ['s1'] },
-  s3: { sections: ['demand'], flags: ['FEATURE_DEMAND_LEDGER'], requires: ['s2'] },
-  s4: { sections: ['opportunities'], flags: ['FEATURE_MERCHANT_OPPORTUNITIES'], requires: ['s3'] },
-  s5: { sections: [], flags: ['FEATURE_DRAFT_ACTIVATION'], requires: ['s4'] },
+  s1: { sections: ['intent'], flags: [], requires: [] },
+  s2: { sections: ['collections'], flags: [], requires: [] },
+  s3: { sections: ['demand'], flags: [], requires: [] },
+  s4: { sections: ['opportunities'], flags: [], requires: [] },
+  s5: { sections: [], flags: ['FEATURE_DRAFT_ACTIVATION'], requires: [] },
 };
 
 export const DEFAULT_MILESTONES = 's1';
@@ -107,6 +107,12 @@ export function featureFlags(env: EnvLike): Record<string, boolean> {
   }
   for (const [key, rawValue] of Object.entries(env)) {
     if (!key.startsWith('FEATURE_') || rawValue === undefined) continue;
+    if (
+      /^FEATURE_(INTENT_CAPTURE|COLLECTION_MATCHING|DEMAND_LEDGER|MERCHANT_OPPORTUNITIES)$/.test(
+        key,
+      )
+    )
+      continue;
     const value = rawValue.trim().toLowerCase();
     if (value === '') continue;
     if (value === 'true' || value === '1') flags[key] = true;
@@ -114,11 +120,7 @@ export function featureFlags(env: EnvLike): Record<string, boolean> {
     else throw new Error(`${key}="${rawValue}": expected true, false, 1, 0, or empty`);
   }
   const dependencies: Record<string, string | undefined> = {
-    FEATURE_INTENT_CAPTURE: undefined,
-    FEATURE_COLLECTION_MATCHING: 'FEATURE_INTENT_CAPTURE',
-    FEATURE_DEMAND_LEDGER: 'FEATURE_COLLECTION_MATCHING',
-    FEATURE_MERCHANT_OPPORTUNITIES: 'FEATURE_DEMAND_LEDGER',
-    FEATURE_DRAFT_ACTIVATION: 'FEATURE_MERCHANT_OPPORTUNITIES',
+    FEATURE_DRAFT_ACTIVATION: undefined,
   };
   const isIntentPlan = resolveMilestones(env.MILESTONES).milestones[0]?.startsWith('s');
   for (const [flag, required] of Object.entries(dependencies)) {

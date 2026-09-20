@@ -63,10 +63,6 @@ const INTENT_FAILURES: Record<IntentInterpretationErrorKind, IntentFailure> = {
 };
 
 const RUN_FAILURES: Record<CollectionRunErrorKind, IntentFailure> = {
-  feature_disabled: {
-    status: 404,
-    body: errorBody('FEATURE_DISABLED', 'Collection matching is not enabled.'),
-  },
   invalid_brief: {
     status: 400,
     body: errorBody('INVALID_BRIEF', 'Review the brief fields and constraints.'),

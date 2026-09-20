@@ -1,0 +1,53 @@
+{
+  "id": "prof_setup_1",
+  "merchant": {
+    "id": "mer_setup_1",
+    "name": "Synthetic setup brand 1",
+    "domain": "setup-brand-1.example"
+  },
+  "domain": "setup",
+  "sampleOrigin": "seed",
+  "offers": [
+    {
+      "id": "offer_setup_1",
+      "merchant": {
+        "id": "mer_setup_1",
+        "name": "Synthetic setup brand 1",
+        "domain": "setup-brand-1.example"
+      },
+      "productId": "product-desk",
+      "variantId": "variant-desk-1",
+      "title": "Synthetic desk",
+      "category": "desk",
+      "productUrl": "https://setup-brand-1.example/products/desk",
+      "imageUrl": null,
+      "price": {
+        "amount": 10000,
+        "currency": "CAD"
+      },
+      "availability": "available",
+      "shipsTo": [
+        "CA"
+      ],
+      "attributes": {
+        "width_cm": 100
+      },
+      "evidence": [
+        {
+          "id": "ev_setup_1",
+          "field": "product_record",
+          "value": "Synthetic fixture: desk, CAD 100, available to CA",
+          "url": "https://setup-brand-1.example/products/desk",
+          "capturedAt": "2026-09-19T12:00:00Z",
+          "method": "catalog"
+        }
+      ],
+      "sampleOrigin": "seed"
+    }
+  ],
+  "confirmed": false,
+  "capturedAt": "2026-09-19T12:00:00Z",
+  "warnings": [
+    "Synthetic demonstration; not observed market demand."
+  ]
+}

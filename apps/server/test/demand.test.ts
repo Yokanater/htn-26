@@ -282,8 +282,8 @@ describe.each(['outfit', 'setup'] as const)('S3 %s private demand API', (domain)
   });
 });
 
-it('does not mount demand routes before S3', async () => {
+it('keeps consent available with obsolete S1/S2 configuration', async () => {
   const app = createApp({ MILESTONES: 's1,s2' });
   const cookie = await session(app);
-  expect((await app.request('/api/consent', { headers: { cookie } })).status).toBe(404);
+  expect((await app.request('/api/consent', { headers: { cookie } })).status).toBe(200);
 });

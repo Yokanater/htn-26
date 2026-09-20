@@ -3,7 +3,6 @@ import type { CollectionMatch, IntentBrief, ShoppingDomain } from '@sei/contract
 import { type CollectionExplainer, checkExplanation, explainCollection } from '@sei/reason';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  CollectionRunError,
   type CollectionRunEvent,
   type CollectionRunnerOptions,
   createCollectionRunner,
@@ -42,7 +41,6 @@ function harness(
   const events: CollectionRunEvent[] = [];
   let n = 0;
   const runner = createCollectionRunner({
-    enabled: true,
     openCatalog: catalog.open,
     matcher,
     checkpoints: createMemoryCheckpointStore(),
@@ -99,7 +97,7 @@ describe.each(DOMAINS)('%s collection run', (domain) => {
     ]);
   });
 
-  it('enforces the confirmation barrier and the feature flag before any provider call', () => {
+  it('enforces the confirmation barrier before any provider call', () => {
     const { brief, catalog, matcher, events, runner } = harness(domain);
     expect(() => runner.start(draft(brief))).toThrow(
       expect.objectContaining({ kind: 'not_confirmed' }),
@@ -107,10 +105,8 @@ describe.each(DOMAINS)('%s collection run', (domain) => {
     expect(() => runner.start({ ...brief, slots: [] })).toThrow(
       expect.objectContaining({ kind: 'invalid_brief' }),
     );
-    const disabled = harness(domain, { runner: { enabled: false } });
-    expect(() => disabled.runner.start(brief)).toThrow(CollectionRunError);
     expect(catalog.stats.searches).toHaveLength(0);
-    expect(catalog.stats.opened + disabled.catalog.stats.opened).toBe(0);
+    expect(catalog.stats.opened).toBe(0);
     expect(matcher.calls).toHaveLength(0);
     expect(events).toEqual([]);
   });

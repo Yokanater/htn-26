@@ -28,7 +28,7 @@ function callbacks(overrides = {}) {
 
 function renderPanel(consent: ConsentRecord | null, overrides = {}) {
   const actions = callbacks(overrides);
-  render(<ConsentPanel consent={consent} flags={{ FEATURE_DEMAND_LEDGER: true }} {...actions} />);
+  render(<ConsentPanel consent={consent} {...actions} />);
   return actions;
 }
 
@@ -73,7 +73,7 @@ describe('ConsentPanel', () => {
     render(
       <>
         <BriefEditor hints={[]} brief={brief} onConfirm={vi.fn()} onSave={vi.fn()} />
-        <ConsentPanel consent={null} flags={{ FEATURE_DEMAND_LEDGER: true }} {...callbacks()} />
+        <ConsentPanel consent={null} {...callbacks()} />
       </>,
     );
     fireEvent.click(screen.getByRole('checkbox', { name: /i agree to share/i }));
@@ -88,7 +88,7 @@ describe('ConsentPanel', () => {
     render(
       <>
         <BriefEditor hints={[]} brief={outfit} onConfirm={vi.fn()} onSave={vi.fn()} />
-        <ConsentPanel consent={null} flags={{ FEATURE_DEMAND_LEDGER: true }} {...failed} />
+        <ConsentPanel consent={null} {...failed} />
       </>,
     );
     fireEvent.click(screen.getByRole('checkbox', { name: /i agree to share/i }));
@@ -99,12 +99,10 @@ describe('ConsentPanel', () => {
     expect(category.disabled).toBe(false);
   });
 
-  it('renders nothing while the demand ledger flag is off', () => {
-    render(
-      <ConsentPanel consent={null} flags={{ FEATURE_DEMAND_LEDGER: false }} {...callbacks()} />,
-    );
-    expect(screen.queryByRole('region', { name: 'Sharing preferences' })).toBeNull();
-    expect(screen.queryByText(/sharing is off by default/i)).toBeNull();
+  it('keeps sharing preferences available without capability configuration', () => {
+    render(<ConsentPanel consent={null} {...callbacks()} />);
+    expect(screen.queryByRole('region', { name: 'Sharing preferences' })).toBeTruthy();
+    expect(screen.queryByText(/sharing is off by default/i)).toBeTruthy();
   });
 
   it('uses accessible labels and buttons', () => {

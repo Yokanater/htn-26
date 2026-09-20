@@ -76,7 +76,7 @@ it('shows actionable empty results from the current streamed run', async () => {
 });
 
 /**
- * Decision controls only reach a shopper if the shell forwards flags and a handler. The
+ * Decision controls only reach a shopper if the shell forwards a handler. The
  * components were complete while nothing passed these through, so S3 was unreachable in the
  * app; this guards that wiring rather than the controls themselves.
  */
@@ -97,7 +97,6 @@ it.each([
         runId="run_test"
         onCancel={() => {}}
         onRetry={() => {}}
-        flags={{ FEATURE_DEMAND_LEDGER: true }}
         onDecision={onDecision}
         events={[
           {

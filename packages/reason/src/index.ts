@@ -3,3 +3,4 @@
  */
 export * from './intent';
 export * from './matching';
+export * from './opportunities';

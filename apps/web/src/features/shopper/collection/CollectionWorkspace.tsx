@@ -2,9 +2,9 @@
  * Shows the collection for the current brief revision only: selected offers via the injected
  * product tile, alternatives, cited explanations, exact missing items and unverified constraints.
  * No cart, combined checkout or shipping total: each store sets its own prices and fulfillment.
- * With FEATURE_DEMAND_LEDGER and a decision handler, explicit choices are added (S3-L3-1a).
+ * With a decision handler, explicit choices are added (S3-L3-1a).
  */
-import type { Capabilities, IntentBrief, ProductOffer } from '@sei/contracts';
+import type { IntentBrief, ProductOffer } from '@sei/contracts';
 import { useMemo } from 'react';
 import {
   CollectionDecisionBar,
@@ -12,7 +12,7 @@ import {
   SlotDecisionControls,
   useCollectionDecisions,
 } from './CollectionDecisions';
-import { type DecisionHandler, displayedCollection, isDemandLedgerEnabled } from './decisions';
+import { type DecisionHandler, displayedCollection } from './decisions';
 import { deriveRunView } from './runState';
 import type {
   CollectionRunEvent,
@@ -107,8 +107,6 @@ export interface CollectionWorkspaceProps {
   events: readonly CollectionRunEvent[];
   renderOffer?: OfferTileRenderer;
   onCancel?: () => void;
-  /** Effective flags from GET /api/capabilities; decisions need FEATURE_DEMAND_LEDGER. */
-  flags?: Capabilities['flags'] | null;
   /** Records an explicit decision. Without it, or with the flag off, no decision control renders. */
   onDecision?: DecisionHandler;
   /** Reloads the latest brief revision after a stale-revision 409. */
@@ -121,7 +119,6 @@ export function CollectionWorkspace({
   events,
   renderOffer = fallbackRenderer,
   onCancel,
-  flags,
   onDecision,
   onRefreshBrief,
 }: CollectionWorkspaceProps) {
@@ -143,7 +140,7 @@ export function CollectionWorkspace({
     [brief, shownMatch, shownOffers],
   );
   const decisions = useCollectionDecisions({
-    enabled: isDemandLedgerEnabled(flags),
+    enabled: true,
     shown,
     onDecision,
   });

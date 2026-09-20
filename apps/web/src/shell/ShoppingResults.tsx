@@ -12,7 +12,6 @@ export function ShoppingResults({
   onEdit,
   onCancel,
   onRetry,
-  flags,
   onDecision,
   onRefreshBrief,
 }: {
@@ -22,8 +21,6 @@ export function ShoppingResults({
   onEdit?: () => void;
   onCancel: () => void;
   onRetry: () => void;
-  /** Effective capability flags; decision controls need FEATURE_DEMAND_LEDGER. */
-  flags?: Record<string, boolean> | null;
   onDecision?: DecisionHandler;
   onRefreshBrief?: () => void;
 }) {
@@ -72,7 +69,6 @@ export function ShoppingResults({
         events={events}
         renderOffer={tile}
         onCancel={onCancel}
-        flags={flags}
         onDecision={onDecision}
         onRefreshBrief={onRefreshBrief}
       />

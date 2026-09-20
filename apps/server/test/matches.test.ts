@@ -329,12 +329,12 @@ describe.each(CASES)('$domain match routes', (c) => {
   });
 });
 
-describe('match routes are gated by the collection flag', () => {
-  it('does not mount or mutate anything when only S1 is enabled', async () => {
+describe('match routes are always available', () => {
+  it('starts matching even with an obsolete S1-only setting', async () => {
     const app = createApp({ MILESTONES: 's1' });
     const cookie = await session(app);
     const brief = await confirmedBrief(app, cookie, CASES[0]);
-    expect((await startRun(app, cookie, brief.id)).status).toBe(404);
+    expect((await startRun(app, cookie, brief.id)).status).toBe(202);
     expect((await app.request('/api/runs/run_x', { headers: { cookie } })).status).toBe(404);
   });
 });

@@ -15,18 +15,24 @@ describe('bootstrap capability metadata', () => {
     expect(JSON.stringify(raw)).not.toContain('do-not-expose');
     expect((await app.request('/api/briefs', { method: 'POST' })).status).toBe(401);
   });
-  it('hides disabled sections and rejects an invalid flag chain at startup', async () => {
+  it('ignores obsolete milestone locks and exposes all implemented sections', async () => {
     const response = await createApp({
       MILESTONES: 's1,s2',
       FEATURE_COLLECTION_MATCHING: 'false',
+      FEATURE_INTENT_CAPTURE: 'false',
+      FEATURE_DEMAND_LEDGER: 'false',
+      FEATURE_MERCHANT_OPPORTUNITIES: 'false',
     }).request('/api/capabilities');
-    expect(CapabilitiesSchema.parse(await response.json()).sections).toEqual(['intent']);
-    expect(() => createApp({ MILESTONES: 's1,s2', FEATURE_INTENT_CAPTURE: 'false' })).toThrow(
-      /requires/,
-    );
+    expect(CapabilitiesSchema.parse(await response.json()).sections).toEqual([
+      'intent',
+      'collections',
+      'demand',
+      'opportunities',
+    ]);
+    expect(() => createApp({ MILESTONES: 's1,s2', FEATURE_INTENT_CAPTURE: 'false' })).not.toThrow();
   });
-  it('identifies an explicitly configured legacy plan', async () => {
+  it('does not let legacy configuration lock the current app', async () => {
     const response = await createApp({ MILESTONES: 'm1' }).request('/api/capabilities');
-    expect(CapabilitiesSchema.parse(await response.json()).milestoneFamily).toBe('legacy');
+    expect(CapabilitiesSchema.parse(await response.json()).milestoneFamily).toBe('intent');
   });
 });

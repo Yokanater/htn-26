@@ -20,6 +20,7 @@ import {
   Store,
 } from 'lucide-react';
 import { useState } from 'react';
+import { MerchantWorkspace as ActiveMerchantWorkspace } from './features/merchant/MerchantWorkspace';
 import { BriefEditor, type DomainHint } from './features/shopper/brief';
 import { MediaIntake, type MediaSelection } from './features/shopper/media';
 import { ApiError, json } from './shell/api';
@@ -429,98 +430,8 @@ function ShopperWorkspace({ back }: { back: () => void }) {
   );
 }
 
-function MerchantWorkspace({ back }: { back: () => void }) {
-  return (
-    <main className="workspace-main merchant-workspace">
-      <button className="back-button" type="button" onClick={back}>
-        <ArrowLeft aria-hidden /> Back to both paths
-      </button>
-      <section className="merchant-hero">
-        <div>
-          <p className="eyebrow">MERCHANT STUDIO</p>
-          <h1>
-            See the demand between <em>categories.</em>
-          </h1>
-          <p>
-            Profile your public catalog, then compare it with privacy-safe patterns from shoppers
-            who chose to contribute.
-          </p>
-          <div className="merchant-form-preview">
-            <label>
-              <span>SHOPIFY STORE URL</span>
-              <input value="your-store.myshopify.com" readOnly />
-            </label>
-            <button type="button" disabled>
-              Profile store <ArrowRight aria-hidden />
-            </button>
-          </div>
-          <p className="coming-note">
-            Merchant profiling unlocks with S4 after the consented demand ledger is active.
-          </p>
-        </div>
-        <section
-          className="signal-preview"
-          aria-label="Example merchant opportunity, synthetic preview"
-        >
-          <div className="preview-top">
-            <span>SYNTHETIC PREVIEW</span>
-            <CircleGauge aria-hidden />
-          </div>
-          <p>OUTFIT · CANADA · LAST 30 DAYS</p>
-          <h2>Structured layers + everyday bags</h2>
-          <div className="signal-count">
-            <strong>24</strong>
-            <span>
-              eligible sessions
-              <br />
-              in this coarse cohort
-            </span>
-          </div>
-          <div className="signal-row">
-            <span>Observed pair support</span>
-            <strong>18</strong>
-          </div>
-          <div className="signal-row">
-            <span>Unmet bag requirement</span>
-            <strong>9</strong>
-          </div>
-          <div className="signal-foot">
-            <ShieldCheck aria-hidden /> No shopper images or individual histories
-          </div>
-        </section>
-      </section>
-      <section className="merchant-principles">
-        <article>
-          <span>01</span>
-          <h3>Evidence before outreach</h3>
-          <p>Every opportunity carries its cohort window, sample size, and public product proof.</p>
-        </article>
-        <article>
-          <span>02</span>
-          <h3>Observed stays observed</h3>
-          <p>
-            New shops can match unmet demand, but never inherit historical support they did not
-            earn.
-          </p>
-        </article>
-        <article>
-          <span>03</span>
-          <h3>Draft, then decide</h3>
-          <p>Collaboration briefs label unknown costs, terms, and willingness.</p>
-        </article>
-      </section>
-    </main>
-  );
-}
-
 export function App() {
   const [surface, setSurface] = useState<Surface>('home');
-  const capabilities = useQuery({
-    queryKey: ['capabilities'],
-    queryFn: () => json<{ flags?: Record<string, boolean> }>('/api/capabilities'),
-    retry: false,
-    staleTime: Number.POSITIVE_INFINITY,
-  });
   const session = useQuery({
     queryKey: ['private-session'],
     queryFn: () => json<{ owner: boolean }>('/api/session'),
@@ -556,15 +467,8 @@ export function App() {
         </span>
       </header>
       {surface === 'home' && <Home enter={setSurface} />}
-      {surface === 'shopper' &&
-        (capabilities.data?.flags?.FEATURE_INTENT_CAPTURE === false ? (
-          <main>
-            <p>Shopper intake is currently disabled.</p>
-          </main>
-        ) : (
-          <ShopperWorkspace back={() => setSurface('home')} />
-        ))}
-      {surface === 'merchant' && <MerchantWorkspace back={() => setSurface('home')} />}
+      {surface === 'shopper' && <ShopperWorkspace back={() => setSurface('home')} />}
+      {surface === 'merchant' && <ActiveMerchantWorkspace back={() => setSurface('home')} />}
       <footer>
         <Brand />
         <span>Personal inspiration. Shared only by choice.</span>

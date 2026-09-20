@@ -24,12 +24,13 @@ newcomer attribution check, backup video, verified deployment, measured latency/
 
 ## Current skeletal shopper demo (S2 integration)
 
-With `MILESTONES=s1,s2`, `VISION_PROVIDER=openai`, `CATALOG_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL_VISION`, and
+With `VISION_PROVIDER=openai`, `CATALOG_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL_VISION`, and
 `OPENAI_MODEL_SEARCH` configured locally, enter an image or description, review the detected
 items, and confirm. Select **Find products** to start a search with a three-minute overall limit.
 The current live adapter uses OpenAI web search to discover Shopify product pages, then reads
 public storefront product and cart JSON for actual variants, images, availability, and currency.
-Browserbase is not part of this new catalog path. Stores without compatible public data are skipped.
+This shopper discovery adapter uses OpenAI search. Merchant catalog onboarding now uses the separate
+Browserbase + Baseten workflow described below. Stores without compatible public data are skipped.
 
 Results expose requirements that could not be verified, plus the discovered product cards.
 Open the source evidence, shortlist a product, visit its merchant page, and download the shortlist.
@@ -37,6 +38,22 @@ Shortlists last for the current visit; purchasing happens at the merchant. Shipp
 unknown until independently verified, and different currencies are never added together.
 Edit requirements to invalidate the old search, or cancel and retry. Clothing sizes use full labels.
 
-This is a working shopper slice, not a completed S3–S5 release: persisted saves, consented demand
-aggregation, and live merchant opportunities still need integration. Merchant previews remain labeled
-synthetic. Offline S2 checks cover outfit and general-product fixtures, ownership, and revisions.
+The integrated consent ledger and S4 merchant workflow use in-memory state. No claim of durable
+storage or S5 activation is made. Offline S2 checks cover both domains, ownership and revisions.
+
+## Merchant workflow (S4)
+
+With `MERCHANT_PROVIDER=fake`, select an outfit or setup demo
+store. Profile it, inspect source evidence, correct categories and confirm. Compare demand and
+partners, inspect observed-pair versus inferred-fit labeling, then create/edit/save/reopen/export
+a collaboration draft. Keep the synthetic label visible throughout; these are not actual shoppers.
+
+For live profiling, configure the keys and access list in [MERCHANT_IMPLEMENTATION.md](MERCHANT_IMPLEMENTATION.md).
+Show Browserbase capture and the read-only live view, followed by verified variant counts and
+Baseten extraction. Cancel once and retry. Profile the candidate partner as well as the primary
+store. Baseten chooses a small falsifiable experiment; deterministic code controls the evidence
+summary. No eligible cohort means an honest insufficient-evidence screen.
+
+Withdraw consent after a live proposal is created, then try reopening/exporting it: the server
+must reject stale evidence. Explain remaining unknown shipping, fit/dimensions, costs and partner
+willingness. No message is sent by this workflow. Repeat the rehearsal for the other domain.

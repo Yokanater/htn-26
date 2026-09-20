@@ -6,8 +6,6 @@
  */
 import type { CollectionMatch, DemandEvent, IntentBrief, ProductOffer } from '@sei/contracts';
 
-export const DEMAND_LEDGER_FLAG = 'FEATURE_DEMAND_LEDGER';
-
 export type RejectionReason = NonNullable<DemandEvent['rejectionReason']>;
 export type DemandSelection = DemandEvent['selections'][number];
 export type DemandDecisionKind = Exclude<DemandEvent['kind'], 'brief_confirmed'>;
@@ -33,10 +31,6 @@ export const REJECTION_REASON_LABEL: Record<RejectionReason, string> = {
   other: 'Other',
 };
 export const REJECTION_REASONS = Object.keys(REJECTION_REASON_LABEL) as RejectionReason[];
-
-export function isDemandLedgerEnabled(flags: Record<string, boolean> | null | undefined): boolean {
-  return flags?.[DEMAND_LEDGER_FLAG] === true;
-}
 
 export interface DisplayedSlot {
   /** The collection's proposed offer, or null when the slot has only alternatives or nothing. */

@@ -23,6 +23,7 @@ export function sessionRoutes(providers: AppProviders): Hono {
     if (providers.sessions.valid(ownerId)) {
       // Revoke first so a run finishing mid-delete cannot store anything for this owner.
       providers.sessions.revoke(ownerId);
+      providers.merchants.deleteOwner(ownerId);
       const briefIds = new Set([
         ...providers.intake.deleteOwner(ownerId),
         ...providers.runs.deleteOwner(ownerId),

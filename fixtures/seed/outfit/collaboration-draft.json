@@ -1,0 +1,64 @@
+{
+  "id": "act_outfit_1",
+  "revision": 1,
+  "opportunity": {
+    "id": "opp_outfit_1",
+    "merchants": [
+      {
+        "id": "mer_outfit_1",
+        "name": "Synthetic outfit brand 1",
+        "domain": "outfit-brand-1.example"
+      },
+      {
+        "id": "mer_outfit_2",
+        "name": "Synthetic outfit brand 2",
+        "domain": "outfit-brand-2.example"
+      }
+    ],
+    "basis": "observed_pair",
+    "demand": {
+      "aggregateId": "agg_outfit_1",
+      "aggregateVersion": 1,
+      "cohort": {
+        "domain": "outfit",
+        "country": "CA",
+        "currency": "CAD",
+        "categories": [
+          "bag",
+          "top"
+        ]
+      },
+      "windowStart": "2026-08-20T12:00:00Z",
+      "windowEnd": "2026-09-19T12:15:00Z",
+      "sampleOrigin": "seed",
+      "status": "available",
+      "minimumSessions": 5,
+      "eligibleSessions": {
+        "min": 5,
+        "max": 9
+      }
+    },
+    "observedPairSupport": {
+      "min": 5,
+      "max": 9
+    },
+    "productEvidenceIds": [
+      "ev_outfit_1",
+      "ev_outfit_2"
+    ],
+    "proposedExperiment": "Test an opt-in co-curated collection with participating merchants",
+    "uncertainties": [
+      "Synthetic cohort; no actual market demand or merchant agreement demonstrated"
+    ]
+  },
+  "title": "Synthetic outfit collaboration",
+  "hypothesis": "Complementary categories may help a useful collection. Synthetic demonstration only.",
+  "experiment": "Ask volunteers whether the pairing meets their needs; stop if it does not.",
+  "outreach": "Would you discuss a small collection test? Terms and willingness are unknown.",
+  "merchantNotes": "",
+  "generatedBy": "template",
+  "warnings": [
+    "Synthetic demonstration"
+  ],
+  "updatedAt": "2026-09-19T12:00:00Z"
+}

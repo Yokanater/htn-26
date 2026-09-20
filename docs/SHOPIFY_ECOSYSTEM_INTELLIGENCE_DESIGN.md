@@ -106,6 +106,41 @@ to be interchangeable Admin API IDs.
 
 ### Provider capability findings (documentation checked 2026-09-19)
 
+### Merchant provider workflow (S4 continuation)
+
+Browserbase and Baseten are first-class stages of merchant onboarding, not optional logos.
+`MERCHANT_PROVIDER=browserbase_baseten` uses the installed Stagehand v4 browser driver with
+Browserbase, then Baseten Model APIs for batched public product-copy extraction. The driver
+does not invoke a second model. Browserbase opens the public collection with a domain policy,
+finds up to eight product pages and exposes a private read-only live view. The server verifies
+up to four variants per product against storefront JSON before normalization. Baseten classifies
+categories and extracts material/function facts with verbatim quotes; unsupported references or
+quotes are rejected. Categories remain interpretations that the merchant must review and confirm.
+Unknown shipping, dimensions and price remain unknown. No scraper/model output counts as demand.
+
+The workspace polls an owner-bound run resource for actual timestamped stages and verified variant
+counts. It supports cancellation, retry, page evidence inspection and read-only Browserbase viewing;
+there are no simulated completion percentages. Two scans can run globally, one per owner, with a
+three-minute hard deadline and browser cleanup. Provider failure never switches a live run to seed.
+An extraction outage retains independently verified records with a visible warning.
+
+Baseten also chooses a falsifiable collaboration experiment from a bounded set, using only safe
+aggregate facts and public citation IDs. Deterministic rendering supplies every numeric claim and
+the immutable evidence summary. Merchant-authored outreach edits are explicitly unverified.
+Snapshot invalidation, catalog changes and product freshness are rechecked when drafting, saving,
+reopening and exporting. No outreach is automatically sent and no Shopify Admin write occurs.
+
+`MERCHANT_PROVIDER=fake` provides a separate labeled synthetic workflow. Live insights are restricted
+to exact `MERCHANT_ALLOWED_DOMAINS` approved by the operator after verifying access. Partner catalogs
+can be publicly profiled in the same private workspace; entering a URL never proves ownership.
+Current single-process workspace state expires after one hour and is lost on restart, consistent
+with the integrated in-memory S1–S3 stores. Downloaded drafts remain copies and cannot be remotely
+revoked. Durable storage and formal merchant authentication remain deployment work.
+
+Configuration, acceptance and human checks: [merchant implementation](MERCHANT_IMPLEMENTATION.md).
+
+### Provider reference findings
+
 - OpenAI Responses accepts image input; Structured Outputs supplies schema-constrained extraction.
   Use the installed SDK, a configured vision-capable model, and a narrow internal schema. Image
   interpretation can be wrong, so shopper confirmation is mandatory. See [vision](https://developers.openai.com/api/docs/guides/images-vision)

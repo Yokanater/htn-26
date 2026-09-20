@@ -63,10 +63,6 @@ describe('featureFlags', () => {
       FEATURE_ACTIONS: false,
       FEATURE_BUNDLE_STUDIO: false,
       FEATURE_SHOPIFY_WRITEBACK: false,
-      FEATURE_INTENT_CAPTURE: false,
-      FEATURE_COLLECTION_MATCHING: false,
-      FEATURE_DEMAND_LEDGER: false,
-      FEATURE_MERCHANT_OPPORTUNITIES: false,
       FEATURE_DRAFT_ACTIVATION: false,
     });
   });
@@ -110,35 +106,36 @@ describe('featureFlags', () => {
 });
 
 describe('active intent milestones', () => {
-  it('requires the complete two-sided dependency chain', () => {
+  it('retains planning sections without runtime prerequisites', () => {
     expect(resolveMilestones('s4,s2,s1,s3').sections).toEqual([
       'intent',
       'collections',
       'demand',
       'opportunities',
     ]);
-    expect(() => resolveMilestones('s1,s4')).toThrow(/s4 requires s3/);
-    expect(() => resolveMilestones('s1,s3,s4')).toThrow(/s3 requires s2/);
-    expect(() => resolveMilestones('s1,s2,s3,s5')).toThrow(/s5 requires s4/);
+    expect(() => resolveMilestones('s1,s4')).not.toThrow();
+    expect(() => resolveMilestones('s1,s3,s4')).not.toThrow();
+    expect(() => resolveMilestones('s1,s2,s3,s5')).not.toThrow();
   });
   it('does not reinterpret legacy settings or mix the two plans', () => {
     expect(resolveMilestones('m1').sections).toEqual(['collaborators']);
     expect(() => resolveMilestones('m1,s1')).toThrow(/cannot mix/);
     expect(() => resolveMilestones(', ,')).toThrow(/at least one/);
   });
-  it('rejects effective flags that bypass prerequisites', () => {
-    expect(() => featureFlags({ MILESTONES: 's1,s2', FEATURE_INTENT_CAPTURE: 'false' })).toThrow(
-      /requires FEATURE_INTENT_CAPTURE/,
-    );
-    expect(() => featureFlags({ FEATURE_DEMAND_LEDGER: 'true' })).toThrow(
-      /requires FEATURE_COLLECTION_MATCHING/,
-    );
-    expect(() => featureFlags({ MILESTONES: 'm1', FEATURE_INTENT_CAPTURE: 'true' })).toThrow(
-      /requires an active s-preset/,
-    );
-    expect(
-      featureFlags({ MILESTONES: 's1,s2', FEATURE_COLLECTION_MATCHING: 'false' })
-        .FEATURE_COLLECTION_MATCHING,
-    ).toBe(false);
+  it('ignores removed S1–S4 flags', () => {
+    const flags = featureFlags({
+      MILESTONES: 's1',
+      FEATURE_INTENT_CAPTURE: 'false',
+      FEATURE_COLLECTION_MATCHING: 'false',
+      FEATURE_DEMAND_LEDGER: 'true',
+      FEATURE_MERCHANT_OPPORTUNITIES: 'false',
+    });
+    for (const name of [
+      'INTENT_CAPTURE',
+      'COLLECTION_MATCHING',
+      'DEMAND_LEDGER',
+      'MERCHANT_OPPORTUNITIES',
+    ])
+      expect(flags).not.toHaveProperty(`FEATURE_${name}`);
   });
 });

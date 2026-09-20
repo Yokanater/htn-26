@@ -4,3 +4,4 @@
  */
 export { createDemandAggregator } from './demand/index';
 export * from './matching/index';
+export * from './opportunities';

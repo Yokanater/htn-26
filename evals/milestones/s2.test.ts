@@ -212,7 +212,7 @@ describe.each(CASES)('S2 $domain collection', (c) => {
     expect(fresh.result.status).toBe('partial');
   });
 
-  it('keeps searches private to their owner and behind the flag and confirmation barrier', async () => {
+  it('keeps searches private to their owner and behind the confirmation barrier', async () => {
     const app = createApp(S2);
     const owner = await session(app);
     const stranger = await session(app);
@@ -246,7 +246,7 @@ describe.each(CASES)('S2 $domain collection', (c) => {
     expect(
       (await s1Only.request(`/api/briefs/${brief.id}/matches`, { method: 'POST', body: '{}' }))
         .status,
-    ).toBe(404);
+    ).toBe(401);
   });
 
   it('never matches synthetic seed offers for a live brief', async () => {

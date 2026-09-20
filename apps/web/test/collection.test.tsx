@@ -250,10 +250,10 @@ describe.each(['outfit', 'setup'] as const)('%s collection search', (domain) => 
     expect(FakeEventSource.instances).toHaveLength(0);
   });
 
-  it('hides the search entirely when collection matching is not enabled', async () => {
+  it('keeps search available despite obsolete capability flags', async () => {
     stubApi(domain, { collectionEnabled: false });
     renderApp();
     await confirmBrief(domain);
-    expect(screen.queryByRole('button', { name: /Find products/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Find products/ })).toBeTruthy();
   });
 });
