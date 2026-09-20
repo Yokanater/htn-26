@@ -4,7 +4,7 @@ import {
   type ProductOffer,
   ProductOfferSchema,
 } from '@sei/contracts';
-import type { MerchantProfiler } from '@sei/core';
+import { type MerchantProfiler, MerchantScanError } from '@sei/core';
 import { z } from 'zod';
 import { stablePrefixedId } from '../stable-id';
 import { fetchPublicHttps, type SafeFetchDeps } from '../url-safety';
@@ -43,7 +43,12 @@ export function createLiveMerchantProfiler(
         'browser',
         'Browserbase is opening the public collection and finding product pages.',
       );
-      const capture = await deps.browser({ url, signal, liveView });
+      const capture = await deps.browser({
+        url,
+        signal,
+        liveView,
+        progress: (message) => progress('browser', message),
+      });
       const merchantDomain = new URL(capture.url).hostname;
       const merchant = {
         id: stablePrefixedId('mer_', merchantDomain),
@@ -57,7 +62,10 @@ export function createLiveMerchantProfiler(
       let currency: string | null = null;
       try {
         const cart = await fetchPublicHttps(
-          new URL('/cart.js', capture.url).href,
+          new URL(
+            `${new URL(capture.url).pathname.match(/^\/[a-z]{2}(?:-[a-z]{2})?(?=\/|$)/i)?.[0] ?? ''}/cart.js`,
+            capture.url,
+          ).href,
           { fetch: deps.fetch, lookup: deps.lookup },
           { signal, maxBytes: 20000 },
         );
@@ -75,7 +83,7 @@ export function createLiveMerchantProfiler(
           const candidate = new URL(productUrl);
           if (
             candidate.hostname !== merchantDomain ||
-            !/^\/products\/[^/]+$/.test(candidate.pathname)
+            !/^(?:\/[a-z]{2}(?:-[a-z]{2})?)?\/products\/[^/]+$/i.test(candidate.pathname)
           )
             continue;
           const response = await fetchPublicHttps(
@@ -129,7 +137,11 @@ export function createLiveMerchantProfiler(
           warnings.push('A product page could not be verified and was excluded.');
         }
       }
-      if (!offers.length) throw new Error('No verifiable public Shopify variants found');
+      if (!offers.length)
+        throw new MerchantScanError(
+          'NO_VERIFIED_VARIANTS',
+          'Product pages were found, but their Shopify variant records could not be verified. The store may use a headless catalog or block public product JSON. Try a standard Shopify collection URL.',
+        );
       progress(
         'extract',
         'Baseten is reading product copy in one batch and checking source quotes.',

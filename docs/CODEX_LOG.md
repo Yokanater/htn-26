@@ -18,3 +18,8 @@ this into the Devpost "How Codex helped" section. Confirm current prize requirem
 | 2026-09-19 | L3 | S3-L3-1b | Claude added flag-gated ConsentPanel (opt-in, withdraw, delete confirm, version display) with callback-only API and full plain-language copy | 9 ConsentPanel tests, typecheck/format/build green; consent routes still mocked |
 
 | 2026-09-19 | Cross-lane | S4 continuation | Removed S1–S4 route, UI, runner and core flag locks at user request; synchronized the previously isolated merchant implementation into the active checkout | 661 offline tests passed; no live provider calls |
+
+| 2026-09-19 | Cross-lane | S4 exploration | Completed automatic partner results without demand, retry, search filtering and failure/cancel/deadline/deletion regressions in both domains | Offline tests; no live provider calls |
+| 2026-09-19 | L4 | S4 session recovery | Fixed merchant requests racing initial session setup and stale cookies after server restart; coalesced session creation and bounded authentication retry | 16 targeted tests and typecheck passed; offline only |
+
+| 2026-09-19 | Cross-lane | S4 live diagnosis | Reproduced the SKIMS startup failure with user-authorized live scan; found missing Stagehand v4 attachment, corrected browser lifecycle and enforced it in mocks; preserved localized routes and added safe diagnostics | 690 offline tests passed; typecheck/build/format passed; follow-up live verification awaits approval |

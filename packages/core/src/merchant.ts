@@ -33,3 +33,13 @@ export interface CollaborationComposer {
     >
   >;
 }
+/** Safe, actionable diagnostic; never expose raw provider errors or credentials to clients. */
+export class MerchantScanError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'MerchantScanError';
+  }
+}

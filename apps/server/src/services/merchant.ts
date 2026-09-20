@@ -16,6 +16,7 @@ import type {
   MerchantProfiler,
   OpportunityMapper,
 } from '@sei/core';
+import { MerchantScanError } from '@sei/core';
 import { loadSeedOffers } from '../replay';
 import type { PrivateDemandLedger } from './demand';
 import type { DemandProjectionService } from './demand-projection';
@@ -268,13 +269,15 @@ export class MerchantWorkspaceService {
         run.profile = MerchantProfileSchema.parse(profile);
         run.status = 'ready';
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (run.status !== 'running') return;
         progress(
           'failed',
           signal.aborted
             ? 'The scan reached its deadline. Retry with a smaller public catalog.'
-            : 'Catalog scan failed. Check provider configuration and public storefront access, then retry.',
+            : error instanceof MerchantScanError
+              ? `[${error.code}] ${error.message}`
+              : 'Catalog scan failed unexpectedly before verification. Retry the scan; if it persists, inspect server diagnostics.',
         );
         run.status = 'failed';
       })
@@ -397,15 +400,35 @@ export class MerchantWorkspaceService {
     return {
       opportunities,
       candidates: this.profiles(owner)
-        .filter((candidate) => candidate.discoveredFor === profile.id && candidate.domain === profile.domain && candidate.sampleOrigin === profile.sampleOrigin)
+        .filter(
+          (candidate) =>
+            candidate.discoveredFor === profile.id &&
+            candidate.domain === profile.domain &&
+            candidate.sampleOrigin === profile.sampleOrigin,
+        )
         .map((candidate) => ({
           profile: candidate,
-          complementaryCategories: [...new Set(candidate.offers
-            .filter((offer) => offer.availability !== 'unavailable' && !profile.offers.some((own) => own.category.toLowerCase() === offer.category.toLowerCase()))
-            .map((offer) => offer.category))],
+          complementaryCategories: [
+            ...new Set(
+              candidate.offers
+                .filter(
+                  (offer) =>
+                    offer.availability !== 'unavailable' &&
+                    !profile.offers.some(
+                      (own) => own.category.toLowerCase() === offer.category.toLowerCase(),
+                    ),
+                )
+                .map((offer) => offer.category),
+            ),
+          ],
           stale: this.#deps.now().getTime() - Date.parse(candidate.capturedAt) > 15 * 60000,
         }))
-        .sort((a, b) => Number(a.stale) - Number(b.stale) || b.complementaryCategories.length - a.complementaryCategories.length || a.profile.merchant.domain.localeCompare(b.profile.merchant.domain)),
+        .sort(
+          (a, b) =>
+            Number(a.stale) - Number(b.stale) ||
+            b.complementaryCategories.length - a.complementaryCategories.length ||
+            a.profile.merchant.domain.localeCompare(b.profile.merchant.domain),
+        ),
       offers: [
         ...new Map(
           [...profile.offers, ...partnerOffers].map((offer) => [offer.id, offer]),

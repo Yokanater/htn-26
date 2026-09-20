@@ -53,7 +53,7 @@ Private `.env` files were not edited. Restart the server after changing configur
   with validated aggregate/evidence references. Counts and factual copy are rendered in code.
 - Merchant state: private owner session, up to 32 variants per profile and 24 saved drafts; one-hour
   expiry, memory only, restart clears it. Copy/download rechecks current snapshot and product age.
-- Partner comparison: confirmed catalogs in the workspace (seeded partners in demo), matching
+- Partner comparison: automatically verified partner catalogs (seeded partners in demo), matching
   category coverage, exclusion of known currency/shipping/availability conflicts. It is not a claim
   that unknown hard constraints pass. Complementary stores are automatically discovered and their public catalogs verified.
 - No automatic outreach, custom model deployment, cross-store checkout or S5 Shopify Admin action.
@@ -66,8 +66,8 @@ latency, custom-domain storefront behavior, live-view embedding and extraction q
 
 ## Human smoke checklist
 
-1. Configure keys privately and enable S4. Start the application using the normal human dev command.
-2. Profile one owned store and a candidate partner for each domain. Watch the browser, cancel once,
+1. Configure keys privately (no milestone flags are required). Start the application using the normal human dev command.
+2. Enter one store for each domain. Verify complementary partners are discovered automatically. Watch the browser, cancel once,
    retry, inspect product source links and confirm or correct categories.
 3. Verify unknown shipping/dimensions are not presented as verified. If no cohort qualifies, keep
    the insufficient-evidence state; do not manufacture demand or relabel synthetic data.
@@ -78,7 +78,7 @@ latency, custom-domain storefront behavior, live-view embedding and extraction q
 ## Acceptance — 2026-09-19
 
 Branch: `codex/merchant-provider-workflow`; base: `9a825bbb0fb760f7024c06dbb2252de5d97fca84`.
-Changes are uncommitted in the isolated merchant worktree; main is unchanged.
+Changes are uncommitted in the active main checkout; the previously isolated implementation was synchronized into it.
 
 | Command | Actual output |
 | --- | --- |
@@ -107,3 +107,11 @@ Scope audit: tracked diff against base and integration target `main`, plus untra
 limited to this assignment's merchant services/UI, provider adapters, additive contracts/ports,
 fixtures, tests and plan/config documentation. Dependency manifests, lockfile and private `.env`
 are unchanged. No commit, merge, push, message or Shopify Admin write was performed.
+
+## Automatic exploration
+
+Browserbase Search receives up to two fixed complementary category queries, never shopper text or product titles. Results must be public HTTPS product links; own-store and duplicate registered domains are excluded. At most three candidate stores are profiled sequentially under the shared three-minute deadline. Baseten extracts cited category/material/function facts from their verified product records. Search access uses the existing Browserbase API key; projects without Search access show a recoverable warning while retaining the primary catalog.
+
+The comparison screen ranks verified candidate catalogs by additional categories even when no demand cohort qualifies. It exposes product evidence, labels supply fit as inferred, marks expired captures, and offers another exploration. Demand-backed drafts still require eligible anonymous demand evidence; catalog discovery never fabricates that evidence. Cancellation/deadline retains completed catalogs and suppresses late results. Session deletion removes them.
+
+Exploration completion validation: `pnpm test` — 54 files passed, 679 tests passed, 2 existing skips; `pnpm typecheck` — exit 0; explicit S4 milestone suite — 2 tests passed; `pnpm format:check`, web production build and `git diff --check` — exit 0. All discovery, partner verification and provider requests were injected offline.

@@ -232,7 +232,12 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
     mutationFn: (storeUrl?: string) =>
       json<MerchantRun>('/api/merchants/profile', {
         method: 'POST',
-        body: JSON.stringify({ url: (storeUrl ?? url).startsWith('https://') ? (storeUrl ?? url) : `https://${storeUrl ?? url}`, domain: profile?.domain ?? domain }),
+        body: JSON.stringify({
+          url: (storeUrl ?? url).startsWith('https://')
+            ? (storeUrl ?? url)
+            : `https://${storeUrl ?? url}`,
+          domain: storeUrl ? (profile?.domain ?? domain) : domain,
+        }),
       }),
     onSuccess: (run) => {
       setRunId(run.id);
@@ -593,24 +598,54 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
               <p className="eyebrow">DEMAND & COMPLEMENTARY SUPPLY</p>
               <h2>Evidence before a first hello.</h2>
               <p>{comparison.message}</p>
-              <button type="button" disabled={busy} onClick={() => start.mutate(profile?.merchant.domain)}>Explore again</button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => start.mutate(profile?.merchant.domain)}
+              >
+                Explore again
+              </button>
               {Boolean(comparison.candidates?.length) && (
                 <section aria-label="Automatically discovered merchants">
                   <h3>Merchants explored for you</h3>
-                  <p>Ranked by additional catalog categories. This is inferred supply fit, not evidence of customer demand or partner interest.</p>
-                  {comparison.candidates?.map(({ profile: candidate, complementaryCategories, stale }) => (
-                    <details className="merchant-evidence" key={candidate.id}>
-                      <summary>
-                        <strong>{candidate.merchant.name}</strong> · {complementaryCategories.length ? complementaryCategories.join(' + ') : 'Similar catalog; no additional category found'}
-                      </summary>
-                      <p>{candidate.sampleOrigin === 'seed' ? 'Synthetic catalog' : 'Public catalog'} · {candidate.merchant.domain}</p>
-                      <p>{stale ? 'Catalog evidence has expired. Run exploration again before relying on it.' : 'Availability, shipping, terms and willingness still need confirmation.'}</p>
-                      {candidate.offers.map((offer) => <ProductProof key={offer.id} offer={offer} />)}
-                    </details>
-                  ))}
+                  <p>
+                    Ranked by additional catalog categories. This is inferred supply fit, not
+                    evidence of customer demand or partner interest.
+                  </p>
+                  {comparison.candidates?.map(
+                    ({ profile: candidate, complementaryCategories, stale }) => (
+                      <details className="merchant-evidence" key={candidate.id}>
+                        <summary>
+                          <strong>{candidate.merchant.name}</strong> ·{' '}
+                          {complementaryCategories.length
+                            ? complementaryCategories.join(' + ')
+                            : 'Similar catalog; no additional category found'}
+                        </summary>
+                        <p>
+                          {candidate.sampleOrigin === 'seed'
+                            ? 'Synthetic catalog'
+                            : 'Public catalog'}{' '}
+                          · {candidate.merchant.domain}
+                        </p>
+                        <p>
+                          {stale
+                            ? 'Catalog evidence has expired. Run exploration again before relying on it.'
+                            : 'Availability, shipping, terms and willingness still need confirmation.'}
+                        </p>
+                        {candidate.offers.map((offer) => (
+                          <ProductProof key={offer.id} offer={offer} />
+                        ))}
+                      </details>
+                    ),
+                  )}
                 </section>
               )}
-              {comparison.candidates?.length === 0 && <p>No partner catalogs were verified. Run exploration again to search for fresh candidates.</p>}
+              {comparison.candidates?.length === 0 && (
+                <p>
+                  No partner catalogs were verified. Run exploration again to search for fresh
+                  candidates.
+                </p>
+              )}
               <div className="merchant-partners">
                 {comparison.opportunities.map((item) => (
                   <button
