@@ -32,6 +32,12 @@ export {
   searchBrowserbaseProducts,
 } from './browserbase-search';
 export {
+  type BrowserbaseCatalogBrowser,
+  type BrowserbaseCatalogBrowserFactory,
+  type BrowserbasePageText,
+  openBrowserbaseCatalogBrowser,
+} from './browserbase-session';
+export {
   type CatalogHitSource,
   type CreateInjectedShoppingCatalogOptions,
   createFixtureShoppingCatalog,

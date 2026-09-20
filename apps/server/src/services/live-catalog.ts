@@ -1,36 +1,57 @@
 import { lookup } from 'node:dns/promises';
 import {
+  assertPublicHttpsUrl,
+  type BrowserbaseCatalogBrowser,
+  type BrowserbaseCatalogBrowserFactory,
   type BrowserbaseProductSearch,
-  fetchPublicHttps,
+  openBrowserbaseCatalogBrowser,
   searchBrowserbaseProducts,
   stablePrefixedId,
 } from '@sei/collect';
 import { type IntentBrief, type ProductOffer, ProductOfferSchema } from '@sei/contracts';
-import type { ShoppingCatalog } from '@sei/core';
+import type { ShoppingCatalog, ShoppingContext } from '@sei/core';
 import { z } from 'zod';
 
 const Product = z.object({
-  id: z.number(),
+  id: z.union([z.number(), z.string()]).transform(String),
   title: z.string(),
   url: z.string().optional(),
   featured_image: z.string().nullable().optional(),
-  options: z.array(z.object({ name: z.string(), position: z.number() })).default([]),
+  options: z
+    .array(z.union([z.string(), z.object({ name: z.string(), position: z.number() })]))
+    .default([]),
   variants: z.array(
     z.object({
-      id: z.number(),
+      id: z.union([z.number(), z.string()]).transform(String),
       title: z.string(),
-      available: z.boolean(),
-      price: z.number(),
+      available: z.boolean().default(false),
+      price: z.union([z.number(), z.string().regex(/^\d+$/).transform(Number)]),
       option1: z.string().nullable().optional(),
       option2: z.string().nullable().optional(),
       option3: z.string().nullable().optional(),
-      featured_image: z.object({ src: z.string() }).nullable().optional(),
+      featured_image: z
+        .union([z.string().transform((src) => ({ src })), z.object({ src: z.string() })])
+        .nullable()
+        .optional(),
     }),
   ),
 });
 
+function parseBrowserJson(text: string): unknown {
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
+    throw new Error('Browserbase page did not contain a JSON object.');
+  }
+}
+
 export type LiveCatalogDeps = {
   searchProducts?: BrowserbaseProductSearch;
+  openBrowser?: BrowserbaseCatalogBrowserFactory;
 };
 
 /** Search discovers pages; verified storefront JSON supplies every displayed product fact. */
@@ -38,9 +59,30 @@ export function liveCatalog(
   brief: IntentBrief,
   env: Record<string, string | undefined>,
   deps: LiveCatalogDeps = {},
-): Pick<ShoppingCatalog, 'search'> {
+): Pick<ShoppingCatalog, 'search'> & { close(): Promise<void> } {
   const searchProducts = deps.searchProducts ?? searchBrowserbaseProducts;
+  const openBrowser = deps.openBrowser ?? openBrowserbaseCatalogBrowser;
   const cache = new Map<string, Promise<ProductOffer[]>>();
+  let browserPromise: Promise<BrowserbaseCatalogBrowser> | undefined;
+  const getBrowser = (context: ShoppingContext) => {
+    if (!browserPromise) {
+      context.consume('browser_session', 1);
+      browserPromise = openBrowser({
+        apiKey: env.BROWSERBASE_API_KEY!,
+        signal: context.signal,
+      }).then((browser) => {
+        console.info(
+          '[catalog]',
+          JSON.stringify({ event: 'browserbase_session_opened', sessionId: browser.sessionId }),
+        );
+        return browser;
+      });
+      browserPromise.catch(() => {
+        browserPromise = undefined;
+      });
+    }
+    return browserPromise;
+  };
   return {
     async search(query, context) {
       if (context.sampleOrigin !== 'live' || brief.sampleOrigin !== 'live') {
@@ -83,38 +125,45 @@ export function liveCatalog(
           }
         }
         const offers: ProductOffer[] = [];
-        await Promise.allSettled(
+        if (urls.size === 0) return offers;
+        const browser = await getBrowser(context);
+        const verified = await Promise.allSettled(
           [...urls].slice(0, 4).map(async (raw) => {
             context.consume('fetch', 1);
             const url = new URL(raw);
             url.pathname = `${url.pathname.replace(/\/$/, '')}.js`;
-            const page = await fetchPublicHttps(
-              url.href,
-              { fetch, lookup: (host) => lookup(host, { all: true }) },
-              { signal: context.signal, maxBytes: 750000, timeoutMs: 12000 },
+            const safeProductUrl = await assertPublicHttpsUrl(url.href, (host) =>
+              lookup(host, { all: true }),
             );
-            const product = Product.parse(JSON.parse(new TextDecoder().decode(page.body)));
+            const page = await browser.readPage(safeProductUrl.href, context.signal);
+            const finalProductUrl = await assertPublicHttpsUrl(page.finalUrl, (host) =>
+              lookup(host, { all: true }),
+            );
+            const product = Product.parse(parseBrowserJson(page.text));
             let currency: string | null = null;
             try {
               context.consume('fetch', 1);
-              const cart = await fetchPublicHttps(
-                new URL('/cart.js', raw).href,
-                { fetch, lookup: (host) => lookup(host, { all: true }) },
-                { signal: context.signal, maxBytes: 100000, timeoutMs: 5000 },
+              const cartUrl = await assertPublicHttpsUrl(new URL('/cart.js', raw).href, (host) =>
+                lookup(host, { all: true }),
               );
+              const cart = await browser.readPage(cartUrl.href, context.signal);
+              await assertPublicHttpsUrl(cart.finalUrl, (host) => lookup(host, { all: true }));
               const parsed = z
                 .object({ currency: z.string().regex(/^[A-Z]{3}$/) })
-                .parse(JSON.parse(new TextDecoder().decode(cart.body)));
+                .parse(parseBrowserJson(cart.text));
               currency = parsed.currency;
             } catch {
               /* Price remains unknown if storefront currency cannot be verified. */
             }
             const capturedAt = new Date().toISOString();
-            const sizeIndex = product.options.find((o) => /size/i.test(o.name))?.position;
+            const sizeIndex = product.options.findIndex((option) =>
+              /size/i.test(typeof option === 'string' ? option : option.name),
+            );
             for (const variant of product.variants.filter((v) => v.available)) {
-              const size = sizeIndex
-                ? [variant.option1, variant.option2, variant.option3][sizeIndex - 1]
-                : null;
+              const size =
+                sizeIndex >= 0
+                  ? [variant.option1, variant.option2, variant.option3][sizeIndex]
+                  : null;
               const image = variant.featured_image?.src || product.featured_image;
               const imageUrl = image
                 ? new URL(image.startsWith('//') ? `https:${image}` : image, raw).href
@@ -134,8 +183,8 @@ export function liveCatalog(
                   name: url.hostname.replace(/^www\./, ''),
                   domain: url.hostname,
                 },
-                productId: String(product.id),
-                variantId: String(variant.id),
+                productId: product.id,
+                variantId: variant.id,
                 title: `${product.title}${variant.title === 'Default Title' ? '' : ` · ${variant.title}`}`,
                 category: slot.category,
                 productUrl,
@@ -149,15 +198,38 @@ export function liveCatalog(
                   id: stablePrefixedId('ev_', `${productUrl}:${field}`),
                   field,
                   value,
-                  url: page.url.href,
+                  url: finalProductUrl.href,
                   capturedAt,
-                  method: 'fetch',
+                  method: 'browser',
                 })),
               });
               offers.push(offer);
             }
           }),
         );
+        for (const [index, result] of verified.entries()) {
+          if (result.status === 'rejected') {
+            let host = 'unknown';
+            try {
+              host = new URL([...urls][index] ?? '').hostname;
+            } catch {
+              // The URL was already validated above; keep this log defensive and data-minimal.
+            }
+            console.warn(
+              '[catalog]',
+              JSON.stringify({
+                event: 'browserbase_product_rejected',
+                host,
+                reason:
+                  result.reason instanceof z.ZodError
+                    ? 'invalid_product_shape'
+                    : result.reason instanceof Error
+                      ? result.reason.message.slice(0, 160)
+                      : 'unknown_error',
+              }),
+            );
+          }
+        }
         // Rank verified variants by the user's words; keep the result set diverse.
         const requested = slot.constraints.find((c) => c.kind === 'size');
         const normalize = (s: string) =>
@@ -194,6 +266,11 @@ export function liveCatalog(
       })();
       cache.set(cacheKey, work);
       return work;
+    },
+    async close() {
+      const browser = await browserPromise?.catch(() => undefined);
+      browserPromise = undefined;
+      await browser?.close();
     },
   };
 }
