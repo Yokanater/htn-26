@@ -7,8 +7,8 @@
  */
 import type { ConsentRecord, IntentBrief } from '@sei/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PackageSearch, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Search, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { ConsentPanel } from '../features/shopper/brief';
 import type { CollectionRunEvent } from '../features/shopper/collection';
 import { decisionRequestBody } from '../features/shopper/collection/decisions';
@@ -22,6 +22,7 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
   const [runId, setRunId] = useState<string | null>(null);
   const [events, setEvents] = useState<CollectionRunEvent[]>([]);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const autoStarted = useRef(false);
 
   const capabilities = useQuery({
     queryKey: ['capabilities'],
@@ -41,6 +42,17 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
   const cancel = useMutation({
     mutationFn: (id: string) => json(`/api/runs/${id}`, { method: 'DELETE' }),
   });
+
+  useEffect(() => {
+    if (
+      capabilities.data?.flags?.FEATURE_COLLECTION_MATCHING === true &&
+      !autoStarted.current &&
+      !runId
+    ) {
+      autoStarted.current = true;
+      start.mutate();
+    }
+  }, [capabilities.data?.flags?.FEATURE_COLLECTION_MATCHING, runId, start.mutate]);
 
   // Consent is independent of searching: a shopper can browse without ever opting in.
   const queryClient = useQueryClient();
@@ -94,25 +106,36 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
   const error = start.error ?? cancel.error ?? (streamError ? new Error(streamError) : null);
   return (
     <section className="collection-panel" aria-label="Product search">
-      {!runId && (
-        <button
-          className="primary"
-          type="button"
-          disabled={start.isPending}
-          onClick={() => start.mutate()}
-        >
-          {start.isPending ? (
-            <RefreshCw className="spin" aria-hidden />
-          ) : (
-            <PackageSearch aria-hidden />
-          )}{' '}
-          Find products
-        </button>
+      {!runId && !error && (
+        <section className="search-launch" aria-live="polite" aria-label="Preparing product search">
+          <div className="search-orbit" aria-hidden>
+            <span>
+              <Search />
+            </span>
+            <i />
+            <i />
+            <i />
+          </div>
+          <p className="eyebrow">CURATING YOUR COLLECTION</p>
+          <h1>Looking for pieces that fit.</h1>
+          <p>Checking products, availability, and the details you care about.</p>
+          <div className="search-steps" aria-hidden>
+            <span className="active">
+              <Sparkles /> Reading your brief
+            </span>
+            <span>Searching stores</span>
+            <span>Building your collection</span>
+          </div>
+        </section>
       )}
       {error && (
-        <p className="form-error" role="alert">
-          {error.message}
-        </p>
+        <div className="search-start-error" role="alert">
+          <strong>We couldn’t start the search.</strong>
+          <p>{error.message}</p>
+          <button type="button" onClick={() => start.mutate()}>
+            Try again
+          </button>
+        </div>
       )}
       {runId && (
         <ShoppingResults
@@ -142,21 +165,26 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
           onRefreshBrief={onEdit}
         />
       )}
-      <ConsentPanel
-        consent={current}
-        flags={flags}
-        onGrant={() => setConsentState('granted')}
-        onWithdraw={() => setConsentState('withdrawn')}
-        onDeleteSession={async () => {
-          try {
-            await json('/api/session', { method: 'DELETE' });
-            await queryClient.invalidateQueries({ queryKey: ['consent'] });
-            return { ok: true };
-          } catch {
-            return { ok: false };
-          }
-        }}
-      />
+      {(runId || error) && (
+        <details className="sharing-disclosure">
+          <summary>Privacy & sharing settings</summary>
+          <ConsentPanel
+            consent={current}
+            flags={flags}
+            onGrant={() => setConsentState('granted')}
+            onWithdraw={() => setConsentState('withdrawn')}
+            onDeleteSession={async () => {
+              try {
+                await json('/api/session', { method: 'DELETE' });
+                await queryClient.invalidateQueries({ queryKey: ['consent'] });
+                return { ok: true };
+              } catch {
+                return { ok: false };
+              }
+            }}
+          />
+        </details>
+      )}
     </section>
   );
 }

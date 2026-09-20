@@ -1,14 +1,8 @@
-import {
-  type InspirationAsset,
-  type IntentBrief,
-  SCHEMA_VERSION,
-  type ShoppingDomain,
-} from '@sei/contracts';
+import type { InspirationAsset, IntentBrief, ShoppingDomain } from '@sei/contracts';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   CircleGauge,
   LockKeyhole,
   PackageSearch,
@@ -19,9 +13,10 @@ import {
   Sparkles,
   Store,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BriefEditor, type DomainHint } from './features/shopper/brief';
 import { MediaIntake, type MediaSelection } from './features/shopper/media';
+import { StudioArtwork } from './StudioArtwork';
 import { ApiError, json } from './shell/api';
 import { CollectionPanel } from './shell/CollectionPanel';
 
@@ -34,7 +29,7 @@ function Brand() {
         <i />
         <i />
       </span>
-      common<b>ground</b>
+      rainforest
     </span>
   );
 }
@@ -94,20 +89,33 @@ function Home({ enter }: { enter: (surface: Surface) => void }) {
             </button>
           </div>
         </div>
-        <div className="hero-object" aria-hidden>
-          <div className="paper-card one">
-            <span>linen</span>
-            <strong>01</strong>
+        <div className="inspiration-board">
+          <div className="board-heading">
+            <span>A little inspiration</span>
+            <span>Endless possibilities</span>
           </div>
-          <div className="paper-card two">
-            <span>walnut</span>
-            <strong>02</strong>
+          <div className="board-studies">
+            <div className="visual-study outfit-study">
+              <StudioArtwork />
+              <span>
+                Everyday, considered.<small>Outfit study</small>
+              </span>
+            </div>
+            <div className="visual-study setup-study">
+              <StudioArtwork domain="setup" />
+              <span>
+                Space to settle in.<small>Room study</small>
+              </span>
+            </div>
           </div>
-          <div className="paper-card three">
-            <span>olive</span>
-            <strong>03</strong>
+          <div className="board-caption">
+            <span className="palette-dots" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>{' '}
+            Your taste. A collection that fits.
           </div>
-          <Sparkles />
         </div>
       </section>
 
@@ -177,6 +185,36 @@ function DomainToggle({
   );
 }
 
+function InspirationReference({ selection }: { selection: MediaSelection | null }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (selection?.kind !== 'image') {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(selection.file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selection]);
+  return (
+    <aside className="inspiration-reference">
+      <p className="eyebrow">THE STARTING POINT</p>
+      <h3>Your inspiration</h3>
+      {preview ? (
+        <img src={preview} alt="Your original inspiration" />
+      ) : selection?.kind === 'text' ? (
+        <blockquote>{selection.text}</blockquote>
+      ) : (
+        <p>Your idea is ready to refine.</p>
+      )}
+      <p>We’ve broken your idea into pieces. Open any item to change its style, fit or details.</p>
+      <span>
+        <LockKeyhole aria-hidden="true" /> Only visible to you
+      </span>
+    </aside>
+  );
+}
+
 function BriefReview({
   brief,
   save,
@@ -184,6 +222,7 @@ function BriefReview({
   pending,
   error,
   reload,
+  selection,
 }: {
   brief: IntentBrief;
   save: (brief: IntentBrief) => void;
@@ -191,6 +230,7 @@ function BriefReview({
   pending: boolean;
   error: Error | null;
   reload: () => void;
+  selection: MediaSelection | null;
 }) {
   const hints: Record<ShoppingDomain, DomainHint> = {
     outfit: {
@@ -208,78 +248,50 @@ function BriefReview({
   };
   return (
     <section className="brief-review" aria-live="polite">
-      <div className="review-heading">
-        <div>
-          <p className="eyebrow">DRAFT · REVISION {brief.revision}</p>
-          <h2>Here’s the collection we heard.</h2>
-          {brief.sampleOrigin === 'seed' && (
-            <p>Synthetic demo draft. Review and edit every item.</p>
-          )}
-          <p>Nothing is searched until you confirm. The full editor can refine every detail.</p>
+      {brief.status !== 'confirmed' && (
+        <div className="review-heading">
+          <div>
+            <p className="eyebrow">YOUR {brief.domain === 'outfit' ? 'LOOK' : 'SPACE'}</p>
+            <h2>Your idea, piece by piece.</h2>
+            {brief.sampleOrigin === 'seed' && (
+              <p>Synthetic demo draft. Review and edit every item.</p>
+            )}
+            <p>Keep what you like. Tweak the details. Then find your collection.</p>
+          </div>
+          <span className="private-badge">
+            <LockKeyhole aria-hidden /> Private to this session
+          </span>
         </div>
-        <span className="private-badge">
-          <LockKeyhole aria-hidden /> Private to this session
-        </span>
-      </div>
-      <div className="slot-list">
-        {brief.slots.map((slot, index) => (
-          <article className="slot-card" key={slot.id}>
-            <small>0{index + 1}</small>
-            <p>{slot.required ? 'REQUIRED' : 'OPTIONAL'}</p>
-            <h3>{slot.category}</h3>
-            <span>{slot.description}</span>
-            <Check aria-hidden />
-          </article>
-        ))}
-      </div>
-      <div className="review-note">
-        <ShieldCheck aria-hidden />
-        <p>
-          <strong>One check before search:</strong> add clothing sizes or furniture dimensions in
-          the full brief editor. We never infer them from an image.
-        </p>
-      </div>
+      )}
       {brief.status === 'confirmed' ? (
-        <>
-          <div className="confirmed-panel">
-            <span>
-              <Check aria-hidden />
-            </span>
-            <div>
-              <strong>Brief confirmed.</strong>
-              <p>Collection matching will use this exact revision.</p>
-            </div>
-          </div>
-          <CollectionPanel
-            key={`${brief.id}-${brief.revision}`}
-            brief={brief}
-            onEdit={() => save(brief)}
-          />
-        </>
+        <CollectionPanel
+          key={`${brief.id}-${brief.revision}`}
+          brief={brief}
+          onEdit={() => save(brief)}
+        />
       ) : (
-        <div className="brief-editor-shell" aria-busy={pending}>
-          <div className="editor-intro">
-            <p className="eyebrow">FINAL CHECK</p>
-            <h3>Make it exact before search.</h3>
-            <p>Adjust categories, sizes, dimensions, and required items. Nothing here is shared.</p>
+        <div className="review-workbench">
+          <div className="brief-editor-shell compact-review" aria-busy={pending}>
+            <BriefEditor
+              key={`${brief.id}-${brief.revision}`}
+              brief={brief}
+              hints={hints[brief.domain]}
+              onSave={save}
+              onConfirm={confirm}
+              disabled={pending}
+            />
+            {error && (
+              <div className="form-error" role="alert">
+                <p>{error.message}</p>
+                {error instanceof ApiError && error.code === 'REVISION_CONFLICT' && (
+                  <button className="text-button" type="button" onClick={reload}>
+                    Reload latest brief
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <BriefEditor
-            key={`${brief.id}-${brief.revision}`}
-            brief={brief}
-            hints={hints[brief.domain]}
-            onSave={save}
-            onConfirm={confirm}
-          />
-          {error && (
-            <div className="form-error" role="alert">
-              <p>{error.message}</p>
-              {error instanceof ApiError && error.code === 'REVISION_CONFLICT' && (
-                <button className="text-button" type="button" onClick={reload}>
-                  Reload latest brief
-                </button>
-              )}
-            </div>
-          )}
+          <InspirationReference selection={selection} />
         </div>
       )}
     </section>
@@ -351,6 +363,13 @@ function ShopperWorkspace({ back }: { back: () => void }) {
             <p>
               Start with the mood and practical goal. You’ll review every item before search begins.
             </p>
+            <div className={`intake-study ${domain}`}>
+              <StudioArtwork domain={domain} />
+              <span>
+                {domain === 'outfit' ? 'A look that feels like you.' : 'Make room for your ideas.'}
+                <small>Illustrative inspiration</small>
+              </span>
+            </div>
             <ol className="steps">
               <li className="active">
                 <span>1</span>
@@ -410,13 +429,17 @@ function ShopperWorkspace({ back }: { back: () => void }) {
               Build my draft brief
             </button>
             <p className="privacy-line">
-              <LockKeyhole aria-hidden /> Private intake. Merchant sharing is a separate, optional
-              choice later.
+              <LockKeyhole aria-hidden />
+              <span>
+                Your inspiration stays private.
+                <small>Merchant sharing is optional, and always your choice.</small>
+              </span>
             </p>
           </form>
         </section>
       ) : (
         <BriefReview
+          selection={selection}
           brief={brief}
           pending={update.isPending || reload.isPending}
           error={update.error ?? reload.error}
@@ -528,7 +551,7 @@ export function App() {
   });
   return (
     <div className="app-shell">
-      <header>
+      <header className="site-header">
         <Brand />
         <nav aria-label="Primary navigation">
           <button
@@ -547,7 +570,7 @@ export function App() {
           </button>
         </nav>
         <span className={`session-status ${session.data?.owner ? 'ready' : ''}`}>
-          <i />
+          <LockKeyhole aria-hidden />
           {session.isPending
             ? 'Securing session'
             : session.data?.owner
@@ -568,7 +591,6 @@ export function App() {
       <footer>
         <Brand />
         <span>Personal inspiration. Shared only by choice.</span>
-        <small>Contracts v{SCHEMA_VERSION}</small>
       </footer>
     </div>
   );

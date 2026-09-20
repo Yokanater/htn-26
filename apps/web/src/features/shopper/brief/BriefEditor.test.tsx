@@ -29,10 +29,38 @@ function renderEditor(brief: IntentBrief) {
   const onSave = vi.fn();
   const onConfirm = vi.fn();
   render(<BriefEditor brief={brief} hints={hints} onConfirm={onConfirm} onSave={onSave} />);
+  for (const summary of document.querySelectorAll('summary')) fireEvent.click(summary);
   return { onConfirm, onSave };
 }
 
 describe('BriefEditor', () => {
+  it.each([outfit, setup])(
+    'opens item details without discarding edits or changing matching preferences',
+    (brief) => {
+      const onConfirm = vi.fn();
+      render(<BriefEditor brief={brief} hints={hints} onSave={vi.fn()} onConfirm={onConfirm} />);
+      expect(document.querySelector('details')!.open).toBe(false);
+      const summary = document.querySelector('summary')!;
+      fireEvent.click(summary);
+      fireEvent.change(screen.getByRole('textbox', { name: 'Item 1 description' }), {
+        target: { value: 'My updated item' },
+      });
+      fireEvent.click(summary);
+      expect(document.querySelector('details')!.open).toBe(false);
+      fireEvent.click(screen.getByRole('button', { name: 'Find my collection' }));
+      expect(onConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slots: expect.arrayContaining([
+            expect.objectContaining({
+              id: brief.slots[0]!.id,
+              description: 'My updated item',
+              required: brief.slots[0]!.required,
+            }),
+          ]),
+        }),
+      );
+    },
+  );
   it.each([outfit, setup])(
     'renders an editable %s.domain brief without confirmation on mount',
     (brief) => {
@@ -58,7 +86,7 @@ describe('BriefEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save edits' }));
     expect(onSave).toHaveBeenCalledOnce();
     expect(onConfirm).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm brief' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Find my collection' }));
     expect(onConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'confirmed', input: imageBrief.input }),
     );
@@ -74,10 +102,10 @@ describe('BriefEditor', () => {
         .every((button) => (button as HTMLButtonElement).disabled),
     ).toBe(true);
     for (let index = 0; index < 5; index += 1)
-      fireEvent.click(screen.getByRole('button', { name: 'Add missed item' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Add an item' }));
     expect(screen.getAllByRole('group', { name: /Item/ })).toHaveLength(6);
     expect(
-      (screen.getByRole('button', { name: 'Add missed item' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: 'Add an item' }) as HTMLButtonElement).disabled,
     ).toBe(true);
     expect(source).toEqual(outfit);
   });
@@ -85,9 +113,11 @@ describe('BriefEditor', () => {
   it('requires at least one required item and announces inline validation errors', () => {
     const { onConfirm } = renderEditor(outfit);
     for (const checkbox of screen.getAllByRole('checkbox')) fireEvent.click(checkbox);
-    expect(screen.getByRole('status').textContent).toContain('At least one slot must be required');
+    expect(screen.getByRole('status').textContent).toContain(
+      'Choose at least one item that must be in your collection',
+    );
     expect(
-      (screen.getByRole('button', { name: 'Confirm brief' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: 'Find my collection' }) as HTMLButtonElement).disabled,
     ).toBe(true);
     expect(onConfirm).not.toHaveBeenCalled();
   });
@@ -109,6 +139,6 @@ describe('BriefEditor', () => {
     const category = screen.getByLabelText('Item 1 category');
     category.focus();
     expect(document.activeElement).toBe(category);
-    expect(screen.getByRole('button', { name: 'Add missed item' }).tagName).toBe('BUTTON');
+    expect(screen.getByRole('button', { name: 'Add an item' }).tagName).toBe('BUTTON');
   });
 });

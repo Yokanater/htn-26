@@ -247,9 +247,7 @@ export function MediaIntake({
             {label}
           </label>
           <p id={helpId} className="text-sm text-muted-foreground">
-            Choose one JPEG, PNG, or WebP image up to 8 MiB. Client type checks are convenience
-            only; the server verifies the real file. Images are resized and re-encoded before upload
-            to remove embedded metadata.
+            Choose a JPEG, PNG, or WebP up to 8 MiB. We remove embedded metadata before upload.
           </p>
           <input
             ref={inputRef}

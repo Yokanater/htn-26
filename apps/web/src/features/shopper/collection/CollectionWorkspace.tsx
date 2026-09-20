@@ -5,7 +5,7 @@
  * With FEATURE_DEMAND_LEDGER and a decision handler, explicit choices are added (S3-L3-1a).
  */
 import type { Capabilities, IntentBrief, ProductOffer } from '@sei/contracts';
-import { useMemo } from 'react';
+import { type CSSProperties, useMemo } from 'react';
 import {
   CollectionDecisionBar,
   ReplaceButton,
@@ -94,9 +94,10 @@ export function FallbackOfferTile({ offer }: { offer: ProductOffer }) {
 const fallbackRenderer: OfferTileRenderer = (offer) => <FallbackOfferTile offer={offer} />;
 
 function missingConstraintText(item: Extract<MissingItem, { kind: 'constraint' }>): string {
+  const label = item.key === 'ships_to' ? 'Shipping' : item.key.replaceAll('_', ' ');
   return item.status === 'unknown'
-    ? `${item.key}: needs verification with the store`
-    : `${item.key}: not met`;
+    ? `${label}: needs verification with the store`
+    : `${label}: not met`;
 }
 
 export interface CollectionWorkspaceProps {
@@ -149,16 +150,16 @@ export function CollectionWorkspace({
   });
 
   return (
-    <section aria-labelledby="collection-heading">
+    <section className="collection-workspace" aria-labelledby="collection-heading">
       <h2 id="collection-heading">Your collection</h2>
-      <div aria-live="polite" role="status">
+      <div className="search-status" aria-live="polite" role="status">
         {view.phase === 'idle' && <p>Confirm your brief to search for products.</p>}
         {view.phase === 'running' && (
           <>
             <p>Searching stores for revision {brief.revision} of your brief…</p>
             <ul aria-label="Search progress">
               {(Object.keys(STAGE_LABEL) as RunStage[]).map((stage) => (
-                <li key={stage}>
+                <li key={stage} data-stage-status={view.stages[stage] ?? 'waiting'}>
                   {STAGE_LABEL[stage]}: {stageText(view.stages[stage])}
                 </li>
               ))}
@@ -167,6 +168,17 @@ export function CollectionWorkspace({
         )}
         {result && <p>{STATUS_TEXT[result.status]}</p>}
       </div>
+      {view.phase === 'running' && (
+        <div className="finds-skeleton" aria-hidden="true">
+          {brief.slots.map((slot) => (
+            <div key={slot.id}>
+              <div />
+              <span />
+              <span />
+            </div>
+          ))}
+        </div>
+      )}
       {view.phase === 'running' && onCancel && (
         <button onClick={onCancel} type="button">
           Cancel search
@@ -175,85 +187,102 @@ export function CollectionWorkspace({
 
       {showsCollection && (
         <>
-          {brief.slots.map((slot) => {
-            const matched = slotMatches.get(slot.id);
-            const selected = matched?.selectedOfferId
-              ? offers.get(matched.selectedOfferId)
-              : undefined;
-            const explanation = explanations.get(slot.id);
-            const slotMissing = missing.filter((item) => item.slotId === slot.id);
-            const alternatives = (matched?.alternativeOfferIds ?? [])
-              .map((id) => offers.get(id))
-              .filter((offer): offer is ProductOffer => offer !== undefined);
-            const headingId = `slot-${slot.id}`;
-            return (
-              <section aria-labelledby={headingId} key={slot.id}>
-                <h3 id={headingId}>
-                  {slot.category} ({slot.required ? 'required' : 'optional'})
-                </h3>
-                {selected ? (
-                  renderOffer(selected, { slotId: slot.id, selected: true })
-                ) : (
-                  <p>
-                    {slotMissing.some(
-                      (item) => item.kind === 'slot' && item.reason === 'no_eligible_offer',
-                    )
-                      ? 'Options found · verification needed.'
-                      : 'Not found.'}
-                  </p>
-                )}
-                <SlotDecisionControls
-                  category={slot.category}
-                  controller={decisions}
-                  key={`${shown?.matchId}:${shown?.briefRevision}`}
-                  slotId={slot.id}
-                />
-                {slotMissing.length > 0 && (
-                  <ul aria-label={`${slot.category} gaps`}>
-                    {slotMissing.map((item) => (
-                      <li key={item.kind === 'slot' ? item.reason : item.key}>
-                        {item.kind === 'slot'
-                          ? MISSING_REASON[item.reason]
-                          : missingConstraintText(item)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {explanation && explanation.lines.length > 0 && (
-                  <ul aria-label={`Why this ${slot.category}`}>
-                    {explanation.lines.map((line) => (
-                      <li key={`${line.basis}-${line.text}`}>
-                        <span>{BASIS_LABEL[line.basis]}</span>: {line.text}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {alternatives.length > 0 && (
-                  <details>
-                    <summary>
-                      {alternatives.length} alternative{alternatives.length === 1 ? '' : 's'}
-                    </summary>
-                    {alternatives.map((offer) => (
-                      <div key={offer.id}>
-                        {renderOffer(offer, { slotId: slot.id, selected: false })}
-                        <ReplaceButton controller={decisions} offerId={offer.id} slotId={slot.id} />
+          <div className="matched-grid">
+            {brief.slots.map((slot, index) => {
+              const matched = slotMatches.get(slot.id);
+              const selected = matched?.selectedOfferId
+                ? offers.get(matched.selectedOfferId)
+                : undefined;
+              const explanation = explanations.get(slot.id);
+              const slotMissing = missing.filter((item) => item.slotId === slot.id);
+              const alternatives = (matched?.alternativeOfferIds ?? [])
+                .map((id) => offers.get(id))
+                .filter((offer): offer is ProductOffer => offer !== undefined);
+              const headingId = `slot-${slot.id}`;
+              return (
+                <section
+                  className="matched-piece find-reveal"
+                  style={{ '--find-index': index } as CSSProperties}
+                  aria-labelledby={headingId}
+                  key={slot.id}
+                >
+                  <h3 id={headingId}>{slot.category}</h3>
+                  {selected ? (
+                    renderOffer(selected, { slotId: slot.id, selected: true })
+                  ) : (
+                    <p className="missing-product">
+                      {slotMissing.some(
+                        (item) => item.kind === 'slot' && item.reason === 'no_eligible_offer',
+                      )
+                        ? 'Options found · verification needed.'
+                        : 'Not found.'}
+                    </p>
+                  )}
+                  <SlotDecisionControls
+                    category={slot.category}
+                    controller={decisions}
+                    key={`${shown?.matchId}:${shown?.briefRevision}`}
+                    slotId={slot.id}
+                  />
+                  {slotMissing.length > 0 && (
+                    <ul className="match-gaps" aria-label={`${slot.category} gaps`}>
+                      {slotMissing.map((item) => (
+                        <li key={item.kind === 'slot' ? item.reason : item.key}>
+                          {item.kind === 'slot'
+                            ? MISSING_REASON[item.reason]
+                            : missingConstraintText(item)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {explanation && explanation.lines.length > 0 && (
+                    <details className="match-explanation">
+                      <summary>Why this match</summary>
+                      <ul aria-label={`Why this ${slot.category}`}>
+                        {explanation.lines.map((line) => (
+                          <li key={`${line.basis}-${line.text}`}>
+                            <span>{BASIS_LABEL[line.basis]}</span>: {line.text}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  {alternatives.length > 0 && (
+                    <details className="match-alternatives">
+                      <summary>
+                        {alternatives.length} alternative{alternatives.length === 1 ? '' : 's'}
+                      </summary>
+                      <div className="alternative-grid">
+                        {alternatives.map((offer) => (
+                          <div key={offer.id}>
+                            {renderOffer(offer, { slotId: slot.id, selected: false })}
+                            <ReplaceButton
+                              controller={decisions}
+                              offerId={offer.id}
+                              slotId={slot.id}
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </details>
-                )}
-              </section>
-            );
-          })}
+                    </details>
+                  )}
+                </section>
+              );
+            })}
+          </div>
           {collection && (
-            <ul aria-label="Collection summary">
-              {collection.explanation.summary.map((line) => (
-                <li key={`${line.basis}-${line.text}`}>
-                  <span>{BASIS_LABEL[line.basis]}</span>: {line.text}
-                </li>
-              ))}
-            </ul>
+            <details className="collection-receipt">
+              <summary>Collection totals & checks</summary>
+              <ul aria-label="Collection summary">
+                {collection.explanation.summary.map((line) => (
+                  <li key={`${line.basis}-${line.text}`}>
+                    <span>{BASIS_LABEL[line.basis]}</span>: {line.text}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
-          <p>
+          <p className="store-note">
             Prices, availability, shipping and tax are set by each store. There is no combined
             checkout; open each product on its own store.
           </p>

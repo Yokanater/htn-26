@@ -1,5 +1,5 @@
 import type { IntentBrief, ProductOffer } from '@sei/contracts';
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 import { type CollectionRunEvent, CollectionWorkspace } from '../features/shopper/collection';
 import type { DecisionHandler } from '../features/shopper/collection/decisions';
 import { deriveRunView } from '../features/shopper/collection/runState';
@@ -34,6 +34,10 @@ export function ShoppingResults({
     current && current.status !== 'superseded' && current.status !== 'cancelled'
       ? { type: 'result' as const, result: current }
       : null;
+  const selectedIds = new Set(
+    result?.result.collection?.match.slots.map((slot) => slot.selectedOfferId),
+  );
+  const moreOffers = result?.result.offers.filter((offer) => !selectedIds.has(offer.id)) ?? [];
   const toggle = (offer: ProductOffer) =>
     setSaved((items) =>
       items.some((i) => i.id === offer.id)
@@ -81,7 +85,7 @@ export function ShoppingResults({
           Search again
         </button>
       )}
-      {result?.type === 'result' && result.result.offers.length > 0 && (
+      {moreOffers.length > 0 && (
         <section className="candidate-section">
           <h2>Explore the finds</h2>
           <p>
@@ -89,8 +93,14 @@ export function ShoppingResults({
             shipping and unverified facts need confirmation at the store.
           </p>
           <div className="candidate-grid">
-            {result.result.offers.map((offer) => (
-              <div key={offer.id}>{tile(offer)}</div>
+            {moreOffers.map((offer, index) => (
+              <div
+                className="find-reveal"
+                style={{ '--find-index': Math.min(index, 7) } as CSSProperties}
+                key={offer.id}
+              >
+                {tile(offer)}
+              </div>
             ))}
           </div>
         </section>
@@ -122,7 +132,7 @@ export function ShoppingResults({
               const url = URL.createObjectURL(file);
               const a = document.createElement('a');
               a.href = url;
-              a.download = 'common-ground-shortlist.txt';
+              a.download = 'rainforest-shortlist.txt';
               a.click();
               URL.revokeObjectURL(url);
             }}

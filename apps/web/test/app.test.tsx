@@ -82,10 +82,8 @@ it('creates a private text brief and stops at the confirmation barrier', async (
     target: { value: 'A compact reading corner with warm wood and soft light' },
   });
   fireEvent.click(screen.getByRole('button', { name: /Build my draft brief/ }));
-  expect(
-    await screen.findByRole('heading', { name: /Here’s the collection we heard/ }),
-  ).toBeTruthy();
-  expect(screen.getByRole('button', { name: /Confirm brief/ })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: /Your idea, piece by piece/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Find my collection/ })).toBeTruthy();
   expect(screen.queryByText(/search results/i)).toBeNull();
   await waitFor(() =>
     expect(fetchMock).toHaveBeenCalledWith(
@@ -95,13 +93,13 @@ it('creates a private text brief and stops at the confirmation barrier', async (
   );
 });
 
-it('renders the shared contract version', () => {
+it('renders the rainforest brand', () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => Response.json({ owner: true })),
   );
   renderApp();
-  expect(screen.getByText(/Contracts v1\.1\.0/)).toBeTruthy();
+  expect(screen.getAllByText('rainforest')).toHaveLength(2);
 });
 
 const CONFLICT_MESSAGE =
@@ -175,13 +173,22 @@ it('shows a failed confirmation on the brief screen and lets the shopper reload 
   });
   renderApp();
   submitTextIdea();
-  fireEvent.click(await screen.findByRole('button', { name: /Confirm brief/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Find my collection/ }));
 
   expect((await screen.findByRole('alert')).textContent).toContain(CONFLICT_MESSAGE);
 
   fireEvent.click(screen.getByRole('button', { name: /Reload latest/ }));
-  expect(await screen.findByText(/REVISION 2/)).toBeTruthy();
-  expect(screen.queryByRole('alert')).toBeNull();
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  fireEvent.click(screen.getByRole('button', { name: /Find my collection/ }));
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/briefs/brief_web_1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.stringContaining('"expectedRevision":2'),
+      }),
+    ),
+  );
   expect(fetchMock).toHaveBeenCalledWith('/api/briefs/brief_web_1', expect.anything());
 });
 
@@ -189,7 +196,7 @@ it('explains a non-JSON server failure instead of leaking a parse error', async 
   stubBriefApi({ patch: () => new Response('Internal Server Error', { status: 500 }) });
   renderApp();
   submitTextIdea();
-  fireEvent.click(await screen.findByRole('button', { name: /Confirm brief/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Find my collection/ }));
 
   const alert = await screen.findByRole('alert');
   expect(alert.textContent).toMatch(/Request failed \(500\)/);

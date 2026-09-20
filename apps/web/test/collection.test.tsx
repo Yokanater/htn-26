@@ -162,8 +162,7 @@ async function confirmBrief(domain: Domain) {
     target: { value: 'A calm, complete collection I can shop from a few stores' },
   });
   fireEvent.click(screen.getByRole('button', { name: /Build my draft brief/ }));
-  fireEvent.click(await screen.findByRole('button', { name: /Confirm brief/ }));
-  await screen.findByText(/Brief confirmed/);
+  fireEvent.click(await screen.findByRole('button', { name: /Find my collection/ }));
 }
 
 describe.each(['outfit', 'setup'] as const)('%s collection search', (domain) => {
@@ -177,7 +176,6 @@ describe.each(['outfit', 'setup'] as const)('%s collection search', (domain) => 
     renderApp();
     await confirmBrief(domain);
 
-    fireEvent.click(await screen.findByRole('button', { name: /Find products/ }));
     expect(await screen.findByText(/Searching stores for revision/)).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/briefs/${brief.id}/matches`,
@@ -214,7 +212,6 @@ describe.each(['outfit', 'setup'] as const)('%s collection search', (domain) => 
     const fetchMock = stubApi(domain);
     const { unmount } = renderApp();
     await confirmBrief(domain);
-    fireEvent.click(await screen.findByRole('button', { name: /Find products/ }));
     fireEvent.click(await screen.findByRole('button', { name: /Cancel search/ }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -243,7 +240,6 @@ describe.each(['outfit', 'setup'] as const)('%s collection search', (domain) => 
     });
     renderApp();
     await confirmBrief(domain);
-    fireEvent.click(await screen.findByRole('button', { name: /Find products/ }));
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Confirm the brief before searching',
     );

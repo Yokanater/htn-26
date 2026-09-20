@@ -207,7 +207,11 @@ export function SlotDecisionControls({
   };
 
   return (
-    <fieldset aria-label={`Your choice for ${category}`} data-decision={choice?.kind ?? 'none'}>
+    <fieldset
+      className="slot-decisions"
+      aria-label={`Your choice for ${category}`}
+      data-decision={choice?.kind ?? 'none'}
+    >
       <p aria-live="polite">
         {choice?.kind === 'accepted' && `Accepted: ${offer.title}.`}
         {choice?.kind === 'rejected' &&
@@ -384,7 +388,7 @@ export function CollectionDecisionBar({
   const saved = current !== null && controller.recorded.collection_saved === current;
   const requested = current !== null && controller.recorded.offer_requested === current;
   return (
-    <section aria-label="Save or request an offer">
+    <section className="selection-toolbar" aria-label="Save or request an offer">
       {stale && (
         <StaleRecovery controller={controller} onRefreshBrief={onRefreshBrief} stale={stale} />
       )}

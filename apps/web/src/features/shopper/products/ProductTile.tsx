@@ -1,5 +1,6 @@
 /** Product offer tile. Owner: L1 (S2-L1-2 C1). */
 import type { ProductOffer } from '@sei/contracts';
+import { ArrowUpRight, ImageOff } from 'lucide-react';
 import { useState } from 'react';
 import { formatMoney, isStaleEvidence } from './freshness';
 
@@ -61,17 +62,16 @@ export function ProductTile({
         : `Ships to ${offer.shipsTo.join(', ')}`;
 
   return (
-    <article
-      className="flex flex-col gap-2 border p-3"
-      data-offer-id={offer.id}
-      data-selected={selected}
-    >
-      <header className="flex flex-col gap-1">
+    <article className="product-card" data-offer-id={offer.id} data-selected={selected}>
+      <header className="product-heading">
         <h3 className="text-base font-semibold">{offer.title}</h3>
         <p className="text-sm">
           {offer.merchant.name} · {offer.merchant.domain}
         </p>
-        <p className="text-xs text-muted-foreground">Provenance: {offer.sampleOrigin}</p>
+        <strong className="product-price">{formatMoney(offer.price)}</strong>
+        {offer.sampleOrigin !== 'live' && (
+          <p className="product-origin">Provenance: {offer.sampleOrigin}</p>
+        )}
       </header>
 
       {offer.imageUrl && !imageFailed ? (
@@ -83,33 +83,42 @@ export function ProductTile({
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <p className="text-sm text-muted-foreground" role="status">
-          {offer.imageUrl ? 'Product image unavailable' : 'No exact variant image available'}
-        </p>
+        <div className="product-image-placeholder" role="status">
+          <ImageOff aria-hidden="true" />
+          <p>{offer.imageUrl ? 'Product image unavailable' : 'No exact variant image available'}</p>
+        </div>
       )}
-
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt>Price</dt>
-        <dd>{formatMoney(offer.price)}</dd>
-        <dt>Availability</dt>
-        <dd>{offer.availability}</dd>
-        <dt>Shipping</dt>
-        <dd>{ships}</dd>
-        <dt>Size</dt>
-        <dd>{size === undefined ? 'Size unknown' : String(size)}</dd>
-        <dt>Dimensions</dt>
-        <dd>{width === undefined ? 'Dimensions unknown' : `width ${width} cm`}</dd>
-        <dt>Variant</dt>
-        <dd>
-          product {offer.productId} / variant {offer.variantId}
-        </dd>
-        <dt>Freshness</dt>
-        <dd>{stale ? 'Facts may be stale' : 'Within freshness window'}</dd>
-      </dl>
-
-      <div className="flex flex-wrap gap-2">
+      <p className="product-availability">
+        {offer.availability === 'available'
+          ? 'Listed as available'
+          : offer.availability === 'unavailable'
+            ? 'Currently unavailable'
+            : 'Availability unverified'}
+        {offer.shipsTo === null ? ' · Check shipping' : ''}
+        {stale ? ' · Recheck latest details' : ''}
+      </p>
+      <details className="product-facts">
+        <summary>Product details</summary>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+          <dt>Availability</dt>
+          <dd>{offer.availability}</dd>
+          <dt>Shipping</dt>
+          <dd>{ships}</dd>
+          <dt>Size</dt>
+          <dd>{size === undefined ? 'Size unknown' : String(size)}</dd>
+          <dt>Dimensions</dt>
+          <dd>{width === undefined ? 'Dimensions unknown' : `width ${width} cm`}</dd>
+          <dt>Variant</dt>
+          <dd>
+            product {offer.productId} / variant {offer.variantId}
+          </dd>
+          <dt>Freshness</dt>
+          <dd>{stale ? 'Facts may be stale' : 'Within freshness window'}</dd>
+        </dl>
+      </details>
+      <div className="product-actions">
         <a href={offer.productUrl} target="_blank" rel="noreferrer">
-          View at merchant
+          View at merchant <ArrowUpRight aria-hidden="true" />
         </a>
         {onSelect ? (
           <button type="button" aria-pressed={selected} onClick={() => onSelect(offer.id)}>
