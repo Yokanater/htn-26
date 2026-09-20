@@ -10,18 +10,25 @@ import {
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { errorBody } from './errors';
-import { type AppProviders, defaultProviders } from './providers';
+import { type AppProviders, defaultProviders, type ProviderOptions } from './providers';
 import { assetRoutes } from './routes/assets';
 import { briefRoutes } from './routes/briefs';
 import { consentRoutes } from './routes/consent';
 import { decisionRoutes } from './routes/decisions';
+import { draftRoutes } from './routes/drafts';
 import { eventRoutes } from './routes/events';
 import { matchRoutes } from './routes/matches';
+import { merchantRoutes } from './routes/merchants';
+import { opportunityRoutes } from './routes/opportunities';
 import { sessionRoutes } from './routes/session';
 
 /** Pure factory: no listeners, environment reads or provider calls. */
-export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): Hono {
-  const providers = defaultProviders(env, { overrides: injected });
+export function createApp(
+  env: EnvLike = {},
+  injected?: Partial<AppProviders>,
+  options: Omit<ProviderOptions, 'overrides'> = {},
+): Hono {
+  const providers = defaultProviders(env, { ...options, overrides: injected });
   const resolved = resolveMilestones(env.MILESTONES);
   const flags = featureFlags(env);
   const sections = resolved.milestones.flatMap((id) => {
@@ -78,6 +85,11 @@ export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): 
   if (flags.FEATURE_DEMAND_LEDGER) {
     app.route('/api', consentRoutes(providers));
     app.route('/api', decisionRoutes(providers));
+  }
+  if (flags.FEATURE_MERCHANT_OPPORTUNITIES) {
+    app.route('/api', merchantRoutes(providers));
+    app.route('/api', opportunityRoutes(providers));
+    app.route('/api', draftRoutes(providers));
   }
   return app;
 }

@@ -14,20 +14,6 @@ it('maps verified seller variants without guessing shipping and keeps query vari
   const brief = IntentBriefSchema.parse({ ...seed, sampleOrigin: 'live' });
   const fetcher = vi.fn(async (input: string | URL | Request) => {
     const url = String(input);
-    if (url === 'https://api.openai.com/v1/responses')
-      return Response.json({
-        output: [
-          {
-            type: 'message',
-            content: [
-              {
-                type: 'output_text',
-                annotations: [{ type: 'url_citation', url: 'https://shop.example/products/shirt' }],
-              },
-            ],
-          },
-        ],
-      });
     if (url.endsWith('/products/shirt.js'))
       return Response.json({
         id: 12,
@@ -40,10 +26,16 @@ it('maps verified seller variants without guessing shipping and keeps query vari
     throw new Error(`Unexpected fake URL: ${url}`);
   });
   vi.stubGlobal('fetch', fetcher);
-  const catalog = liveCatalog(brief, {
-    OPENAI_API_KEY: 'test-only',
-    OPENAI_MODEL_SEARCH: 'test-model',
-  });
+  const searchProducts = vi.fn(async () => [
+    { title: 'Shirt', url: 'https://shop.example/products/shirt' },
+  ]);
+  const catalog = liveCatalog(
+    brief,
+    {
+      BROWSERBASE_API_KEY: 'test-only',
+    },
+    { searchProducts },
+  );
   const context: ShoppingContext = {
     sampleOrigin: 'live',
     signal: new AbortController().signal,
@@ -69,8 +61,9 @@ it('maps verified seller variants without guessing shipping and keeps query vari
   });
   await catalog.search(query, context);
   await catalog.search({ ...query, text: 'cotton shirt' }, context);
-  expect(fetcher.mock.calls.filter(([url]) => String(url).includes('api.openai.com'))).toHaveLength(
-    2,
+  expect(searchProducts).toHaveBeenCalledTimes(2);
+  expect(searchProducts).toHaveBeenCalledWith(
+    expect.objectContaining({ apiKey: 'test-only', limit: 4, signal: context.signal }),
   );
 });
 
@@ -101,12 +94,11 @@ it('never contacts providers for a synthetic brief or a pre-cancelled run', asyn
 });
 
 it('requires explicit credentials for live catalog composition', () => {
-  expect(() => defaultProviders({ CATALOG_PROVIDER: 'openai' })).toThrow('requires');
+  expect(() => defaultProviders({ CATALOG_PROVIDER: 'browserbase' })).toThrow('requires');
   expect(
     typeof defaultProviders({
-      CATALOG_PROVIDER: 'openai',
-      OPENAI_API_KEY: 'test-only',
-      OPENAI_MODEL_SEARCH: 'test-model',
+      CATALOG_PROVIDER: 'browserbase',
+      BROWSERBASE_API_KEY: 'test-only',
     }).catalog,
   ).toBe('function');
 });

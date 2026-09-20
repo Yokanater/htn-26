@@ -27,6 +27,11 @@ export {
   verifyProductWithBrowser,
 } from './browser-verify';
 export {
+  type BrowserbaseProductSearch,
+  type BrowserbaseProductSearchResult,
+  searchBrowserbaseProducts,
+} from './browserbase-search';
+export {
   type CatalogHitSource,
   type CreateInjectedShoppingCatalogOptions,
   createFixtureShoppingCatalog,
