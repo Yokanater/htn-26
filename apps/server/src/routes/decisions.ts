@@ -1,49 +1,40 @@
-/** Owner-authorized demand decisions. Owner: L4 (S3-L4-1). Design v3 §6, §8. */
-import {
-  type CollectionMatch,
-  DecisionRequestSchema,
-  type DemandEvent,
-  DemandEventSchema,
-  type IntentBrief,
-  newId,
-  type ProductOffer,
-} from '@sei/contracts';
-import type { CollectionRunResult } from '@sei/pipeline';
+/** Validated explicit shopper decisions. Owner: L4 (S3-L4-1). */
+import { DemandEventSchema, newId } from '@sei/contracts';
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
-import { errorBody, SESSION_ENDED } from '../errors';
+import { z } from 'zod';
+import { errorBody } from '../errors';
 import type { AppProviders } from '../providers';
-import {
-  decisionFingerprint,
-  IDEMPOTENCY_KEY_PATTERN,
-  IdempotencyConflictError,
-  SessionDeletedError,
-} from '../services/demand';
-import { isSuperseded, type RunRecord } from '../services/runs';
+import { IdempotencyConflictError, SessionDeletedError } from '../services/demand';
 import { SESSION_COOKIE } from '../services/session';
 
-const NOT_FOUND = errorBody('NOT_FOUND', 'Not found.');
-const INVALID_REQUEST = errorBody('INVALID_REQUEST', 'Check the decision fields and try again.');
-const INVALID_SELECTION = errorBody(
-  'INVALID_SELECTION',
-  'That offer was not shown for this slot in the selected match.',
-);
-const STALE_REVISION = errorBody(
-  'STALE_REVISION',
-  'A newer version of this brief exists. Reload it and try again.',
-);
-const BRIEF_NOT_CONFIRMED = errorBody(
-  'BRIEF_NOT_CONFIRMED',
-  'Confirm the brief before recording a decision.',
-);
-const IDEMPOTENCY_REQUIRED = errorBody(
-  'IDEMPOTENCY_KEY_REQUIRED',
-  'Provide an Idempotency-Key header.',
-);
-const IDEMPOTENCY_CONFLICT = errorBody(
-  'IDEMPOTENCY_CONFLICT',
-  'That idempotency key was already used with a different request.',
-);
+const selectionInput = z.strictObject({
+  slotId: z.string().regex(/^slot_[A-Za-z0-9_-]+$/),
+  offerId: z.string().regex(/^offer_[A-Za-z0-9_-]+$/),
+});
+const decisionInput = z.strictObject({
+  idempotencyKey: z.string().trim().min(8).max(128),
+  briefRevision: z.number().int().positive(),
+  runId: z
+    .string()
+    .regex(/^run_[A-Za-z0-9_-]+$/)
+    .nullable(),
+  matchId: z
+    .string()
+    .regex(/^match_[A-Za-z0-9_-]+$/)
+    .nullable(),
+  kind: z.enum([
+    'brief_confirmed',
+    'item_accepted',
+    'item_rejected',
+    'collection_saved',
+    'offer_requested',
+  ]),
+  selections: z.array(selectionInput).max(6),
+  rejectionReason: z
+    .enum(['price', 'style', 'size', 'dimensions', 'material', 'shipping', 'availability', 'other'])
+    .nullable(),
+});
 
 export function decisionRoutes(providers: AppProviders): Hono {
   const routes = new Hono();
@@ -52,176 +43,133 @@ export function decisionRoutes(providers: AppProviders): Hono {
     const ownerId = getCookie(c, SESSION_COOKIE);
     if (!providers.sessions.valid(ownerId))
       return c.json(errorBody('UNAUTHORIZED', 'Start a private session first.'), 401);
-
-    const idempotencyKey = c.req.header('idempotency-key')?.trim() ?? '';
-    if (!idempotencyKey) return c.json(IDEMPOTENCY_REQUIRED, 400);
-    if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) return c.json(INVALID_REQUEST, 400);
-
-    const parsed = DecisionRequestSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json(INVALID_REQUEST, 400);
-    const body = parsed.data;
-
-    const brief = providers.intake.getBrief(ownerId, c.req.param('id'));
-    if (!brief) return c.json(NOT_FOUND, 404);
-    if (brief.status !== 'confirmed') return c.json(BRIEF_NOT_CONFIRMED, 409);
-    if (body.briefRevision !== brief.revision) return c.json(STALE_REVISION, 409);
-
-    let event: DemandEvent;
-    try {
-      event = await buildEvent(providers, ownerId, brief, body);
-    } catch (error) {
-      const failure = describeDecisionFailure(error);
-      if (!failure) throw error;
-      return c.json(failure.body, failure.status);
-    }
-
-    if (!providers.sessions.valid(ownerId)) return c.json(SESSION_ENDED, 401);
-
-    const fingerprint = decisionFingerprint({
-      briefId: brief.id,
-      kind: body.kind,
-      runId: body.kind === 'brief_confirmed' ? null : body.runId,
-      matchId: body.kind === 'brief_confirmed' ? null : body.matchId,
-      selections: body.kind === 'brief_confirmed' ? [] : body.selections,
-      rejectionReason: body.kind === 'item_rejected' ? body.rejectionReason : null,
-      briefRevision: body.briefRevision,
-    });
-
-    try {
-      const recorded = await providers.demand.record(event, idempotencyKey, fingerprint);
-      console.info(
-        '[demand]',
-        JSON.stringify({
-          eventId: recorded.event.id,
-          kind: recorded.event.kind,
-          duplicate: recorded.status === 'duplicate',
-        }),
+    const input = decisionInput.safeParse(await c.req.json().catch(() => null));
+    if (!input.success)
+      return c.json(
+        errorBody('INVALID_DECISION', 'The decision shape or idempotency key is invalid.'),
+        400,
       );
-      return c.json(recorded.event, recorded.status === 'inserted' ? 201 : 200);
-    } catch (error) {
-      if (error instanceof IdempotencyConflictError) return c.json(IDEMPOTENCY_CONFLICT, 409);
-      if (error instanceof SessionDeletedError) return c.json(SESSION_ENDED, 401);
-      throw error;
+    const brief = providers.intake.getBrief(ownerId, c.req.param('id'));
+    if (!brief) return c.json(errorBody('NOT_FOUND', 'Not found.'), 404);
+    if (brief.status !== 'confirmed' || brief.revision !== input.data.briefRevision)
+      return c.json(
+        errorBody('STALE_BRIEF', 'Use the current confirmed brief before recording a choice.'),
+        409,
+      );
+
+    const previous = providers.demand.eventForKey(ownerId, input.data.idempotencyKey);
+    if (previous) {
+      const sameRequest =
+        previous.briefId === brief.id &&
+        previous.briefRevision === input.data.briefRevision &&
+        previous.kind === input.data.kind &&
+        previous.matchId === input.data.matchId &&
+        previous.rejectionReason === input.data.rejectionReason &&
+        JSON.stringify(previous.selections.map(({ slotId, offerId }) => ({ slotId, offerId }))) ===
+          JSON.stringify(input.data.selections);
+      if (!sameRequest)
+        return c.json(
+          errorBody(
+            'IDEMPOTENCY_CONFLICT',
+            'That idempotency key already identifies another choice.',
+          ),
+          409,
+        );
+      return c.json({ event: previous, duplicate: true });
     }
-  });
 
-  return routes;
-}
+    let sampleOrigin = brief.sampleOrigin;
+    let selections: { slotId: string; offerId: string; merchantId: string }[] = [];
+    if (input.data.kind === 'brief_confirmed') {
+      if (
+        input.data.runId !== null ||
+        input.data.matchId !== null ||
+        input.data.selections.length !== 0 ||
+        input.data.rejectionReason !== null
+      )
+        return c.json(
+          errorBody('INVALID_DECISION', 'Brief confirmation selects no products.'),
+          400,
+        );
+    } else {
+      const run = input.data.runId ? providers.runs.get(ownerId, input.data.runId) : null;
+      if (
+        !run?.done ||
+        !run.result ||
+        run.briefId !== brief.id ||
+        run.briefRevision !== brief.revision
+      )
+        return c.json(errorBody('MATCH_NOT_FOUND', 'Use a completed current collection.'), 409);
+      const collections = [run.result.collection, ...run.result.alternatives].filter(
+        (value) => value !== null,
+      );
+      const collection = collections.find((value) => value.match.id === input.data.matchId);
+      if (!collection)
+        return c.json(errorBody('MATCH_NOT_FOUND', 'That collection was not displayed.'), 409);
+      const offers = new Map(run.result.offers.map((offer) => [offer.id, offer]));
+      selections = [];
+      for (const selection of input.data.selections) {
+        const slot = collection.match.slots.find((value) => value.slotId === selection.slotId);
+        const allowed = new Set(
+          [slot?.selectedOfferId, ...(slot?.alternativeOfferIds ?? [])].filter(Boolean),
+        );
+        for (const candidate of run.result.candidates.find(
+          (value) => value.slotId === selection.slotId,
+        )?.offerIds ?? [])
+          allowed.add(candidate);
+        const offer = offers.get(selection.offerId);
+        if (!slot || !allowed.has(selection.offerId) || !offer)
+          return c.json(
+            errorBody('FORGED_SELECTION', 'A selected product was not shown for that item.'),
+            422,
+          );
+        selections.push({
+          slotId: selection.slotId,
+          offerId: selection.offerId,
+          merchantId: offer.merchant.id,
+        });
+      }
+      sampleOrigin = run.result.sampleOrigin;
+    }
 
-class DecisionFailure extends Error {
-  readonly status: 400 | 404 | 409;
-  readonly body: ReturnType<typeof errorBody>;
-  constructor(status: 400 | 404 | 409, body: ReturnType<typeof errorBody>) {
-    super(body.error.code);
-    this.name = 'DecisionFailure';
-    this.status = status;
-    this.body = body;
-  }
-}
-
-function describeDecisionFailure(
-  error: unknown,
-): { status: 400 | 404 | 409; body: ReturnType<typeof errorBody> } | null {
-  return error instanceof DecisionFailure ? error : null;
-}
-
-async function buildEvent(
-  providers: AppProviders,
-  ownerId: string,
-  brief: IntentBrief,
-  body: ReturnType<typeof DecisionRequestSchema.parse>,
-): Promise<DemandEvent> {
-  const consent = await providers.demand.getConsent(ownerId);
-  const consentVersion = consent?.state === 'granted' ? consent.version : null;
-  const occurredAt = providers.now().toISOString();
-
-  if (body.kind === 'brief_confirmed') {
-    return DemandEventSchema.parse({
+    const consent = await providers.demand.getConsent(ownerId);
+    const event = DemandEventSchema.safeParse({
       id: newId('evt_'),
       sessionId: ownerId,
       briefId: brief.id,
       briefRevision: brief.revision,
-      consentVersion,
-      occurredAt,
-      sampleOrigin: brief.sampleOrigin,
-      kind: 'brief_confirmed',
-      matchId: null,
-      selections: [],
-      rejectionReason: null,
+      consentVersion: consent?.state === 'granted' ? consent.version : null,
+      occurredAt: providers.now().toISOString(),
+      sampleOrigin,
+      kind: input.data.kind,
+      matchId: input.data.matchId,
+      selections,
+      rejectionReason: input.data.rejectionReason,
     });
-  }
-
-  const record = providers.runs.get(ownerId, body.runId);
-  const result = requireFinishedRun(providers, brief, record);
-  const match = locateMatch(result, body.matchId);
-  if (!match) throw new DecisionFailure(404, NOT_FOUND);
-  if (match.briefId !== brief.id || match.briefRevision !== brief.revision) {
-    throw new DecisionFailure(409, STALE_REVISION);
-  }
-  if (match.sampleOrigin !== result.sampleOrigin) throw new DecisionFailure(404, NOT_FOUND);
-
-  const offers = new Map(result.offers.map((offer) => [offer.id, offer]));
-  const selections = body.selections.map((selection) =>
-    resolveSelection(body.kind, match, offers, result.sampleOrigin, selection),
-  );
-
-  return DemandEventSchema.parse({
-    id: newId('evt_'),
-    sessionId: ownerId,
-    briefId: brief.id,
-    briefRevision: brief.revision,
-    consentVersion,
-    occurredAt,
-    sampleOrigin: result.sampleOrigin,
-    kind: body.kind,
-    matchId: match.id,
-    selections,
-    rejectionReason: body.kind === 'item_rejected' ? body.rejectionReason : null,
+    if (!event.success)
+      return c.json(
+        errorBody('INVALID_DECISION', 'This choice is incomplete for the selected action.'),
+        400,
+      );
+    let status: 'inserted' | 'duplicate';
+    try {
+      status = await providers.demand.append(event.data, input.data.idempotencyKey);
+    } catch (error) {
+      if (error instanceof IdempotencyConflictError)
+        return c.json(errorBody('IDEMPOTENCY_CONFLICT', error.message), 409);
+      if (error instanceof SessionDeletedError)
+        return c.json(errorBody('SESSION_DELETED', error.message), 409);
+      throw error;
+    }
+    const stored =
+      status === 'duplicate'
+        ? providers.demand.eventForKey(ownerId, input.data.idempotencyKey)
+        : event.data;
+    return c.json(
+      { event: stored, duplicate: status === 'duplicate' },
+      status === 'duplicate' ? 200 : 201,
+    );
   });
-}
 
-function requireFinishedRun(
-  providers: AppProviders,
-  brief: IntentBrief,
-  record: RunRecord | null,
-): CollectionRunResult {
-  if (!record) throw new DecisionFailure(404, NOT_FOUND);
-  if (record.briefId !== brief.id) throw new DecisionFailure(404, NOT_FOUND);
-  if (record.closedReason === 'deleted') throw new DecisionFailure(404, NOT_FOUND);
-  const latest = providers.runner.latestRevision(brief.id) ?? brief.revision;
-  if (isSuperseded(record, latest) || record.briefRevision !== brief.revision) {
-    throw new DecisionFailure(409, STALE_REVISION);
-  }
-  if (!record.done || !record.result) throw new DecisionFailure(404, NOT_FOUND);
-  const status = record.result.status;
-  if (status === 'cancelled' || status === 'failed' || status === 'superseded') {
-    if (status === 'superseded') throw new DecisionFailure(409, STALE_REVISION);
-    throw new DecisionFailure(404, NOT_FOUND);
-  }
-  return record.result;
-}
-
-function locateMatch(result: CollectionRunResult, matchId: string): CollectionMatch | null {
-  if (result.collection?.match.id === matchId) return result.collection.match;
-  return result.alternatives.find((item) => item.match.id === matchId)?.match ?? null;
-}
-
-function resolveSelection(
-  kind: 'item_accepted' | 'item_rejected' | 'collection_saved' | 'offer_requested',
-  match: CollectionMatch,
-  offers: Map<string, ProductOffer>,
-  runOrigin: ProductOffer['sampleOrigin'],
-  selection: { slotId: string; offerId: string },
-): DemandEvent['selections'][number] {
-  const slot = match.slots.find((item) => item.slotId === selection.slotId);
-  if (!slot) throw new DecisionFailure(400, INVALID_SELECTION);
-  const allowed =
-    kind === 'item_rejected'
-      ? [slot.selectedOfferId, ...slot.alternativeOfferIds]
-      : [slot.selectedOfferId];
-  if (!allowed.includes(selection.offerId)) throw new DecisionFailure(400, INVALID_SELECTION);
-  const offer = offers.get(selection.offerId);
-  if (!offer) throw new DecisionFailure(400, INVALID_SELECTION);
-  if (offer.sampleOrigin !== runOrigin) throw new DecisionFailure(400, INVALID_SELECTION);
-  return { slotId: slot.slotId, offerId: offer.id, merchantId: offer.merchant.id };
+  return routes;
 }

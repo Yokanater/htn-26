@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { createApp } from '../src/app';
 import { defaultProviders } from '../src/providers';
 import { loadDemoNewcomerHosts, loadSeedOffers } from '../src/replay';
-import { DemandLedger } from '../src/services/demand';
+import { PrivateDemandLedger } from '../src/services/demand';
 import { classifyMerchantHost } from '../src/services/merchant-url';
 import { MerchantWorkspaceStore } from '../src/services/merchant-workspace';
 
@@ -161,9 +161,8 @@ describe.each([
   },
 ])('S4 $domain observed merchant workspace', (c) => {
   it('profiles a seed URL, lists a banded opportunity, and PATCHes a draft', async () => {
-    const demand = new DemandLedger();
+    const demand = new PrivateDemandLedger();
     const readSnapshot = vi.spyOn(demand, 'readSnapshot');
-    const project = vi.spyOn(demand, 'project');
     const app = createApp(S4, { demand });
     const cookie = await session(app);
 
@@ -202,7 +201,6 @@ describe.each([
     expect(saved.draft?.version).toBe(2);
     expect(saved.draft?.proposalText).toContain('synthetic');
     expect(readSnapshot).not.toHaveBeenCalled();
-    expect(project).not.toHaveBeenCalled();
   });
 });
 
@@ -440,9 +438,8 @@ describe.each([
   },
 ])('S4 $domain inferred newcomer', (c) => {
   it('pairs a complementary seed merchant on the default catalog without inheriting pair support', async () => {
-    const demand = new DemandLedger();
+    const demand = new PrivateDemandLedger();
     const readSnapshot = vi.spyOn(demand, 'readSnapshot');
-    const project = vi.spyOn(demand, 'project');
     const app = createApp(S4, { demand });
     const cookie = await session(app);
     const created = await profile(app, cookie, `https://${c.host}/`);
@@ -457,7 +454,6 @@ describe.each([
     expect(opportunity.productEvidenceIds.length).toBeGreaterThan(1);
     expect(opportunity.demand.sampleOrigin).toBe('seed');
     expect(readSnapshot).not.toHaveBeenCalled();
-    expect(project).not.toHaveBeenCalled();
   });
 });
 

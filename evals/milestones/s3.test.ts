@@ -1,184 +1,303 @@
-/**
- * S3 gate: explicit decisions, consent versioning and erasure in both domains. Owner: L4.
- * Projection stays a safe fake: live/granted/current-version only, always insufficient_evidence.
- */
-import {
-  CapabilitiesSchema,
-  ConsentRecordSchema,
-  DemandEventSchema,
-  type IntentBrief,
-  IntentBriefSchema,
-  type ShoppingDomain,
-} from '@sei/contracts';
-import type { CollectionRunResult } from '@sei/pipeline';
+/** S3-L4 integration gate: explicit choices, consent versions, ownership and erasure. */
+import { type DemandEvent, IntentBriefSchema } from '@sei/contracts';
+import { createDemandAggregator } from '@sei/enrich';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../../apps/server/src/app';
-import { DemandLedger, SnapshotInvalidatedError } from '../../apps/server/src/services/demand';
+import { PrivateDemandLedger } from '../../apps/server/src/services/demand';
+import { DemandProjectionService } from '../../apps/server/src/services/demand-projection';
+import { IntakeStore } from '../../apps/server/src/services/intake';
 
-type App = ReturnType<typeof createApp>;
-const S3 = { MILESTONES: 's1,s2,s3' };
+const headers = (cookie: string) => ({ cookie, 'content-type': 'application/json' });
+const getSession = async (app: ReturnType<typeof createApp>) =>
+  (await app.request('/api/session')).headers.get('set-cookie')!.split(';')[0]!;
 
-const CASES = [
-  {
-    domain: 'outfit' as const satisfies ShoppingDomain,
-    text: 'A relaxed neutral outfit with a structured bag',
-    slot: 'top',
-    constraint: { kind: 'size', value: 'M' },
-  },
-  {
-    domain: 'setup' as const satisfies ShoppingDomain,
-    text: 'A compact desk setup with warm lighting',
-    slot: 'desk',
-    constraint: { kind: 'dimension', axis: 'width', maxCm: 120 },
-  },
-];
-
-const json = (cookie: string, extra: Record<string, string> = {}) => ({
-  cookie,
-  'Content-Type': 'application/json',
-  ...extra,
-});
-const session = async (app: App) =>
-  (await app.request('/api/session')).headers.get('set-cookie')?.split(';')[0] ?? '';
-const ownerIdOf = (cookie: string) => cookie.replace(/^sei_owner=/, '');
-
-async function confirm(app: App, cookie: string, c: (typeof CASES)[number]): Promise<IntentBrief> {
-  const draft = IntentBriefSchema.parse(
-    await (
-      await app.request('/api/briefs', {
-        method: 'POST',
-        headers: json(cookie),
-        body: JSON.stringify({ domain: c.domain, text: c.text }),
-      })
-    ).json(),
-  );
-  const response = await app.request(`/api/briefs/${draft.id}`, {
-    method: 'PATCH',
-    headers: json(cookie),
-    body: JSON.stringify({
-      expectedRevision: draft.revision,
-      status: 'confirmed',
-      slots: draft.slots.map((slot) => ({
-        ...slot,
-        constraints: slot.category === c.slot ? [c.constraint] : slot.constraints,
-      })),
-      country: draft.country,
-      currency: draft.currency,
-      itemBudget: draft.itemBudget,
-    }),
-  });
-  expect(response.status).toBe(200);
-  return IntentBriefSchema.parse(await response.json());
-}
-
-async function search(app: App, cookie: string, briefId: string) {
-  const started = await app.request(`/api/briefs/${briefId}/matches`, {
-    method: 'POST',
-    headers: json(cookie),
-    body: '{}',
-  });
-  expect(started.status).toBe(202);
-  const { runId } = (await started.json()) as { runId: string };
-  await (await app.request(`/api/runs/${runId}/events`, { headers: { cookie } })).text();
-  const body = (await (
-    await app.request(`/api/runs/${runId}`, { headers: { cookie } })
-  ).json()) as {
-    result: CollectionRunResult | null;
-  };
-  expect(body.result?.collection).not.toBeNull();
-  return { runId, result: body.result as CollectionRunResult };
-}
-
-describe.each(CASES)('S3 $domain demand ledger', (c) => {
-  it('records a validated selection, gates live eligibility, and erases on delete', async () => {
-    const demand = new DemandLedger();
-    const app = createApp(S3, { demand });
-    const cookie = await session(app);
-    const brief = await confirm(app, cookie, c);
-    const { runId, result } = await search(app, cookie, brief.id);
-    const match = result.collection!.match;
-    const selections = match.slots
-      .filter((slot) => slot.selectedOfferId)
-      .map((slot) => ({ slotId: slot.slotId, offerId: slot.selectedOfferId as string }));
-
-    const saved = await app.request(`/api/briefs/${brief.id}/decisions`, {
-      method: 'POST',
-      headers: json(cookie, { 'Idempotency-Key': `save-${c.domain}` }),
-      body: JSON.stringify({
-        kind: 'collection_saved',
-        runId,
-        matchId: match.id,
-        selections,
-        briefRevision: brief.revision,
-      }),
-    });
-    expect(saved.status).toBe(201);
-    const event = DemandEventSchema.parse(await saved.json());
-    expect(event.kind).toBe('collection_saved');
-    expect(event.sampleOrigin).toBe('seed');
-    expect(event.selections.every((item) => item.merchantId.startsWith('mer_'))).toBe(true);
-
-    const consent = ConsentRecordSchema.parse(
+describe.each([
+  ['outfit', 'A relaxed neutral outfit with a structured bag'],
+  ['setup', 'A compact writing setup with a warm desk light'],
+] as const)('S3 %s explicit-choice journey', (domain, text) => {
+  it('records one current, consented collection and erases it with the session', async () => {
+    const demand = new PrivateDemandLedger();
+    const app = createApp({ MILESTONES: 's1,s2,s3' }, { demand });
+    const cookie = await getSession(app);
+    const created = IntentBriefSchema.parse(
       await (
-        await app.request('/api/consent', {
-          method: 'PUT',
-          headers: json(cookie),
-          body: JSON.stringify({ state: 'granted', expectedVersion: null }),
+        await app.request('/api/briefs', {
+          method: 'POST',
+          headers: headers(cookie),
+          body: JSON.stringify({ domain, text, country: 'CA', currency: 'CAD' }),
         })
       ).json(),
     );
-    expect(consent.state).toBe('granted');
-
-    const window = {
-      start: new Date('2026-09-01T00:00:00.000Z'),
-      end: new Date('2026-10-01T00:00:00.000Z'),
+    const confirmed = IntentBriefSchema.parse(
+      await (
+        await app.request(`/api/briefs/${created.id}`, {
+          method: 'PATCH',
+          headers: headers(cookie),
+          body: JSON.stringify({
+            expectedRevision: created.revision,
+            status: 'confirmed',
+            slots: created.slots,
+            country: created.country,
+            currency: created.currency,
+            itemBudget: null,
+          }),
+        })
+      ).json(),
+    );
+    const started = await app.request(`/api/briefs/${confirmed.id}/matches`, {
+      method: 'POST',
+      headers: headers(cookie),
+      body: '{}',
+    });
+    expect(started.status).toBe(202);
+    const { runId } = (await started.json()) as { runId: string };
+    let result: {
+      collection: {
+        match: { id: string; slots: { slotId: string; selectedOfferId: string | null }[] };
+      };
+    } | null = null;
+    await expect
+      .poll(async () => {
+        const run = (await (
+          await app.request(`/api/runs/${runId}`, { headers: { cookie } })
+        ).json()) as { result: typeof result };
+        result = run.result;
+        return result?.collection?.match.id;
+      })
+      .toMatch(/^match_/);
+    const consent = await app.request('/api/consent', {
+      method: 'PUT',
+      headers: headers(cookie),
+      body: JSON.stringify({ state: 'granted', expectedVersion: null }),
+    });
+    expect(consent.status).toBe(200);
+    const selections = result!.collection.match.slots.flatMap((slot) =>
+      slot.selectedOfferId ? [{ slotId: slot.slotId, offerId: slot.selectedOfferId }] : [],
+    );
+    const decisionBody = {
+      idempotencyKey: `${domain}-milestone-save`,
+      briefRevision: confirmed.revision,
+      runId,
+      matchId: result!.collection.match.id,
+      kind: 'collection_saved',
+      selections,
+      rejectionReason: null,
     };
-    const [snapshot] = await demand.project({ window, briefs: [brief] });
-    expect(snapshot?.summary.status).toBe('insufficient_evidence');
-    // Seed observations never become live support.
-    expect(snapshot?.contributingSessions).toEqual([]);
-    expect(snapshot?.sessionRefs[0]?.sessionId).toBe(ownerIdOf(cookie));
-
+    const choice = await app.request(`/api/briefs/${confirmed.id}/decisions`, {
+      method: 'POST',
+      headers: headers(cookie),
+      body: JSON.stringify(decisionBody),
+    });
+    expect(choice.status).toBe(201);
+    const event = ((await choice.json()) as { event: DemandEvent }).event;
+    expect(event).toMatchObject({
+      briefId: confirmed.id,
+      briefRevision: confirmed.revision,
+      consentVersion: 1,
+      kind: 'collection_saved',
+      sampleOrigin: 'seed',
+    });
+    expect(event.selections).toHaveLength(selections.length);
+    const stranger = await getSession(app);
     expect(
       (
-        await app.request('/api/consent', {
-          method: 'PUT',
-          headers: json(cookie),
-          body: JSON.stringify({ state: 'withdrawn', expectedVersion: 1 }),
-        })
-      ).status,
-    ).toBe(200);
-    expect(() => demand.readSnapshot(snapshot!.id)).toThrow(SnapshotInvalidatedError);
-
-    expect(
-      (await app.request('/api/session', { method: 'DELETE', headers: { cookie } })).status,
-    ).toBe(200);
-    expect(await demand.readWindow(window.start, window.end)).toEqual([]);
-    expect(
-      (
-        await app.request(`/api/briefs/${brief.id}/decisions`, {
+        await app.request(`/api/briefs/${confirmed.id}/decisions`, {
           method: 'POST',
-          headers: json(cookie, { 'Idempotency-Key': 'after-delete' }),
-          body: JSON.stringify({ kind: 'brief_confirmed', briefRevision: brief.revision }),
+          headers: headers(stranger),
+          body: JSON.stringify({ ...decisionBody, idempotencyKey: `${domain}-stranger-save` }),
         })
       ).status,
-    ).toBe(401);
+    ).toBe(404);
+    expect(
+      (
+        await app.request('/api/session', {
+          method: 'DELETE',
+          headers: { cookie },
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      await demand.readWindow(new Date('2000-01-01T00:00:00Z'), new Date('2100-01-01T00:00:00Z')),
+    ).toEqual([]);
   });
 });
 
-describe('S3 flag surface', () => {
-  it('advertises the demand section only when S3 is enabled', async () => {
-    const enabled = CapabilitiesSchema.parse(
-      await (await createApp(S3).request('/api/capabilities')).json(),
+/**
+ * S3's remaining exit criteria: consent gates aggregate use, deduplication holds, and a
+ * withdrawal makes a published snapshot unreadable until it is recomputed.
+ */
+describe.each([
+  ['outfit', 'A relaxed neutral outfit with a structured bag'],
+  ['setup', 'A compact writing setup with a warm desk light'],
+] as const)('S3 %s consented aggregation', (domain, text) => {
+  async function shopperSaves(
+    app: ReturnType<typeof createApp>,
+    seq: number,
+  ): Promise<{ cookie: string; briefId: string; revision: number }> {
+    const cookie = await getSession(app);
+    const created = IntentBriefSchema.parse(
+      await (
+        await app.request('/api/briefs', {
+          method: 'POST',
+          headers: headers(cookie),
+          body: JSON.stringify({ domain, text, country: 'CA', currency: 'CAD' }),
+        })
+      ).json(),
     );
-    expect(enabled).toMatchObject({
-      sections: expect.arrayContaining(['demand']),
-      flags: expect.objectContaining({ FEATURE_DEMAND_LEDGER: true }),
+    const confirmed = IntentBriefSchema.parse(
+      await (
+        await app.request(`/api/briefs/${created.id}`, {
+          method: 'PATCH',
+          headers: headers(cookie),
+          body: JSON.stringify({
+            expectedRevision: created.revision,
+            status: 'confirmed',
+            slots: created.slots,
+            country: created.country,
+            currency: created.currency,
+            itemBudget: null,
+          }),
+        })
+      ).json(),
+    );
+    const { runId } = (await (
+      await app.request(`/api/briefs/${confirmed.id}/matches`, {
+        method: 'POST',
+        headers: headers(cookie),
+        body: '{}',
+      })
+    ).json()) as { runId: string };
+    let match: { id: string; slots: { slotId: string; selectedOfferId: string | null }[] } | null =
+      null;
+    await expect
+      .poll(async () => {
+        const run = (await (
+          await app.request(`/api/runs/${runId}`, { headers: { cookie } })
+        ).json()) as { result: { collection: { match: typeof match } } | null };
+        match = run.result?.collection?.match ?? null;
+        return match?.id;
+      })
+      .toMatch(/^match_/);
+    await app.request('/api/consent', {
+      method: 'PUT',
+      headers: headers(cookie),
+      body: JSON.stringify({ state: 'granted', expectedVersion: null }),
     });
-    const disabled = CapabilitiesSchema.parse(
-      await (await createApp({ MILESTONES: 's1,s2' }).request('/api/capabilities')).json(),
+    const body = {
+      idempotencyKey: `${domain}-agg-${seq}`,
+      briefRevision: confirmed.revision,
+      runId,
+      matchId: match!.id,
+      kind: 'collection_saved',
+      selections: match!.slots.flatMap((slot) =>
+        slot.selectedOfferId ? [{ slotId: slot.slotId, offerId: slot.selectedOfferId }] : [],
+      ),
+      rejectionReason: null,
+    };
+    const first = await app.request(`/api/briefs/${confirmed.id}/decisions`, {
+      method: 'POST',
+      headers: headers(cookie),
+      body: JSON.stringify(body),
+    });
+    expect(first.status).toBe(201);
+    // The same key retried must not add a second observation.
+    const retry = await app.request(`/api/briefs/${confirmed.id}/decisions`, {
+      method: 'POST',
+      headers: headers(cookie),
+      body: JSON.stringify(body),
+    });
+    expect(retry.status).toBe(200);
+    return { cookie, briefId: confirmed.id, revision: confirmed.revision };
+  }
+
+  it('supersedes published evidence when a contributing brief is revised', async () => {
+    const demand = new PrivateDemandLedger();
+    const intake = new IntakeStore();
+    const projection = new DemandProjectionService({
+      ledger: demand,
+      briefs: (ids) => intake.findBriefs(ids),
+      aggregator: createDemandAggregator(),
+      minimumSessions: 5,
+      retentionDays: 30,
+      snapshotMinutes: 15,
+      now: () => new Date(),
+    });
+    const app = createApp(
+      { MILESTONES: 's1,s2,s3' },
+      { demand, intake, demandProjection: projection },
     );
-    expect(disabled.flags.FEATURE_DEMAND_LEDGER).toBe(false);
-    expect(disabled.sections).not.toContain('demand');
+
+    const shoppers = [];
+    for (let seq = 1; seq <= 6; seq += 1) shoppers.push(await shopperSaves(app, seq));
+    const [summary] = await projection.refresh('seed');
+    expect(projection.published(summary.aggregateId)).not.toBeNull();
+
+    // Revising a confirmed brief changes what the cohort means; the ledger cannot see it.
+    const owner = shoppers[0]!;
+    const revised = await app.request(`/api/briefs/${owner.briefId}`, {
+      method: 'PATCH',
+      headers: headers(owner.cookie),
+      body: JSON.stringify({
+        expectedRevision: owner.revision,
+        status: 'confirmed',
+        slots: [
+          {
+            id: 'slot_new',
+            category: 'something else entirely',
+            description: 'a different requirement',
+            required: true,
+            visualAttributes: [],
+            constraints: [],
+          },
+        ],
+        country: 'CA',
+        currency: 'CAD',
+        itemBudget: null,
+      }),
+    });
+    expect(revised.status).toBe(200);
+
+    expect(projection.published(summary.aggregateId)).toBeNull();
+  });
+
+  it('publishes only a consent-gated, coarse cohort and drops it on withdrawal', async () => {
+    const demand = new PrivateDemandLedger();
+    const intake = new IntakeStore();
+    const projection = new DemandProjectionService({
+      ledger: demand,
+      briefs: (ids) => intake.findBriefs(ids),
+      aggregator: createDemandAggregator(),
+      minimumSessions: 5,
+      retentionDays: 30,
+      snapshotMinutes: 15,
+      now: () => new Date(),
+    });
+    const app = createApp(
+      { MILESTONES: 's1,s2,s3' },
+      { demand, intake, demandProjection: projection },
+    );
+
+    const shoppers = [];
+    for (let seq = 1; seq <= 6; seq += 1) shoppers.push(await shopperSaves(app, seq));
+
+    const [summary, ...rest] = await projection.refresh('seed');
+    expect(rest).toEqual([]);
+    expect(summary.status).toBe('available');
+    expect(summary.cohort.domain).toBe(domain);
+    // Published evidence is banded and carries no session or event identifier.
+    expect(typeof summary.eligibleSessions).not.toBe('number');
+    expect(JSON.stringify(summary)).not.toMatch(/sess_|evt_|brief_/);
+    expect(projection.published(summary.aggregateId)).toEqual(summary);
+
+    // Erasing one contributor invalidates the snapshot until it is recomputed.
+    await app.request('/api/session', {
+      method: 'DELETE',
+      headers: { cookie: shoppers[0]!.cookie },
+    });
+    expect(projection.published(summary.aggregateId)).toBeNull();
+
+    const [recomputed] = await projection.refresh('seed');
+    expect(recomputed.aggregateId).toBe(summary.aggregateId);
+    expect(recomputed.status).toBe('available');
   });
 });

@@ -1,6 +1,7 @@
 import type { IntentBrief, ProductOffer } from '@sei/contracts';
 import { useState } from 'react';
 import { type CollectionRunEvent, CollectionWorkspace } from '../features/shopper/collection';
+import type { DecisionHandler } from '../features/shopper/collection/decisions';
 import { deriveRunView } from '../features/shopper/collection/runState';
 import { EvidenceDrawer, ProductTile } from '../features/shopper/products';
 
@@ -11,6 +12,9 @@ export function ShoppingResults({
   onEdit,
   onCancel,
   onRetry,
+  flags,
+  onDecision,
+  onRefreshBrief,
 }: {
   brief: IntentBrief;
   runId: string;
@@ -18,6 +22,10 @@ export function ShoppingResults({
   onEdit?: () => void;
   onCancel: () => void;
   onRetry: () => void;
+  /** Effective capability flags; decision controls need FEATURE_DEMAND_LEDGER. */
+  flags?: Record<string, boolean> | null;
+  onDecision?: DecisionHandler;
+  onRefreshBrief?: () => void;
 }) {
   const [saved, setSaved] = useState<ProductOffer[]>([]);
   const [evidence, setEvidence] = useState<ProductOffer | null>(null);
@@ -64,6 +72,9 @@ export function ShoppingResults({
         events={events}
         renderOffer={tile}
         onCancel={onCancel}
+        flags={flags}
+        onDecision={onDecision}
+        onRefreshBrief={onRefreshBrief}
       />
       {current && (
         <button type="button" onClick={onRetry}>

@@ -73,6 +73,119 @@ describe.each(['outfit', 'setup'])('%s intent-loop invariants', (domain) => {
     expect(DemandAggregateSchema.safeParse(aggregate).success).toBe(false);
   });
 
+  it('counts merchant support separately from pair support', () => {
+    const aggregate = fixture(domain, 'aggregate');
+    const [first, second] = aggregate.pairs[0].merchantIds;
+    const supported = {
+      ...aggregate,
+      merchantSupport: [
+        { merchantId: first, supportingSessions: aggregate.eligibleSessions },
+        { merchantId: second, supportingSessions: aggregate.eligibleSessions },
+      ],
+    };
+    expect(DemandAggregateSchema.safeParse(supported).success).toBe(true);
+    expect(
+      DemandAggregateSchema.safeParse({
+        ...supported,
+        merchantSupport: [
+          { merchantId: first, supportingSessions: aggregate.eligibleSessions + 1 },
+          { merchantId: second, supportingSessions: aggregate.eligibleSessions },
+        ],
+      }).success,
+    ).toBe(false);
+    // A pair cannot be supported by more sessions than either merchant in it.
+    expect(
+      DemandAggregateSchema.safeParse({
+        ...supported,
+        merchantSupport: [
+          { merchantId: first, supportingSessions: 1 },
+          { merchantId: second, supportingSessions: aggregate.eligibleSessions },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      DemandAggregateSchema.safeParse({
+        ...aggregate,
+        pairs: [],
+        merchantSupport: [
+          { merchantId: first, supportingSessions: 1 },
+          { merchantId: first, supportingSessions: 2 },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps gap counts inside the denominator and unduplicated', () => {
+    const aggregate = fixture(domain, 'aggregate');
+    expect(
+      DemandAggregateSchema.safeParse({
+        ...aggregate,
+        gaps: [{ kind: 'rejection', reason: 'price', sessions: 2 }],
+      }).success,
+    ).toBe(true);
+    expect(
+      DemandAggregateSchema.safeParse({
+        ...aggregate,
+        gaps: [{ kind: 'rejection', reason: 'price', sessions: aggregate.eligibleSessions + 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      DemandAggregateSchema.safeParse({
+        ...aggregate,
+        gaps: [
+          { kind: 'rejection', reason: 'price', sessions: 1 },
+          { kind: 'rejection', reason: 'price', sessions: 2 },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('suppresses published merchant and gap breakdowns below the threshold', () => {
+    const { demand } = fixture(domain, 'opportunity');
+    const [merchantId] = fixture(domain, 'aggregate').pairs[0].merchantIds;
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...demand,
+        merchantSupport: [{ merchantId, support: { min: 5, max: 10 } }],
+      }).success,
+    ).toBe(true);
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...demand,
+        merchantSupport: [{ merchantId, support: { min: 1, max: 4 } }],
+      }).success,
+    ).toBe(false);
+    // A suppressed cohort must not disclose a breakdown that reveals it.
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...demand,
+        status: 'insufficient_evidence',
+        eligibleSessions: null,
+        merchantSupport: [{ merchantId, support: { min: 5, max: 10 } }],
+      }).success,
+    ).toBe(false);
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...demand,
+        gaps: [{ kind: 'rejection', reason: 'price', support: { min: 5, max: 10 } }],
+      }).success,
+    ).toBe(true);
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...demand,
+        gaps: [{ kind: 'rejection', reason: 'price', support: { min: 1, max: 4 } }],
+      }).success,
+    ).toBe(false);
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...demand,
+        status: 'insufficient_evidence',
+        eligibleSessions: null,
+        gaps: [{ kind: 'rejection', reason: 'price', support: { min: 5, max: 10 } }],
+      }).success,
+    ).toBe(false);
+  });
+
   it('suppresses small cohorts and forbids private identifiers in merchant summaries', () => {
     const { demand } = fixture(domain, 'opportunity');
     expect(

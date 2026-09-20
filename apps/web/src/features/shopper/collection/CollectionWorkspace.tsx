@@ -2,8 +2,17 @@
  * Shows the collection for the current brief revision only: selected offers via the injected
  * product tile, alternatives, cited explanations, exact missing items and unverified constraints.
  * No cart, combined checkout or shipping total: each store sets its own prices and fulfillment.
+ * With FEATURE_DEMAND_LEDGER and a decision handler, explicit choices are added (S3-L3-1a).
  */
-import type { IntentBrief, ProductOffer } from '@sei/contracts';
+import type { Capabilities, IntentBrief, ProductOffer } from '@sei/contracts';
+import { useMemo } from 'react';
+import {
+  CollectionDecisionBar,
+  ReplaceButton,
+  SlotDecisionControls,
+  useCollectionDecisions,
+} from './CollectionDecisions';
+import { type DecisionHandler, displayedCollection, isDemandLedgerEnabled } from './decisions';
 import { deriveRunView } from './runState';
 import type {
   CollectionRunEvent,
@@ -98,6 +107,12 @@ export interface CollectionWorkspaceProps {
   events: readonly CollectionRunEvent[];
   renderOffer?: OfferTileRenderer;
   onCancel?: () => void;
+  /** Effective flags from GET /api/capabilities; decisions need FEATURE_DEMAND_LEDGER. */
+  flags?: Capabilities['flags'] | null;
+  /** Records an explicit decision. Without it, or with the flag off, no decision control renders. */
+  onDecision?: DecisionHandler;
+  /** Reloads the latest brief revision after a stale-revision 409. */
+  onRefreshBrief?: () => void;
 }
 
 export function CollectionWorkspace({
@@ -106,6 +121,9 @@ export function CollectionWorkspace({
   events,
   renderOffer = fallbackRenderer,
   onCancel,
+  flags,
+  onDecision,
+  onRefreshBrief,
 }: CollectionWorkspaceProps) {
   const view = deriveRunView(brief, runId, events);
   const result = view.result;
@@ -116,6 +134,19 @@ export function CollectionWorkspace({
     collection?.explanation.slots.map((slot) => [slot.slotId, slot]) ?? [],
   );
   const missing = result?.missing ?? [];
+  const showsCollection =
+    result !== null && result.status !== 'cancelled' && result.status !== 'superseded';
+  const shownMatch = showsCollection ? (collection?.match ?? null) : null;
+  const shownOffers = result?.offers;
+  const shown = useMemo(
+    () => displayedCollection(brief, shownMatch, shownOffers ?? []),
+    [brief, shownMatch, shownOffers],
+  );
+  const decisions = useCollectionDecisions({
+    enabled: isDemandLedgerEnabled(flags),
+    shown,
+    onDecision,
+  });
 
   return (
     <section aria-labelledby="collection-heading">
@@ -142,7 +173,7 @@ export function CollectionWorkspace({
         </button>
       )}
 
-      {result && result.status !== 'cancelled' && result.status !== 'superseded' && (
+      {showsCollection && (
         <>
           {brief.slots.map((slot) => {
             const matched = slotMatches.get(slot.id);
@@ -171,6 +202,12 @@ export function CollectionWorkspace({
                       : 'Not found.'}
                   </p>
                 )}
+                <SlotDecisionControls
+                  category={slot.category}
+                  controller={decisions}
+                  key={`${shown?.matchId}:${shown?.briefRevision}`}
+                  slotId={slot.id}
+                />
                 {slotMissing.length > 0 && (
                   <ul aria-label={`${slot.category} gaps`}>
                     {slotMissing.map((item) => (
@@ -199,6 +236,7 @@ export function CollectionWorkspace({
                     {alternatives.map((offer) => (
                       <div key={offer.id}>
                         {renderOffer(offer, { slotId: slot.id, selected: false })}
+                        <ReplaceButton controller={decisions} offerId={offer.id} slotId={slot.id} />
                       </div>
                     ))}
                   </details>
@@ -221,6 +259,7 @@ export function CollectionWorkspace({
           </p>
         </>
       )}
+      <CollectionDecisionBar controller={decisions} onRefreshBrief={onRefreshBrief} />
     </section>
   );
 }

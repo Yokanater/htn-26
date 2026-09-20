@@ -83,8 +83,8 @@ export function createApp(
     app.route('/api', eventRoutes(providers));
   }
   if (flags.FEATURE_DEMAND_LEDGER) {
-    app.route('/api', decisionRoutes(providers));
     app.route('/api', consentRoutes(providers));
+    app.route('/api', decisionRoutes(providers));
   }
   if (flags.FEATURE_MERCHANT_OPPORTUNITIES) {
     app.route('/api', merchantRoutes(providers));

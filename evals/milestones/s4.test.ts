@@ -15,7 +15,7 @@ import {
 import type { CollectionRunResult } from '@sei/pipeline';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../apps/server/src/app';
-import { DemandLedger } from '../../apps/server/src/services/demand';
+import { PrivateDemandLedger } from '../../apps/server/src/services/demand';
 
 type App = ReturnType<typeof createApp>;
 const S4 = { MILESTONES: 's1,s2,s3,s4' };
@@ -102,9 +102,8 @@ async function search(app: App, cookie: string, briefId: string) {
 
 describe.each(CASES)('S4 $domain shopper-to-merchant loop', (c) => {
   it('keeps the shopper path intact and serves seed merchant evidence, not live snapshots', async () => {
-    const demand = new DemandLedger();
+    const demand = new PrivateDemandLedger();
     const readSnapshot = vi.spyOn(demand, 'readSnapshot');
-    const project = vi.spyOn(demand, 'project');
     const app = createApp(S4, { demand });
     const cookie = await session(app);
     const brief = await confirm(app, cookie, c);
@@ -119,18 +118,19 @@ describe.each(CASES)('S4 $domain shopper-to-merchant loop', (c) => {
           method: 'POST',
           headers: json(cookie, { 'Idempotency-Key': `save-${c.domain}` }),
           body: JSON.stringify({
+            idempotencyKey: `save-${c.domain}`,
             kind: 'collection_saved',
             runId,
             matchId: match.id,
             selections,
             briefRevision: brief.revision,
+            rejectionReason: null,
           }),
         })
       ).status,
     ).toBe(201);
 
     readSnapshot.mockClear();
-    project.mockClear();
     const profiled = MerchantWorkspaceProfileSchema.parse(
       await (
         await app.request('/api/merchants/profile', {
@@ -178,7 +178,6 @@ describe.each(CASES)('S4 $domain shopper-to-merchant loop', (c) => {
     );
     expect(patched.version).toBe(2);
     expect(readSnapshot).not.toHaveBeenCalled();
-    expect(project).not.toHaveBeenCalled();
   });
 });
 

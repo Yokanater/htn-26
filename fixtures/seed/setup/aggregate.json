@@ -22,5 +22,16 @@
       ],
       "supportingSessions": 6
     }
-  ]
+  ],
+  "merchantSupport": [
+    {
+      "merchantId": "mer_setup_1",
+      "supportingSessions": 6
+    },
+    {
+      "merchantId": "mer_setup_2",
+      "supportingSessions": 6
+    }
+  ],
+  "gaps": []
 }
