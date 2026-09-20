@@ -86,7 +86,10 @@ export function BriefEditor({
           category: '',
           description: '',
           required: false,
-          visualAttributes: [],
+          visualAttributes:
+            edited.slots[0]?.visualAttributes.filter((value) =>
+              value.startsWith('Shopping department: '),
+            ) ?? [],
           constraints: [],
         },
       ],
@@ -108,6 +111,43 @@ export function BriefEditor({
           ),
         )}
       </datalist>
+      {edited.domain === 'outfit' && (
+        <label>
+          Shop for
+          <select
+            aria-label="Shopping department"
+            disabled={disabled}
+            value={
+              edited.slots[0]?.visualAttributes
+                .find((value) => value.startsWith('Shopping department: '))
+                ?.slice('Shopping department: '.length) ?? ''
+            }
+            onChange={(event) =>
+              update({
+                ...edited,
+                slots: edited.slots.map((slot) => ({
+                  ...slot,
+                  visualAttributes: [
+                    ...slot.visualAttributes.filter(
+                      (value) => !value.startsWith('Shopping department: '),
+                    ),
+                    ...(event.target.value ? [`Shopping department: ${event.target.value}`] : []),
+                  ],
+                })),
+              })
+            }
+          >
+            <option value="">Use item descriptions / no preference</option>
+            <option value="men">Menswear</option>
+            <option value="women">Womenswear</option>
+            <option value="unisex">Unisex</option>
+            <option value="kids">Kids</option>
+          </select>
+          <small>
+            Choose the product department; we do not infer it from the person in a photo.
+          </small>
+        </label>
+      )}
       <div className="review-list-heading">
         <span>{edited.slots.length} pieces to find</span>
         <span>Curated from your idea</span>

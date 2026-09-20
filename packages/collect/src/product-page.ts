@@ -35,7 +35,73 @@ export type ProductPageFacts = {
   variants: ProductPageVariant[];
 };
 
-const MAX_VARIANTS = 12;
+// Bound parsing, not the catalogue's final candidate count. Colour × size matrices routinely
+// exceed twelve variants; truncating here drops the requested variant before it can be ranked.
+const MAX_VARIANTS = 500;
+const MAX_TITLE_CHARS = 200;
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+};
+/** Page titles append the store name after one of these; the product name comes first. */
+const TITLE_SEPARATOR = /\s+(?:\||–|—|·|»|:|-)\s+/;
+const TITLE_BOILERPLATE = new Set([
+  'officialsite',
+  'officialstore',
+  'onlinestore',
+  'shop',
+  'shopnow',
+  'store',
+  'home',
+  'freeshipping',
+  'buyonline',
+]);
+
+/** Marketplaces write `&amp;` into `og:title`; a shopper must never read the escape. */
+export function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
+      String.fromCodePoint(Number.parseInt(code, 16)),
+    )
+    .replace(
+      /&(amp|lt|gt|quot|apos|nbsp);/gi,
+      (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match,
+    );
+}
+
+/** Drops the store-name segment a page title appends, keeping the product name it starts with. */
+export function productTitle(raw: unknown, finalUrl: string): string | null {
+  if (typeof raw !== 'string') return null;
+  const decoded = decodeHtmlEntities(raw).replace(/\s+/g, ' ').trim();
+  if (!decoded) return null;
+  let brand = '';
+  try {
+    brand =
+      new URL(finalUrl).hostname
+        .replace(/^www\./, '')
+        .split('.')[0]
+        ?.toLowerCase() ?? '';
+  } catch {
+    brand = '';
+  }
+  const key = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const parts = decoded
+    .split(TITLE_SEPARATOR)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const kept = parts.filter((part, index) => {
+    if (index === 0) return true;
+    const normalized = key(part);
+    if (TITLE_BOILERPLATE.has(normalized)) return false;
+    return !(brand.length > 2 && normalized.startsWith(brand));
+  });
+  return (kept.join(' · ') || decoded).slice(0, MAX_TITLE_CHARS);
+}
 const ZERO_DECIMAL = new Set([
   'BIF',
   'CLP',
@@ -110,7 +176,8 @@ export function normalizeAvailability(raw: unknown): ProductPageAvailability {
 function absoluteHttpsUrl(raw: unknown, base: string): string | null {
   if (typeof raw !== 'string' || !raw.trim()) return null;
   try {
-    const url = new URL(raw.trim().startsWith('//') ? `https:${raw.trim()}` : raw.trim(), base);
+    const decoded = decodeHtmlEntities(raw.trim());
+    const url = new URL(decoded.startsWith('//') ? `https:${decoded}` : decoded, base);
     return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
   } catch {
     return null;
@@ -159,10 +226,15 @@ function metaContent(html: string, names: readonly string[]): string | null {
     const tag = html.match(
       new RegExp(`<meta[^>]+(?:property|name|itemprop)=["']${escaped}["'][^>]*>`, 'i'),
     )?.[0];
-    const content = tag?.match(/content=["']([^"']*)["']/i)?.[1];
-    if (content?.trim()) return content.trim();
+    const content = tag?.match(/content=(["'])([\s\S]*?)\1/i)?.[2];
+    if (content?.trim()) return decodeHtmlEntities(content).trim();
   }
   return null;
+}
+
+function documentTitle(html: string): string | null {
+  const raw = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+  return raw?.trim() ? raw : null;
 }
 
 function canonicalFromHtml(html: string, base: string): string | null {
@@ -180,7 +252,11 @@ export function hasShopifyPageSignals(html: string): boolean {
   );
 }
 
-/** Page-level currency stated by meta tags or the Shopify storefront globals. */
+/**
+ * Page-level currency, only from a tag or global that states the *price* currency. A bare
+ * `"currency"` somewhere in the markup can belong to another market, so an unstated currency
+ * stays unknown instead of mislabelling an amount.
+ */
 function detectPageCurrency(html: string): string | null {
   return (
     normalizeCurrency(
@@ -194,7 +270,34 @@ function detectPageCurrency(html: string): string | null {
     normalizeCurrency(
       html.match(/Shopify\.currency\s*=\s*\{[^}]*"active"\s*:\s*"([A-Z]{3})"/i)?.[1],
     ) ??
-    normalizeCurrency(html.match(/"currency"\s*:\s*"([A-Z]{3})"/)?.[1])
+    normalizeCurrency(html.match(/"shop_currency"\s*:\s*"([A-Z]{3})"/i)?.[1])
+  );
+}
+
+/** Image the page advertises for itself, used when the winning layer states none of its own. */
+function metaImageUrl(html: string, finalUrl: string): string | null {
+  return absoluteHttpsUrl(
+    metaContent(html, [
+      'og:image:secure_url',
+      'og:image',
+      'twitter:image',
+      'twitter:image:src',
+      'image',
+    ]),
+    finalUrl,
+  );
+}
+
+function metaAvailability(html: string): ProductPageAvailability {
+  return normalizeAvailability(
+    metaContent(html, ['product:availability', 'og:availability', 'availability']),
+  );
+}
+
+function metaProductTitle(html: string, finalUrl: string): string | null {
+  return productTitle(
+    metaContent(html, ['og:title', 'twitter:title']) ?? documentTitle(html),
+    finalUrl,
   );
 }
 
@@ -246,11 +349,18 @@ function variantFromJsonLdOffer(
   base: string,
   currencyHint: string | null,
 ): ProductPageVariant {
+  const specifications = Array.isArray(offer.priceSpecification)
+    ? offer.priceSpecification
+    : [offer.priceSpecification];
+  const specification = (
+    specifications.length === 1 && specifications[0] && typeof specifications[0] === 'object'
+      ? specifications[0]
+      : {}
+  ) as Record<string, unknown>;
   const currency =
     normalizeCurrency(offer.priceCurrency) ??
-    normalizeCurrency((offer.priceSpecification as Record<string, unknown>)?.priceCurrency) ??
+    normalizeCurrency(specification.priceCurrency) ??
     currencyHint;
-  const specification = (offer.priceSpecification ?? {}) as Record<string, unknown>;
   const low = parseMajorAmount(offer.lowPrice);
   const high = parseMajorAmount(offer.highPrice);
   // A low/high range states no single amount unless both ends agree.
@@ -259,8 +369,16 @@ function variantFromJsonLdOffer(
     parseMajorAmount(offer.price) ?? parseMajorAmount(specification.price) ?? rangeAmount;
   return {
     variantId:
-      firstString(offer.sku, offer.gtin13, offer.gtin12, offer.gtin, offer.mpn, offer.productID) ??
-      variantIdFromUrl(offer.url),
+      variantIdFromUrl(offer.url) ??
+      firstString(
+        offer.sku,
+        offer.gtin13,
+        offer.gtin12,
+        offer.gtin,
+        offer.mpn,
+        offer.productID,
+        product.sku,
+      ),
     title: cleanJsonLdText(offer.name, 120) || null,
     amountMinorUnits: majorToMinorUnits(amount, currency),
     currency,
@@ -275,9 +393,52 @@ function fromJsonLd(html: string, finalUrl: string): ProductPageFacts | null {
   if (blocks.length === 0) return null;
   const nodes = blocks.flatMap((block) => collectJsonLdNodes(block));
   const products = nodes.filter((node) => hasJsonLdType(node, 'product'));
-  const product = products[0];
+  const canonical = canonicalFromHtml(html, finalUrl) ?? finalUrl;
+  const pageTitle = metaProductTitle(html, finalUrl)?.toLowerCase();
+  const samePage = (raw: unknown) => {
+    if (typeof raw !== 'string') return false;
+    try {
+      return new URL(raw, finalUrl).pathname === new URL(canonical).pathname;
+    } catch {
+      return false;
+    }
+  };
+  const groups = nodes.filter((node) => hasJsonLdType(node, 'productgroup'));
+  const group =
+    groups.find((node) => samePage(node.url) || samePage(node['@id'])) ??
+    (groups.length === 1 ? groups[0] : undefined);
+  // A related-product carousel may put its Product before the current page's Product.
+  const product =
+    group ??
+    products.find((node) => samePage(node.url) || samePage(node['@id'])) ??
+    products.find(
+      (node) => typeof node.name === 'string' && node.name.toLowerCase() === pageTitle,
+    ) ??
+    (products.length === 1 ? products[0] : undefined);
   if (!product) return null;
   const currencyHint = detectPageCurrency(html);
+  if (group && Array.isArray(group.hasVariant)) {
+    const variants = dedupeVariants(
+      group.hasVariant.flatMap((variant) => {
+        if (!variant || typeof variant !== 'object') return [];
+        const merged = { ...group, ...variant };
+        return jsonLdOfferNodes(variant).map((offer) =>
+          variantFromJsonLdOffer(offer, merged, finalUrl, currencyHint),
+        );
+      }),
+    );
+    if (variants.length)
+      return {
+        strategy: 'json_ld',
+        productId: firstString(group.productGroupID, group.sku),
+        title: productTitle(group.name, finalUrl),
+        imageUrl: firstImageUrl(group.image, finalUrl),
+        currency: variants.find((variant) => variant.currency)?.currency ?? currencyHint,
+        canonicalUrl: canonicalFromHtml(html, finalUrl),
+        shopifySignalsPresent: hasShopifyPageSignals(html),
+        variants,
+      };
+  }
   let offers = jsonLdOfferNodes(product);
   if (offers.length === 0 && products.length === 1) {
     // `@graph` documents often keep the Offer beside its single Product.
@@ -289,7 +450,7 @@ function fromJsonLd(html: string, finalUrl: string): ProductPageFacts | null {
   return {
     strategy: 'json_ld',
     productId: firstString(product.productID, product.sku, product.mpn, product.gtin13),
-    title: cleanJsonLdText(product.name, 200) || null,
+    title: productTitle(cleanJsonLdText(product.name, MAX_TITLE_CHARS), finalUrl),
     imageUrl: firstImageUrl(product.image, finalUrl),
     currency: variants.find((variant) => variant.currency)?.currency ?? currencyHint,
     canonicalUrl: canonicalFromHtml(html, finalUrl),
@@ -458,7 +619,7 @@ export function factsFromShopifyProductJson(
   return {
     strategy: options.strategy ?? 'shopify_js',
     productId: firstString(product.id, product.handle),
-    title: firstString(product.title),
+    title: productTitle(product.title, finalUrl),
     imageUrl: firstImageUrl(product.featured_image ?? product.images, finalUrl),
     currency: options.currency ?? null,
     canonicalUrl: null,
@@ -480,21 +641,23 @@ function fromShopifyState(html: string, finalUrl: string): ProductPageFacts | nu
 }
 
 function fromMetaTags(html: string, finalUrl: string): ProductPageFacts | null {
-  const title = metaContent(html, ['og:title', 'twitter:title', 'title']);
+  const title = metaProductTitle(html, finalUrl);
   const canonicalUrl = canonicalFromHtml(html, finalUrl);
   const currency = detectPageCurrency(html);
   const amount = parseMajorAmount(
     metaContent(html, ['product:price:amount', 'og:price:amount', 'price']),
   );
-  const availability = normalizeAvailability(
-    metaContent(html, ['product:availability', 'og:availability', 'availability']),
-  );
-  const imageUrl = absoluteHttpsUrl(
-    metaContent(html, ['og:image', 'og:image:secure_url', 'twitter:image']),
-    finalUrl,
-  );
+  const availability = metaAvailability(html);
+  const imageUrl = metaImageUrl(html, finalUrl);
   const productId = metaContent(html, ['product:retailer_item_id', 'product:sku', 'og:sku', 'sku']);
   const minor = majorToMinorUnits(amount, currency);
+  // A title alone is not a product: every page has one. Require a stated price, or a page that
+  // declares itself a product offer, so an About or blog page never becomes an offer.
+  const declaresProduct =
+    (metaContent(html, ['og:type'])?.toLowerCase() ?? '').startsWith('product') ||
+    productId !== null ||
+    availability !== 'unknown';
+  if (minor === null && !declaresProduct) return null;
   if (!title && minor === null) return null;
   return {
     strategy: 'meta_tags',
@@ -532,9 +695,31 @@ export function extractProductFacts(input: {
   for (const layer of [fromJsonLd, fromShopifyState, fromMetaTags]) {
     const facts = layer(html, input.finalUrl);
     if (!facts) continue;
-    if (facts.variants.length > 0) return facts;
+    if (facts.variants.length > 0) return withPageFallbacks(facts, html, input.finalUrl);
     // A named product with no stated offer: keep looking for a layer that has one.
     recognized ??= facts;
   }
-  return recognized;
+  return recognized ? withPageFallbacks(recognized, html, input.finalUrl) : null;
+}
+
+/**
+ * Structured data routinely omits the title, image or stock state that the same page states in its
+ * meta tags. Filling those in from the page itself keeps the facts complete without inventing any:
+ * the page-level stock state is trusted only when the page describes a single offer.
+ */
+export function withPageFallbacks(
+  facts: ProductPageFacts,
+  html: string,
+  finalUrl: string,
+): ProductPageFacts {
+  const pageAvailability = facts.variants.length === 1 ? metaAvailability(html) : 'unknown';
+  return {
+    ...facts,
+    title: facts.title ?? metaProductTitle(html, finalUrl),
+    imageUrl: facts.imageUrl ?? metaImageUrl(html, finalUrl),
+    variants: facts.variants.map((variant) => ({
+      ...variant,
+      availability: variant.availability === 'unknown' ? pageAvailability : variant.availability,
+    })),
+  };
 }

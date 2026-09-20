@@ -30,7 +30,8 @@ const MISSING_REASON: Record<MissingSlotReason, string> = {
   no_candidates: 'No products were found for this item.',
   provider_failed: 'The product search failed for this item. Try again later.',
   deadline: 'The search ran out of time before this item was found.',
-  budget_exhausted: 'The search limit was reached before this item was searched.',
+  budget_exhausted:
+    'Search stopped after its page-read limit. No usable product was retrieved for this item.',
   no_eligible_offer: 'Products were found, but not every requirement could be verified.',
   matcher_failed: 'Products were found, but a collection could not be assembled.',
 };

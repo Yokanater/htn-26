@@ -24,6 +24,29 @@ import {
 
 const DOMAINS: readonly ShoppingDomain[] = ['outfit', 'setup'];
 
+it('prefers the described blue button-up over a red shirt with more complete shipping data', () => {
+  const target = brief('outfit', (value) => {
+    value.slots = [value.slots[0]!];
+    value.slots[0]!.description = 'Mens pale blue plain long sleeve button up shirt';
+    value.slots[0]!.visualAttributes = ['pale blue', 'plain'];
+  });
+  const blue = offer('outfit', 0, 'blue', (value) => {
+    value.title = 'Mens Pale Blue Plain Long Sleeve Button Up Shirt';
+    value.shipsTo = null;
+  });
+  const red = offer('outfit', 0, 'red', (value) => {
+    value.title = 'Mens Red Shirt';
+    value.shipsTo = ['CA'];
+  });
+  const results = matchCollections(
+    target,
+    { [target.slots[0]!.id]: [red, blue] },
+    { sampleOrigin: 'seed' },
+  );
+  expect(results[0]?.slots[0]?.selectedOfferId).toBe(blue.id);
+  expect(results[0]?.slots[0]?.checks.some((check) => check.status === 'unknown')).toBe(true);
+});
+
 /** Seed slot 0 is constrained (outfit size M / setup width <= 120 cm); slot 1 is not. */
 const CONSTRAINED = {
   outfit: { key: 'size', violating: { size: 'L' } },

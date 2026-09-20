@@ -59,6 +59,28 @@ function draft(brief: IntentBrief): IntentBrief {
 }
 
 describe.each(DOMAINS)('%s collection run', (domain) => {
+  it('calls a self-refining research adapter once per slot, not twice', async () => {
+    const { brief, catalog, runner } = harness(domain, { runner: { queriesPerSlot: 1 } });
+    const result = await runner.start(brief).result;
+    expect(result.queries).toHaveLength(brief.slots.length);
+    expect(catalog.stats.searches).toHaveLength(brief.slots.length);
+    expect(result.usage.catalog_query).toBe(brief.slots.length);
+  });
+
+  it('does not reuse discoveries after a confirmed attribute changes even if the short query is unchanged', async () => {
+    const { brief, catalog, runner } = harness(domain);
+    brief.slots[0]!.visualAttributes = ['neutral plain casual everyday soft simple original'];
+    await runner.start(brief).result;
+    const before = catalog.stats.searches.length;
+    const edited = structuredClone(brief);
+    edited.revision += 1;
+    edited.slots[0]!.visualAttributes = ['neutral plain casual everyday soft simple changed'];
+    await runner.start(edited).result;
+    expect(catalog.stats.searches.length).toBeGreaterThan(before);
+    expect(
+      catalog.stats.searches.slice(before).every((query) => query.slotId === edited.slots[0]!.id),
+    ).toBe(true);
+  });
   it('turns a confirmed brief into a ready, evidence-cited collection and closes the catalog', async () => {
     const { brief, catalog, events, runner } = harness(domain);
     const result = await runner.start(brief).result;

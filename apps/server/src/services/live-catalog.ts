@@ -20,6 +20,7 @@ import {
   searchBrowserbaseProducts,
   stablePrefixedId,
   UrlSafetyError,
+  withPageFallbacks,
 } from '@sei/collect';
 import {
   type IntentBrief,
@@ -30,6 +31,7 @@ import {
   type SampleOrigin,
 } from '@sei/contracts';
 import type { ProductQuery, ShoppingCatalog, ShoppingContext } from '@sei/core';
+import { offerIntentText, productIntentFit, requestedAudience, slotSearchTerms } from '@sei/core';
 import { BudgetExhaustedError, DEFAULT_RUN_CAPS } from '@sei/pipeline';
 
 const SEARCH_RESULTS_PER_QUERY = 6;
@@ -38,6 +40,8 @@ const OFFERS_PER_PRODUCT = 2;
 const OFFERS_PER_SLOT = 8;
 const VERIFY_CONCURRENCY = 2;
 const MAX_QUERY_CHARS = 120;
+/** Six reads per maximum six-slot brief, including recovery. Still one shared browser. */
+export const LIVE_FETCH_BUDGET = 36;
 /** Marks an offer the page stated at product level, with no merchant variant identifier. */
 const UNSPECIFIED_VARIANT = 'unspecified';
 
@@ -91,7 +95,15 @@ const AUDIENCES: ReadonlyArray<{ term: string; pattern: RegExp; conflict: RegExp
   { term: 'unisex', pattern: /\bunisex\b/i, conflict: null },
 ];
 
-const PRODUCT_PATH = /\/(products?|p|dp|item|items|shop|collections)\//i;
+const PRODUCT_PATH = /\/(products?|p|dp|item|items)\//i;
+/** A listing, search or category page never states one product's offer. */
+const LISTING_PATH = /\/(collections|categor(y|ies)|search|shop-all|catalog|tag|tags)(\/|$)/i;
+/**
+ * Third-party marketplaces, aggregators, search engines and social sites are not merchant
+ * storefronts: their pages describe other sellers' listings, so they are never candidates.
+ */
+const NON_STOREFRONT_HOST =
+  /(^|\.)(amazon|ebay|walmart|aliexpress|alibaba|temu|shein|wish|dhgate|etsy|poshmark|depop|mercari|vinted|kijiji|craigslist|lyst|shopstyle|google|bing|yahoo|duckduckgo|pinterest|reddit|facebook|instagram|tiktok|youtube|twitter|linkedin|wikipedia|quora|medium|substack|tripadvisor|yelp)\./i;
 
 type CategoryProfile = { positive: readonly string[]; negative: readonly string[] };
 
@@ -198,7 +210,7 @@ function categoryScore(slot: IntentSlot, text: string): number {
   const profile = categoryProfile(slot);
   const positive = profile.positive.filter((term) => containsTerm(text, term)).length;
   const negative = profile.negative.filter((term) => containsTerm(text, term)).length;
-  return positive * 35 - negative * 45;
+  return (positive > 0 ? 35 : 0) - (positive === 0 && negative > 0 ? 45 : 0);
 }
 
 function isCategoryConflict(slot: IntentSlot, text: string): boolean {
@@ -240,8 +252,7 @@ function slotWords(slot: IntentSlot): string {
 }
 
 function detectAudience(slot: IntentSlot): (typeof AUDIENCES)[number] | null {
-  const text = slotWords(slot);
-  return AUDIENCES.find((audience) => audience.pattern.test(text)) ?? null;
+  return AUDIENCES.find((audience) => audience.term === requestedAudience(slot)) ?? null;
 }
 
 /** Shopper-meaningful constraint terms only; negations and mounting hurt recall, so they are dropped. */
@@ -260,16 +271,12 @@ export function buildSearchQuery(input: {
   country: string;
   fallback?: boolean;
 }): string {
-  const audience = detectAudience(input.slot)?.term;
-  const parts = input.fallback
-    ? [audience, ...categorySearchTerms(input.slot), countryName(input.country)]
-    : [
-        audience,
-        ...categorySearchTerms(input.slot),
-        input.text,
-        ...constraintTerms(input.slot),
-        countryName(input.country),
-      ];
+  // Query the complete confirmed item, not the planner's truncated six-word fragment.
+  // Destination stays on retry; removing it sends discovery to unrelated regional storefronts.
+  const parts = [
+    ...slotSearchTerms(input.slot, input.fallback),
+    ...(!input.fallback ? constraintTerms(input.slot) : []),
+  ];
   const seen = new Set<string>();
   const words: string[] = [];
   for (const word of parts.filter(Boolean).join(' ').split(/\s+/)) {
@@ -278,7 +285,11 @@ export function buildSearchQuery(input: {
     seen.add(key);
     words.push(word);
   }
-  return words.join(' ').slice(0, MAX_QUERY_CHARS).trim();
+  const location = countryName(input.country);
+  return `${words
+    .join(' ')
+    .slice(0, MAX_QUERY_CHARS - location.length - 1)
+    .trim()} ${location}`;
 }
 
 /** Deduplicated HTTPS candidates, product-shaped paths first, discovery order preserved. */
@@ -287,6 +298,7 @@ export function candidateUrls(
   limit: number,
   slot?: IntentSlot,
   queryText = '',
+  country = '',
 ): string[] {
   const ranked = new Map<string, { index: number; score: number }>();
   results.forEach((result, index) => {
@@ -294,9 +306,13 @@ export function candidateUrls(
       const url = new URL(result.url);
       if (url.protocol !== 'https:' || url.username || url.password) return;
       if (url.pathname === '/' || url.pathname === '') return;
+      if (NON_STOREFRONT_HOST.test(url.hostname)) return;
+      if (!PRODUCT_PATH.test(url.pathname) && LISTING_PATH.test(url.pathname)) return;
       url.search = '';
       url.hash = '';
-      const searchable = `${result.title} ${decodeURIComponent(url.pathname.replaceAll('/', ' '))}`;
+      const searchable = `${result.title} ${decodeURIComponent(url.pathname).replace(/[/_-]/g, ' ')}`;
+      const fit = slot ? productIntentFit(slot, searchable) : null;
+      if (fit?.conflict || (slot && isCategoryConflict(slot, searchable))) return;
       const queryWords = normalizedWords(queryText);
       const candidateWords = normalizedWords(searchable);
       const overlap = [...queryWords].filter((word) => candidateWords.has(word)).length;
@@ -309,8 +325,15 @@ export function candidateUrls(
             : 0
         : 0;
       const score =
+        (country === 'CA' &&
+        (url.hostname.endsWith('.ca') ||
+          /(^ca\.|\/en[-_]ca\/|\/ca\/)/i.test(url.href.replace('https://', '')))
+          ? 200
+          : 0) +
         (PRODUCT_PATH.test(url.pathname) ? 15 : 0) +
+        (!PRODUCT_PATH.test(url.pathname) && LISTING_PATH.test(url.pathname) ? -25 : 0) +
         overlap * 4 +
+        (fit?.score ?? 0) +
         (slot ? categoryScore(slot, searchable) : 0) +
         audienceScore;
       if (!ranked.has(url.href)) ranked.set(url.href, { index, score });
@@ -376,6 +399,8 @@ export function createFetchShare(
     },
     /** This slot no longer needs a reserved attempt to be held for it. */
     settle(slotId: string): void {
+      pool += quota.get(slotId) ?? 0;
+      quota.set(slotId, 0);
       settled.add(slotId);
     },
     async lane<T>(work: () => Promise<T>): Promise<T> {
@@ -438,6 +463,17 @@ function withoutQuery(href: string): string {
 function urlHandle(href: string): string {
   const segments = new URL(href).pathname.split('/').filter(Boolean);
   return segments[segments.length - 1] ?? 'product';
+}
+
+/** `olive-oxford-shirt` → `Olive Oxford Shirt`: a readable name from the merchant's own slug. */
+function humanizeHandle(handle: string): string {
+  const words = decodeURIComponent(handle)
+    .replace(/\.(html?|php|aspx?)$/i, '')
+    .split(/[-_+]+/)
+    .filter((word) => word.length > 0 && !/^\d+$/.test(word));
+  return words.length > 0
+    ? words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+    : handle;
 }
 
 const log = (level: 'info' | 'warn', payload: Record<string, unknown>): void => {
@@ -507,7 +543,10 @@ export function liveCatalog(
       const parsed = parseJsonObject(page.text);
       if (!parsed) return { failure: 'invalid_product_shape' };
       const facts = factsFromShopifyProductJson(parsed, safe.href, { strategy: 'shopify_js' });
-      return facts ? { facts } : { failure: 'invalid_product_shape' };
+      // `product.js` carries no image or stock meta tags; the page we already read may.
+      return facts
+        ? { facts: withPageFallbacks(facts, html, safe.href) }
+        : { failure: 'invalid_product_shape' };
     } catch (error) {
       if (context.signal.aborted || isAbortError(error)) throw error;
       if (error instanceof BudgetExhaustedError) throw error;
@@ -605,7 +644,6 @@ export function liveCatalog(
     };
     const offers: ProductOffer[] = [];
     for (const variant of facts.variants) {
-      if (offers.length >= OFFERS_PER_PRODUCT) break;
       if (variant.availability === 'unavailable') continue;
       const currency = variant.currency ?? facts.currency ?? input.currency;
       const price =
@@ -614,9 +652,14 @@ export function liveCatalog(
           : null;
       const variantTitle =
         variant.title && variant.title !== 'Default Title' ? variant.title : null;
-      const title = [facts.title, variantTitle].filter(Boolean).join(' · ') || urlHandle(pageUrl);
+      // A variant label such as `18-20" long` is never the product name; fall back to the slug.
+      const productName = facts.title ?? humanizeHandle(urlHandle(pageUrl));
+      const title =
+        variantTitle && !containsTerm(productName, variantTitle)
+          ? `${productName} · ${variantTitle}`
+          : productName;
       const productUrl =
-        variant.variantId && facts.shopifySignalsPresent
+        variant.variantId && /^\d+$/.test(variant.variantId) && facts.shopifySignalsPresent
           ? `${pageUrl}?variant=${encodeURIComponent(variant.variantId)}`
           : pageUrl;
       const fields: Array<[string, string]> = [['source_strategy', facts.strategy]];
@@ -652,7 +695,8 @@ export function liveCatalog(
       });
       if (parsed.success) offers.push(parsed.data);
     }
-    return offers;
+    // A requested M/blue variant may be the 30th variant on the page, not one of the first two.
+    return rank(slot, offers).slice(0, OFFERS_PER_PRODUCT);
   };
 
   const rank = (slot: IntentSlot, offers: readonly ProductOffer[]): ProductOffer[] => {
@@ -679,8 +723,8 @@ export function liveCatalog(
         normalize(String(offer.attributes.size)) === normalize(requested.value);
       const priced = offer.price ? 1 : 0;
       return (
-        categoryScore(slot, offer.title) * 3 +
-        (sizeMatch ? 40 : 0) +
+        productIntentFit(slot, offerIntentText(offer)).score * 3 +
+        (sizeMatch ? 4000 : 0) +
         priced +
         [...words].filter((word) => title.has(word)).length * 5
       );
@@ -691,7 +735,10 @@ export function liveCatalog(
         // An explicitly requested audience excludes the opposite one; nothing else is filtered.
         .filter(
           (offer) =>
-            !audience?.conflict?.test(offer.title) && !isCategoryConflict(slot, offer.title),
+            !audience?.conflict?.test(offer.title) &&
+            !isCategoryConflict(slot, offer.title) &&
+            !productIntentFit(slot, offerIntentText(offer)).conflict &&
+            (!offer.price || offer.price.currency === brief.currency),
         )
         .sort((left, right) => score(right) - score(left) || left.id.localeCompare(right.id))
         .filter((offer) => {
@@ -707,10 +754,27 @@ export function liveCatalog(
   const hasStrongOffer = (slot: IntentSlot, offers: readonly ProductOffer[]): boolean =>
     offers.some((offer) => {
       const audience = detectAudience(slot);
+      const size = slot.constraints.find((constraint) => constraint.kind === 'size');
+      const normalizeSize = (value: string) =>
+        value
+          .toLowerCase()
+          .trim()
+          .replace(/^extra small$/, 'xs')
+          .replace(/^extra large$/, 'xl')
+          .replace(/^medium$/, 'm')
+          .replace(/^large$/, 'l')
+          .replace(/^small$/, 's');
+      const statedSize = offer.attributes.size;
+      const wrongSize =
+        size?.kind === 'size' &&
+        statedSize !== undefined &&
+        normalizeSize(String(statedSize)) !== normalizeSize(size.value);
       return (
+        !wrongSize &&
+        offer.price?.currency === brief.currency &&
         !audience?.conflict?.test(offer.title) &&
         !isCategoryConflict(slot, offer.title) &&
-        categoryScore(slot, offer.title) >= 35
+        productIntentFit(slot, offerIntentText(offer)).strong
       );
     });
 
@@ -765,9 +829,10 @@ export function liveCatalog(
         failures.add(failure);
         continue;
       }
-      // Spend one verification on the precise query first. If it is weak, preserve the slot's
-      // remaining share for two differently ranked candidates from the broader category query.
-      const candidates = candidateUrls(results, fallback ? CANDIDATES_PER_QUERY : 1, slot, text);
+      // Try the best precise results before broadening. Reserve one read for a retry if weak.
+      const candidates = candidateUrls(results, SEARCH_RESULTS_PER_QUERY, slot, text, query.country)
+        .filter((url) => !attemptedCandidates.has(url))
+        .slice(0, CANDIDATES_PER_QUERY);
       candidateCount += candidates.length;
       if (candidates.length === 0) {
         failures.add('discovery_empty');
@@ -778,6 +843,8 @@ export function liveCatalog(
       for (const candidate of candidates) {
         context.signal.throwIfAborted();
         if (attemptedCandidates.has(candidate)) continue;
+        if (hasStrongOffer(slot, collected)) break;
+        if (!fallback && attemptedCandidates.size >= Math.max(1, share.perSlot - 1)) break;
         attemptedCandidates.add(candidate);
         if (collected.length >= OFFERS_PER_SLOT) break;
         if (!pageCache.has(candidate) && !share.claim(slot.id)) {
@@ -808,7 +875,9 @@ export function liveCatalog(
         }
         const needsCurrency =
           !outcome.facts.currency &&
-          outcome.facts.variants.some((variant) => variant.amountMinorUnits !== null) &&
+          outcome.facts.variants.some(
+            (variant) => variant.amountMinorUnits !== null && !variant.currency,
+          ) &&
           outcome.facts.shopifySignalsPresent;
         const currency = needsCurrency
           ? await merchantCurrency(outcome.host, outcome.pageUrl, slot, context, browser)
@@ -856,7 +925,8 @@ export function liveCatalog(
         throw new Error('Live discovery requires a live brief');
       }
       context.signal.throwIfAborted();
-      const cacheKey = JSON.stringify([query.slotId, query.text, query.country, query.currency]);
+      // Both planner variants represent the same confirmed slot: share one bounded research job.
+      const cacheKey = JSON.stringify([query.slotId, query.country, query.currency]);
       const cached = searchCache.get(cacheKey);
       if (cached) return cached;
       const work = (async () => {

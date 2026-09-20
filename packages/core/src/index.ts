@@ -10,6 +10,7 @@ export * from './demand';
 export * from './enrich';
 export * from './milestones';
 export * from './pipeline';
+export * from './product-intent';
 export * from './reason';
 export * from './shopping';
 export * from './store';

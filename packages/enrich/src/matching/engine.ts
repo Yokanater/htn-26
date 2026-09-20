@@ -1,6 +1,6 @@
 /** Constrained collection engine. Owner: L2 (S2-L2-1). Design v3 §§5.2–5.3.
  * Deterministic: checks, money and ranking are code; no model call and no demand-based ranking.
- * Ranking order: required coverage, budget, unverified checks, optional coverage, relevance,
+ * Ranking order: required coverage, budget, optional coverage, relevance, unverified checks,
  * item subtotal, fewer merchants, then offer IDs so replay is stable.
  */
 import {
@@ -12,6 +12,7 @@ import {
   type ProductOffer,
   type SampleOrigin,
 } from '@sei/contracts';
+import { offerIntentText, productIntentFit } from '@sei/core';
 import { evaluateOffer } from './checks';
 import { type NormalizedAttributes, normalizeOfferAttributes } from './normalize';
 import { relevance } from './relevance';
@@ -62,8 +63,8 @@ const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 function compareCandidates(a: Candidate, b: Candidate): number {
   return (
-    a.unknown - b.unknown ||
     b.relevance - a.relevance ||
+    a.unknown - b.unknown ||
     (a.offer.price?.amount ?? Number.POSITIVE_INFINITY) -
       (b.offer.price?.amount ?? Number.POSITIVE_INFINITY) ||
     byId(a.offer, b.offer)
@@ -89,6 +90,11 @@ function planSlot(
     seen.add(variantKey);
     if (offer.sampleOrigin !== options.sampleOrigin) {
       exclude('provenance');
+      excludedOffers += 1;
+      continue;
+    }
+    if (productIntentFit(slot, offerIntentText(offer)).conflict) {
+      exclude('product_type_or_audience');
       excludedOffers += 1;
       continue;
     }
@@ -139,9 +145,9 @@ function compareStates(a: State, b: State): number {
   return (
     b.requiredCovered - a.requiredCovered ||
     Number(a.overBudget) - Number(b.overBudget) ||
-    a.unknown - b.unknown ||
     b.optionalCovered - a.optionalCovered ||
     b.relevance - a.relevance ||
+    a.unknown - b.unknown ||
     a.priced - b.priced ||
     a.merchants - b.merchants ||
     compareText(a.ids, b.ids)

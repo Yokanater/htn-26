@@ -42,6 +42,7 @@ export class CollectionRunError extends Error {
 }
 
 export interface CollectionRunnerOptions {
+  queriesPerSlot?: 1 | 2;
   /** Effective FEATURE_COLLECTION_MATCHING; when false, `start` rejects and nothing runs. */
   enabled: boolean;
   openCatalog: OpenCatalog;
@@ -83,6 +84,7 @@ interface ActiveRun {
 
 export function createCollectionRunner(options: CollectionRunnerOptions): CollectionRunner {
   const settings: CollectionRunSettings = {
+    queriesPerSlot: options.queriesPerSlot,
     openCatalog: options.openCatalog,
     matcher: options.matcher,
     explainer: options.explainer,

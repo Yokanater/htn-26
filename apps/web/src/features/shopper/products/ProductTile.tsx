@@ -79,6 +79,7 @@ export function ProductTile({
           src={offer.imageUrl}
           alt={offer.title}
           loading="lazy"
+          referrerPolicy="no-referrer"
           className="max-h-40 object-contain"
           onError={() => setImageFailed(true)}
         />

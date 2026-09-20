@@ -33,7 +33,7 @@ import {
   type IntentDraftService,
   InterpreterIntentDraftService,
 } from './services/intake';
-import { liveCatalog } from './services/live-catalog';
+import { LIVE_FETCH_BUDGET, liveCatalog } from './services/live-catalog';
 import {
   createFakeMerchantCatalog,
   createLiveMerchantCatalog,
@@ -133,7 +133,7 @@ function createIntentService(
 }
 
 /** Live discovery is opt-in; tests and the default application use synthetic inventory. */
-function createCatalog(env: EnvLike): AppProviders['catalog'] {
+function createCatalog(env: EnvLike, fetchBudget = LIVE_FETCH_BUDGET): AppProviders['catalog'] {
   const provider = env.CATALOG_PROVIDER?.trim().toLowerCase() || 'fake';
   if (provider === 'fake') {
     return createInjectedShoppingCatalog({ offers: loadSeedOffers(), sampleOrigin: 'seed' });
@@ -142,7 +142,7 @@ function createCatalog(env: EnvLike): AppProviders['catalog'] {
     if (!env.BROWSERBASE_API_KEY?.trim()) {
       throw new Error('CATALOG_PROVIDER=browserbase requires BROWSERBASE_API_KEY');
     }
-    return (brief) => liveCatalog(brief, env);
+    return (brief) => liveCatalog(brief, env, { fetchBudget });
   }
   throw new Error(`Unsupported CATALOG_PROVIDER "${provider}" (expected "fake" or "browserbase")`);
 }
@@ -165,7 +165,7 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
   const now = overrides.now ?? (() => new Date());
   const runs = overrides.runs ?? new RunRegistry();
   const checkpoints = overrides.checkpoints ?? new PrivateCheckpointStore();
-  const catalog = overrides.catalog ?? createCatalog(env);
+  const catalog = overrides.catalog ?? createCatalog(env, options.runner?.caps?.fetch);
   const merchantCatalog = overrides.merchantCatalog ?? createMerchantCatalog(env, options);
   const matcher = overrides.matcher ?? createCollectionMatcher();
   const mode = merchantCatalogMode(env);
@@ -202,7 +202,18 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
       overrides.runner ??
       createCollectionRunner({
         clock: now,
+        ...(env.CATALOG_PROVIDER?.trim().toLowerCase() === 'browserbase'
+          ? {
+              queriesPerSlot: 1 as const,
+              catalogVersion: 'browserbase.intent.v3',
+              caps: { fetch: LIVE_FETCH_BUDGET },
+            }
+          : {}),
         ...options.runner,
+        caps:
+          env.CATALOG_PROVIDER?.trim().toLowerCase() === 'browserbase'
+            ? { fetch: LIVE_FETCH_BUDGET, ...options.runner?.caps }
+            : options.runner?.caps,
         enabled: featureFlags(env).FEATURE_COLLECTION_MATCHING === true,
         openCatalog:
           typeof catalog === 'function'

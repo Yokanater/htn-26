@@ -42,6 +42,42 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+
+it('shows one product in Explore the finds instead of duplicate size variants', () => {
+  const base = ProductOfferSchema.parse(outfitOffers[0]);
+  const first = { ...base, id: 'offer_first', variantId: 'M', title: 'Alternative blue shirt' };
+  const second = { ...first, id: 'offer_second', variantId: 'L' };
+  render(
+    <ShoppingResults
+      brief={brief}
+      runId="run_test"
+      onCancel={vi.fn()}
+      onRetry={vi.fn()}
+      events={[
+        {
+          type: 'result',
+          runId: 'run_test',
+          briefId: brief.id,
+          briefRevision: brief.revision,
+          seq: 1,
+          result: {
+            runId: 'run_test',
+            briefId: brief.id,
+            briefRevision: brief.revision,
+            status: 'partial',
+            collection: null,
+            alternatives: [],
+            offers: [first, second],
+            candidates: [],
+            missing: [],
+            warnings: [],
+          },
+        },
+      ]}
+    />,
+  );
+  expect(screen.getAllByText('Alternative blue shirt')).toHaveLength(1);
+});
 it('shows actionable empty results from the current streamed run', async () => {
   render(
     <ShoppingResults

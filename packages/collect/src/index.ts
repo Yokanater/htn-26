@@ -72,6 +72,7 @@ export {
 } from './normalize';
 export {
   currencyExponent,
+  decodeHtmlEntities,
   extractProductFacts,
   factsFromShopifyProductJson,
   hasShopifyPageSignals,
@@ -80,6 +81,8 @@ export {
   type ProductPageFacts,
   type ProductPageStrategy,
   type ProductPageVariant,
+  productTitle,
+  withPageFallbacks,
 } from './product-page';
 export {
   evidenceIdentityKey,

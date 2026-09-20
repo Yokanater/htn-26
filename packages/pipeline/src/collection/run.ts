@@ -52,6 +52,8 @@ export function staticCatalog(catalog: Pick<ShoppingCatalog, 'search'>): OpenCat
 }
 
 export interface CollectionRunSettings {
+  /** Research adapters already perform their own bounded, per-slot query refinement. */
+  queriesPerSlot?: 1 | 2;
   openCatalog: OpenCatalog;
   /** Injected collection engine (L2); the pipeline never imports its implementation. */
   matcher: CollectionMatcher;
@@ -244,6 +246,14 @@ export async function executeCollectionRun(
   try {
     // Plan.
     const plan = planSlotQueries(brief);
+    if (settings.queriesPerSlot === 1) {
+      const seen = new Set<string>();
+      plan.queries = plan.queries.filter((query) => {
+        if (seen.has(query.slotId)) return false;
+        seen.add(query.slotId);
+        return true;
+      });
+    }
     setStage('plan', 'completed');
 
     // Discover: every query settles on its own (salvaged partial-results behavior).
@@ -262,7 +272,14 @@ export async function executeCollectionRun(
       });
       if (discoverySignal.aborted) return done(failureStatus(null));
       const key = `discover:${brief.sampleOrigin}:${brief.id}:${settings.catalogVersion}:${fingerprint(
-        [query.slotId, query.text, query.country, query.currency, query.limit],
+        [
+          query.slotId,
+          query.text,
+          query.country,
+          query.currency,
+          query.limit,
+          brief.slots.find((slot) => slot.id === query.slotId),
+        ],
       )}`;
       const cached = await readCheckpoint(store, key, DiscoveryCheckpointSchema);
       if (cached && clock().getTime() - Date.parse(cached.capturedAt) <= settings.factTtlMs) {

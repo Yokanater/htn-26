@@ -34,6 +34,20 @@ function renderEditor(brief: IntentBrief) {
 }
 
 describe('BriefEditor', () => {
+  it('lets shoppers explicitly select menswear for every image-derived item', () => {
+    const { onConfirm } = renderEditor(outfit);
+    const choice = screen.getByRole('combobox', { name: 'Shopping department' });
+    expect((choice as HTMLSelectElement).value).toBe('');
+    fireEvent.change(choice, { target: { value: 'men' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Find my collection' }));
+    const saved: IntentBrief = onConfirm.mock.calls[0]![0];
+    expect(
+      saved.slots.every((slot) => slot.visualAttributes.includes('Shopping department: men')),
+    ).toBe(true);
+    expect(
+      outfit.slots.some((slot) => slot.visualAttributes.includes('Shopping department: men')),
+    ).toBe(false);
+  });
   it.each([outfit, setup])(
     'opens item details without discarding edits or changing matching preferences',
     (brief) => {

@@ -40,12 +40,25 @@ export function ShoppingResults({
       result.result.collection?.match.slots.map((slot) => [slot.slotId, slot.selectedOfferId]) ??
         [],
     );
+    for (const selected of selectedBySlot.values()) {
+      if (selected) selectedIds.add(selected);
+    }
     for (const candidate of result.result.candidates) {
       const displayed = selectedBySlot.get(candidate.slotId) ?? candidate.offerIds[0];
       if (displayed) selectedIds.add(displayed);
     }
   }
-  const moreOffers = result?.result.offers.filter((offer) => !selectedIds.has(offer.id)) ?? [];
+  const productKey = (offer: ProductOffer) => `${offer.merchant.id}:${offer.productId}`;
+  const shownProducts = new Set(
+    result?.result.offers.filter((offer) => selectedIds.has(offer.id)).map(productKey),
+  );
+  const moreOffers =
+    result?.result.offers.filter((offer) => {
+      const key = productKey(offer);
+      if (shownProducts.has(key)) return false;
+      shownProducts.add(key);
+      return true;
+    }) ?? [];
   const toggle = (offer: ProductOffer) =>
     setSaved((items) =>
       items.some((i) => i.id === offer.id)

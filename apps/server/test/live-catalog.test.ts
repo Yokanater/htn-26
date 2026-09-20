@@ -1,11 +1,12 @@
 import type { BrowserbasePageText } from '@sei/collect';
 import { type IntentBrief, IntentBriefSchema } from '@sei/contracts';
 import type { ShoppingContext } from '@sei/core';
-import { createRunBudget } from '@sei/pipeline';
+import { createCollectionMatcher } from '@sei/enrich';
+import { createCollectionRunner, createRunBudget } from '@sei/pipeline';
 import { expect, it, vi } from 'vitest';
 import seed from '../../../fixtures/seed/outfit/brief.json';
 import { defaultProviders } from '../src/providers';
-import { buildSearchQuery, liveCatalog } from '../src/services/live-catalog';
+import { buildSearchQuery, candidateUrls, liveCatalog } from '../src/services/live-catalog';
 
 // Every provider is injected and DNS is faked: this suite makes no live call.
 vi.mock('node:dns/promises', () => ({
@@ -118,6 +119,146 @@ const query = (brief: IntentBrief, index = 0, text = 'olive shirt') => ({
   limit: 8,
 });
 
+it('researches all five photo items, rejects wrong product types and departments, and preserves slots through matching', async () => {
+  // Synthetic public-page responses, not claims about these products being live inventory.
+  const titles = [
+    'Mens Pale Blue Plain Long Sleeve Button Up Shirt',
+    'Mens Cream Chino Shorts',
+    'Mens Cream Slide Sandals',
+    'Black Sunglasses',
+    'Brown Leather Strap Watch',
+  ];
+  const brief = briefWithSlots(
+    titles.map((description, index) => ({
+      category: ['top', 'bottom', 'footwear', 'accessory', 'accessory'][index]!,
+      description,
+    })),
+  );
+  brief.itemBudget = null;
+  brief.slots.forEach((slot) => {
+    slot.visualAttributes = ['Shopping department: men'];
+  });
+  const { openBrowser, readPage, close } = fakeBrowser((url) => {
+    const index = Number(new URL(url).pathname.split('/').at(-1));
+    if (!titles[index]) return undefined;
+    return {
+      html: jsonLdPage({
+        title: titles[index]!,
+        sku: `REAL-${index}`,
+        price: '45.00',
+        currency: 'CAD',
+      }),
+    };
+  });
+  const searched = new Set<number>();
+  const searchProducts = vi.fn(async ({ query: text }: { query: string }) => {
+    const index = text.includes('shorts')
+      ? 1
+      : text.includes('sandals')
+        ? 2
+        : text.includes('sunglasses')
+          ? 3
+          : text.includes('watch')
+            ? 4
+            : 0;
+    // Every primary query is empty: every slot needs its retry under the SAME total budget.
+    expect(text).toContain('Canada');
+    if (!searched.has(index)) {
+      searched.add(index);
+      return [];
+    }
+    return [
+      { title: 'Made in Canada Red Graphic T-Shirt', url: 'https://bad.example/products/red-tee' },
+      { title: 'Womens Blue Striped Blouse', url: 'https://bad.example/products/womens-blouse' },
+      {
+        title: 'Womens White Decorative Slide Sandals',
+        url: 'https://bad.example/products/womens-slides',
+      },
+      { title: titles[index]!, url: `https://store.example/products/${index}` },
+    ];
+  });
+  const runner = createCollectionRunner({
+    enabled: true,
+    queriesPerSlot: 1,
+    matcher: createCollectionMatcher(),
+    openCatalog: async () =>
+      liveCatalog(brief, { BROWSERBASE_API_KEY: 'test-only' }, { searchProducts, openBrowser }),
+  });
+  const result = await runner.start(brief).result;
+  expect(result.queries).toHaveLength(5);
+  expect(result.queries.every((query) => query.status === 'fetched')).toBe(true);
+  expect(result.candidates.every((slot) => slot.offerIds.length > 0)).toBe(true);
+  expect(result.offers.map((offer) => offer.title).sort()).toEqual([...titles].sort());
+  const byId = new Map(result.offers.map((offer) => [offer.id, offer]));
+  expect(
+    result.collection?.match.slots.map((slot) => byId.get(slot.selectedOfferId!)?.title),
+  ).toEqual(titles);
+  expect(result.usage.catalog_query).toBe(10);
+  expect(result.usage.fetch).toBe(5);
+  expect(readPage).toHaveBeenCalledTimes(5);
+  expect(openBrowser).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledTimes(1);
+});
+
+it('ranks the requested variant even when it is after the first twelve variants', async () => {
+  const brief = briefWithSlots([
+    { category: 'top', description: 'Blue shirt', constraints: [{ kind: 'size', value: 'M' }] },
+  ]);
+  brief.slots[0]!.visualAttributes = ['blue'];
+  const { openBrowser } = fakeBrowser(() => ({
+    html: `<script type="application/ld+json">${JSON.stringify({
+      '@type': 'Product',
+      name: 'Blue Shirt',
+      sku: 'MULTI',
+      offers: Array.from({ length: 20 }, (_, index) => ({
+        '@type': 'Offer',
+        sku: `V-${index}`,
+        price: '40',
+        priceCurrency: 'CAD',
+        size: index === 19 ? 'M' : 'XS',
+        availability: 'https://schema.org/InStock',
+      })),
+    })}</script>`,
+  }));
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test-only' },
+    {
+      openBrowser,
+      searchProducts: async () => [
+        { title: 'Blue Shirt', url: 'https://store.example/products/blue-shirt' },
+      ],
+    },
+  );
+  const offers = await catalog.search(query(brief), liveContext());
+  expect(offers[0]?.variantId).toBe('V-19');
+  expect(offers[0]?.attributes.size).toBe('M');
+  expect(offers).toHaveLength(2);
+});
+
+it('coalesces simultaneous planner variants for the same confirmed slot', async () => {
+  const brief = briefWithSlots([{ category: 'top', description: 'Olive shirt' }]);
+  const { openBrowser, readPage } = fakeBrowser(() => ({
+    html: jsonLdPage({ title: 'Olive Shirt', sku: 'S', price: '30', currency: 'CAD' }),
+  }));
+  const searchProducts = vi.fn(async () => [
+    { title: 'Olive Shirt', url: 'https://store.example/products/shirt' },
+  ]);
+  const context = liveContext();
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test-only' },
+    { openBrowser, searchProducts },
+  );
+  const [first, second] = await Promise.all([
+    catalog.search(query(brief, 0, 'top olive'), context),
+    catalog.search(query(brief, 0, 'shirt'), context),
+  ]);
+  expect(first).toBe(second);
+  expect(searchProducts).toHaveBeenCalledTimes(1);
+  expect(readPage).toHaveBeenCalledTimes(1);
+});
+
 it('builds a readable recall query without operators or serialized constraints', () => {
   const outfit = briefWithSlots([
     {
@@ -141,19 +282,69 @@ it('builds a readable recall query without operators or serialized constraints',
     text: 'top olive shirt',
     country: 'CA',
   });
-  expect(shirt).toBe('men shirt top olive size M Canada');
+  expect(shirt).toBe('men shirt olive size M Canada');
   expect(shirt).not.toContain('inurl');
   expect(shirt).not.toContain('{');
   expect(buildSearchQuery({ slot: setup.slots[0]!, text: 'desk oak writing', country: 'US' })).toBe(
-    'desk oak writing 120 cm United States',
+    'desk olive oak 120 cm United States',
   );
   // No audience token in the brief means none is invented.
   expect(buildSearchQuery({ slot: setup.slots[0]!, text: 'desk', country: 'GB' })).toBe(
-    'desk 120 cm United Kingdom',
+    'desk olive oak 120 cm United Kingdom',
   );
   expect(
     buildSearchQuery({ slot: outfit.slots[0]!, text: 'top', country: 'CA', fallback: true }),
-  ).toBe('men shirt Canada');
+  ).toBe('men shirt olive Canada');
+});
+
+it('never truncates the destination from a verbose photo description, including retries', () => {
+  const brief = briefWithSlots([
+    {
+      category: 'top',
+      description:
+        'Light blue long-sleeve button-up shirt with a relaxed casual resort style worn open at the collar lightweight fabric linen-like texture '.repeat(
+          3,
+        ),
+    },
+  ]);
+  for (const fallback of [false, true]) {
+    const text = buildSearchQuery({
+      slot: brief.slots[0]!,
+      text: 'top blue',
+      country: 'CA',
+      fallback,
+    });
+    expect(text.endsWith('Canada')).toBe(true);
+    expect(text.length).toBeLessThanOrEqual(120);
+    expect(text).toContain('light blue');
+    expect(text).not.toContain('worn open at');
+  }
+});
+
+it('keeps looking past foreign-currency offers instead of returning QAR for a CAD brief', async () => {
+  const brief = briefWithSlots([{ category: 'top', description: 'Olive shirt' }]);
+  const { openBrowser } = fakeBrowser((url) => ({
+    html: jsonLdPage({
+      title: 'Olive Shirt',
+      sku: url.includes('foreign') ? 'Q' : 'CA',
+      price: '49',
+      currency: url.includes('foreign') ? 'QAR' : 'CAD',
+    }),
+  }));
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test-only' },
+    {
+      openBrowser,
+      searchProducts: async () => [
+        { title: 'Olive Shirt', url: 'https://foreign.example/products/shirt' },
+        { title: 'Olive Shirt', url: 'https://local.example/products/shirt' },
+      ],
+    },
+  );
+  const offers = await catalog.search(query(brief), liveContext());
+  expect(offers).toHaveLength(1);
+  expect(offers[0]?.price?.currency).toBe('CAD');
 });
 
 it('verifies a JSON-LD storefront without any Shopify endpoint', async () => {
@@ -328,7 +519,7 @@ it('gives every slot a verified offer under a constrained fetch budget', async (
   const budget = createRunBudget({ fetch: 12 });
   const { readPage, openBrowser } = fakeBrowser((url) => ({
     html: jsonLdPage({
-      title: new URL(url).hostname,
+      title: `${new URL(url).hostname} olive`,
       sku: new URL(url).hostname,
       price: '25.00',
       currency: 'CAD',
@@ -442,8 +633,8 @@ it('runs one broader fallback query when the planned query verifies nothing', as
   const context = liveContext();
   const offers = await catalog.search(query(brief, 0, 'top linen'), context);
   expect(searchProducts.mock.calls.map(([call]) => call.query)).toEqual([
-    'women top linen Canada',
-    'women top Canada',
+    'women top olive linen Canada',
+    'women top olive Canada',
   ]);
   expect(offers).toHaveLength(1);
   expect(context.consume).toHaveBeenCalledWith('catalog_query', 1);
@@ -472,6 +663,56 @@ it('drops offers for the opposite audience when the brief states one', async () 
   );
   const offers = await catalog.search(query(brief, 0, 'top olive'), liveContext());
   expect(offers.map((offer) => offer.title)).toEqual(["Women's olive blouse"]);
+});
+
+it('never spends a read on a marketplace, aggregator or listing page', async () => {
+  const brief = briefWithSlots([{ category: 'top' }]);
+  const { readPage, openBrowser } = fakeBrowser((url) =>
+    url === 'https://shop.example/products/olive-shirt'
+      ? { html: jsonLdPage({ title: 'Olive shirt', sku: 'S-1', price: '40.00', currency: 'CAD' }) }
+      : undefined,
+  );
+  const searchProducts = vi.fn(async () => [
+    { title: 'Olive shirt on Amazon', url: 'https://www.amazon.ca/dp/B0123' },
+    { title: 'Olive shirt pins', url: 'https://pinterest.com/pin/12' },
+    { title: 'Olive shirt roundup', url: 'https://www.lyst.com/shopping/olive-shirt' },
+    { title: 'Tops collection', url: 'https://shop.example/collections/tops' },
+    { title: 'Olive shirt', url: 'https://shop.example/products/olive-shirt' },
+  ]);
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test-only' },
+    { searchProducts, openBrowser, fetchBudget: 6 },
+  );
+  const offers = await catalog.search(query(brief, 0, 'top olive shirt'), liveContext());
+  expect(offers).toHaveLength(1);
+  // Marketplaces, aggregators and listing pages are dropped before any browser read.
+  expect(candidateUrls(await searchProducts(), 5, brief.slots[0], 'top olive shirt')).toEqual([
+    'https://shop.example/products/olive-shirt',
+  ]);
+  expect(readPage.mock.calls.map(([url]) => url)).toEqual([
+    'https://shop.example/products/olive-shirt',
+  ]);
+});
+
+it('names a product from its slug rather than a variant label', async () => {
+  const brief = briefWithSlots([{ category: 'accessory' }]);
+  const { openBrowser } = fakeBrowser(() => ({
+    html: `<!doctype html><html><head><script type="application/ld+json">${JSON.stringify({
+      '@type': 'Product',
+      offers: { '@type': 'Offer', name: '18-20" long', price: '70.00', priceCurrency: 'CAD' },
+    })}</script></head><body>necklace</body></html>`,
+  }));
+  const searchProducts = vi.fn(async () => [
+    { title: 'Necklace', url: 'https://orangeavocado.ca/products/beaded-necklace' },
+  ]);
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test-only' },
+    { searchProducts, openBrowser },
+  );
+  const offers = await catalog.search(query(brief, 0, 'accessory necklace'), liveContext());
+  expect(offers[0]?.title).toBe('Beaded Necklace · 18-20" long');
 });
 
 it('stops on cancellation and closes the session exactly once', async () => {

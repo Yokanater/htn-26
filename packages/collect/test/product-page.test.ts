@@ -16,6 +16,85 @@ function facts(head: string, finalUrl = PAGE_URL) {
 }
 
 describe('JSON-LD layer', () => {
+  it('reads a ProductGroup with per-size Product variants and array price specifications', () => {
+    const result = facts(
+      jsonLd({
+        '@type': 'ProductGroup',
+        name: 'Light Beige Cotton Shorts',
+        sku: 'SHORTS',
+        url: PAGE_URL,
+        color: 'Light Beige',
+        hasVariant: [
+          {
+            '@type': 'Product',
+            sku: 'SHORTS-28',
+            size: '28',
+            offers: {
+              '@type': 'Offer',
+              availability: 'https://schema.org/InStock',
+              priceSpecification: [
+                { '@type': 'UnitPriceSpecification', price: 250, priceCurrency: 'CAD' },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    expect(result).toMatchObject({
+      title: 'Light Beige Cotton Shorts',
+      productId: 'SHORTS',
+      variants: [
+        expect.objectContaining({
+          variantId: 'SHORTS-28',
+          currency: 'CAD',
+          amountMinorUnits: 25000,
+          attributes: { size: '28', color: 'Light Beige' },
+        }),
+      ],
+    });
+  });
+  it('prefers the explicit Shopify variant URL over a different SKU', () => {
+    const result = facts(
+      jsonLd({
+        '@type': 'Product',
+        name: 'Light Blue Shirt',
+        offers: {
+          '@type': 'Offer',
+          sku: 'SHIRT-BLUE-XS',
+          url: `${PAGE_URL}?variant=32593207590966`,
+          price: 69.99,
+          priceCurrency: 'CAD',
+        },
+      }),
+    );
+    expect(result?.variants[0]?.variantId).toBe('32593207590966');
+  });
+  it('selects the current product instead of the first related-product JSON-LD node', () => {
+    const result = facts(
+      jsonLd([
+        {
+          '@type': 'Product',
+          name: 'Black Recommended Sandal',
+          url: 'https://shop.example/products/other',
+          offers: { '@type': 'Offer', price: 10, priceCurrency: 'USD' },
+        },
+        {
+          '@type': 'Product',
+          name: 'Current White Sandal',
+          url: PAGE_URL,
+          offers: { '@type': 'Offer', price: 50, priceCurrency: 'CAD' },
+        },
+      ]),
+    );
+    expect(result).toMatchObject({ title: 'Current White Sandal', currency: 'CAD' });
+  });
+  it('preserves apostrophes in a double-quoted product title and decodes image URLs', () => {
+    const result = facts(
+      `<meta property="og:title" content="White Men's Helix Slide Sandals | PEDRO"><meta property="product:price:amount" content="116"><meta property="product:price:currency" content="CAD"><meta property="og:image" content="https://shop.example/image.jpg?a=1&amp;b=2">`,
+    );
+    expect(result?.title).toContain("White Men's Helix Slide Sandals");
+    expect(result?.imageUrl).toBe('https://shop.example/image.jpg?a=1&b=2');
+  });
   it('reads a single offer with an explicit variant, price and availability', () => {
     const result = facts(
       `<link rel="canonical" href="https://shop.example/products/olive-shirt">${jsonLd({
@@ -329,6 +408,65 @@ describe('meta tag layer and unsupported pages', () => {
 <meta property="product:price:currency" content="USD">`,
     );
     expect(result).toMatchObject({ strategy: 'meta_tags', title: 'Recovered Product' });
+  });
+
+  it('decodes HTML entities and drops the store name a page title appends', () => {
+    const result = facts(
+      `<meta property="og:title" content="Nike Endure Sunglasses, Shoes &amp; Accessories | Steve Madden">
+<meta property="product:price:amount" content="69.98">
+<meta property="product:price:currency" content="CAD">`,
+      'https://stevemadden.ca/products/endure',
+    );
+    expect(result?.title).toBe('Nike Endure Sunglasses, Shoes & Accessories');
+  });
+
+  it('completes a JSON-LD offer from the page title, image and stock meta tags', () => {
+    const result = facts(
+      `${jsonLd({
+        '@type': 'Product',
+        offers: { '@type': 'Offer', name: '18-20" long', price: '70.00', priceCurrency: 'CAD' },
+      })}
+<meta property="og:title" content="Beaded Necklace | Orange Avocado">
+<meta property="og:image" content="https://cdn.orangeavocado.ca/necklace.jpg">
+<meta property="product:availability" content="instock">`,
+      'https://orangeavocado.ca/products/beaded-necklace',
+    );
+    expect(result).toMatchObject({
+      strategy: 'json_ld',
+      title: 'Beaded Necklace',
+      imageUrl: 'https://cdn.orangeavocado.ca/necklace.jpg',
+    });
+    // A single stated offer may take the page's stock state; its label is not a variant ID.
+    expect(result?.variants[0]).toMatchObject({
+      variantId: null,
+      title: '18-20" long',
+      availability: 'available',
+    });
+  });
+
+  it('does not take page stock state when the page lists several offers', () => {
+    const result = facts(
+      `${jsonLd({
+        '@type': 'Product',
+        name: 'Tee',
+        offers: [
+          { '@type': 'Offer', sku: 'A', price: '10.00', priceCurrency: 'CAD' },
+          { '@type': 'Offer', sku: 'B', price: '10.00', priceCurrency: 'CAD' },
+        ],
+      })}
+<meta property="product:availability" content="instock">`,
+    );
+    expect(result?.variants.map((variant) => variant.availability)).toEqual(['unknown', 'unknown']);
+  });
+
+  it('leaves currency unknown when only an unrelated currency appears in the markup', () => {
+    const result = facts(
+      `<script>window.config = {"currency":"USD","locale":"en-CA"};</script>
+${jsonLd({ '@type': 'Product', name: 'Scarf', offers: { '@type': 'Offer', price: '70.00' } })}`,
+      'https://orangeavocado.ca/products/scarf',
+    );
+    expect(result?.currency).toBeNull();
+    expect(result?.variants[0]?.amountMinorUnits).toBeNull();
   });
 
   it('returns null for a page that states no product', () => {
