@@ -93,6 +93,129 @@ const AUDIENCES: ReadonlyArray<{ term: string; pattern: RegExp; conflict: RegExp
 
 const PRODUCT_PATH = /\/(products?|p|dp|item|items|shop|collections)\//i;
 
+type CategoryProfile = { positive: readonly string[]; negative: readonly string[] };
+
+const CATEGORY_PROFILES: Record<string, CategoryProfile> = {
+  top: {
+    positive: ['top', 'shirt', 'blouse', 'tee', 't-shirt', 'tank', 'sweater', 'cardigan', 'hoodie'],
+    negative: [
+      'shorts',
+      'pants',
+      'trousers',
+      'jeans',
+      'skirt',
+      'shoe',
+      'sandals',
+      'boots',
+      'hat',
+      'cap',
+      'sunglasses',
+      'watch',
+      'bag',
+    ],
+  },
+  bottom: {
+    positive: ['bottom', 'shorts', 'pants', 'trousers', 'jeans', 'skirt', 'leggings'],
+    negative: ['shirt', 'blouse', 'tee', 'sweater', 'shoe', 'sandals', 'hat', 'cap', 'bag'],
+  },
+  footwear: {
+    positive: [
+      'footwear',
+      'shoe',
+      'shoes',
+      'sandal',
+      'sandals',
+      'boot',
+      'boots',
+      'sneaker',
+      'sneakers',
+      'loafer',
+      'heel',
+    ],
+    negative: ['shirt', 'shorts', 'pants', 'hat', 'cap', 'sunglasses', 'watch', 'bag'],
+  },
+  headwear: {
+    positive: ['headwear', 'hat', 'cap', 'beanie', 'visor'],
+    negative: ['shirt', 'shorts', 'pants', 'shoe', 'sandals', 'sunglasses', 'watch', 'bag'],
+  },
+  sunglasses: {
+    positive: ['sunglasses', 'eyewear', 'shades', 'glasses'],
+    negative: ['shirt', 'shorts', 'pants', 'shoe', 'sandals', 'hat', 'cap', 'watch', 'bag'],
+  },
+  bag: {
+    positive: ['bag', 'handbag', 'tote', 'backpack', 'purse', 'satchel'],
+    negative: ['shirt', 'shorts', 'pants', 'shoe', 'sandals', 'hat', 'cap', 'sunglasses', 'watch'],
+  },
+  desk: {
+    positive: ['desk', 'workstation', 'writing table', 'computer table'],
+    negative: ['lamp', 'lighting', 'chair', 'stool', 'rug', 'carpet'],
+  },
+  lighting: {
+    positive: ['lighting', 'lamp', 'light', 'sconce', 'chandelier', 'pendant'],
+    negative: ['desk', 'chair', 'stool', 'rug', 'carpet', 'shelf', 'cabinet'],
+  },
+  chair: {
+    positive: ['chair', 'stool', 'seat', 'seating', 'armchair'],
+    negative: ['desk', 'lamp', 'lighting', 'rug', 'carpet', 'shelf', 'cabinet'],
+  },
+  storage: {
+    positive: ['storage', 'shelf', 'shelves', 'bookcase', 'cabinet', 'organizer'],
+    negative: ['desk', 'lamp', 'lighting', 'chair', 'stool', 'rug', 'carpet'],
+  },
+  rug: {
+    positive: ['rug', 'carpet', 'floor mat'],
+    negative: ['desk', 'lamp', 'lighting', 'chair', 'shelf', 'cabinet'],
+  },
+};
+
+const RANK_STOP_WORDS = new Set(
+  'a an and the of for with in on to from my our your this that matching confirmed inspiration item product canada united states kingdom size'.split(
+    ' ',
+  ),
+);
+
+function normalizedWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}-]+/gu, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length > 1 && !RANK_STOP_WORDS.has(word)),
+  );
+}
+
+function containsTerm(text: string, term: string): boolean {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:$|[^\\p{L}\\p{N}])`, 'iu').test(text);
+}
+
+function categoryProfile(slot: IntentSlot): CategoryProfile {
+  const key = slot.category.toLowerCase().trim();
+  return CATEGORY_PROFILES[key] ?? { positive: [key], negative: [] };
+}
+
+function categoryScore(slot: IntentSlot, text: string): number {
+  const profile = categoryProfile(slot);
+  const positive = profile.positive.filter((term) => containsTerm(text, term)).length;
+  const negative = profile.negative.filter((term) => containsTerm(text, term)).length;
+  return positive * 35 - negative * 45;
+}
+
+function isCategoryConflict(slot: IntentSlot, text: string): boolean {
+  const profile = categoryProfile(slot);
+  return (
+    !profile.positive.some((term) => containsTerm(text, term)) &&
+    profile.negative.some((term) => containsTerm(text, term))
+  );
+}
+
+function categorySearchTerms(slot: IntentSlot): string[] {
+  const profile = categoryProfile(slot);
+  const detail = slotWords(slot);
+  const explicit = profile.positive.find((term) => containsTerm(detail, term));
+  return explicit ? [explicit] : profile.positive.slice(0, 3);
+}
+
 export type LiveCatalogDeps = {
   searchProducts?: BrowserbaseProductSearch;
   openBrowser?: BrowserbaseCatalogBrowserFactory;
@@ -139,8 +262,14 @@ export function buildSearchQuery(input: {
 }): string {
   const audience = detectAudience(input.slot)?.term;
   const parts = input.fallback
-    ? [audience, input.slot.category, countryName(input.country)]
-    : [audience, input.text, ...constraintTerms(input.slot), countryName(input.country)];
+    ? [audience, ...categorySearchTerms(input.slot), countryName(input.country)]
+    : [
+        audience,
+        ...categorySearchTerms(input.slot),
+        input.text,
+        ...constraintTerms(input.slot),
+        countryName(input.country),
+      ];
   const seen = new Set<string>();
   const words: string[] = [];
   for (const word of parts.filter(Boolean).join(' ').split(/\s+/)) {
@@ -156,22 +285,41 @@ export function buildSearchQuery(input: {
 export function candidateUrls(
   results: readonly BrowserbaseProductSearchResult[],
   limit: number,
+  slot?: IntentSlot,
+  queryText = '',
 ): string[] {
-  const ranked = new Map<string, number>();
-  for (const result of results) {
+  const ranked = new Map<string, { index: number; score: number }>();
+  results.forEach((result, index) => {
     try {
       const url = new URL(result.url);
-      if (url.protocol !== 'https:' || url.username || url.password) continue;
-      if (url.pathname === '/' || url.pathname === '') continue;
+      if (url.protocol !== 'https:' || url.username || url.password) return;
+      if (url.pathname === '/' || url.pathname === '') return;
       url.search = '';
       url.hash = '';
-      if (!ranked.has(url.href)) ranked.set(url.href, PRODUCT_PATH.test(url.pathname) ? 0 : 1);
+      const searchable = `${result.title} ${decodeURIComponent(url.pathname.replaceAll('/', ' '))}`;
+      const queryWords = normalizedWords(queryText);
+      const candidateWords = normalizedWords(searchable);
+      const overlap = [...queryWords].filter((word) => candidateWords.has(word)).length;
+      const audience = slot ? detectAudience(slot) : null;
+      const audienceScore = audience
+        ? audience.conflict?.test(result.title)
+          ? -100
+          : audience.pattern.test(result.title)
+            ? 20
+            : 0
+        : 0;
+      const score =
+        (PRODUCT_PATH.test(url.pathname) ? 15 : 0) +
+        overlap * 4 +
+        (slot ? categoryScore(slot, searchable) : 0) +
+        audienceScore;
+      if (!ranked.has(url.href)) ranked.set(url.href, { index, score });
     } catch {
       // Search results are untrusted input; a malformed URL is simply not a candidate.
     }
-  }
+  });
   return [...ranked.entries()]
-    .sort(([, left], [, right]) => left - right)
+    .sort(([, left], [, right]) => right.score - left.score || left.index - right.index)
     .map(([href]) => href)
     .slice(0, limit);
 }
@@ -520,7 +668,7 @@ export function liveCatalog(
         .replace(/^large$/, 'l')
         .replace(/^small$/, 's');
     const words = new Set(
-      slotWords(slot)
+      `${categorySearchTerms(slot).join(' ')} ${slotWords(slot)}`
         .toLowerCase()
         .match(/[a-z]{3,}/g) ?? [],
     );
@@ -529,14 +677,22 @@ export function liveCatalog(
       const sizeMatch =
         requested?.kind === 'size' &&
         normalize(String(offer.attributes.size)) === normalize(requested.value);
-      const priced = offer.price ? 5 : 0;
-      return (sizeMatch ? 100 : 0) + priced + [...words].filter((word) => title.has(word)).length;
+      const priced = offer.price ? 1 : 0;
+      return (
+        categoryScore(slot, offer.title) * 3 +
+        (sizeMatch ? 40 : 0) +
+        priced +
+        [...words].filter((word) => title.has(word)).length * 5
+      );
     };
     const perProduct = new Map<string, number>();
     return (
       [...offers]
         // An explicitly requested audience excludes the opposite one; nothing else is filtered.
-        .filter((offer) => !audience?.conflict?.test(offer.title))
+        .filter(
+          (offer) =>
+            !audience?.conflict?.test(offer.title) && !isCategoryConflict(slot, offer.title),
+        )
         .sort((left, right) => score(right) - score(left) || left.id.localeCompare(right.id))
         .filter((offer) => {
           const key = `${offer.merchant.id}:${offer.productId}`;
@@ -547,6 +703,16 @@ export function liveCatalog(
         .slice(0, OFFERS_PER_SLOT)
     );
   };
+
+  const hasStrongOffer = (slot: IntentSlot, offers: readonly ProductOffer[]): boolean =>
+    offers.some((offer) => {
+      const audience = detectAudience(slot);
+      return (
+        !audience?.conflict?.test(offer.title) &&
+        !isCategoryConflict(slot, offer.title) &&
+        categoryScore(slot, offer.title) >= 35
+      );
+    });
 
   const runSearch = async (
     query: ProductQuery,
@@ -560,10 +726,11 @@ export function liveCatalog(
     let verifiedCount = 0;
     let usedFallback = false;
     let sessionId: string | null = null;
+    const attemptedCandidates = new Set<string>();
 
     for (const fallback of [false, true] as const) {
       if (fallback) {
-        if (collected.length > 0 || fallbackUsed.has(slot.id)) break;
+        if (hasStrongOffer(slot, collected) || fallbackUsed.has(slot.id)) break;
         try {
           context.consume('catalog_query', 1);
         } catch {
@@ -598,7 +765,9 @@ export function liveCatalog(
         failures.add(failure);
         continue;
       }
-      const candidates = candidateUrls(results, CANDIDATES_PER_QUERY);
+      // Spend one verification on the precise query first. If it is weak, preserve the slot's
+      // remaining share for two differently ranked candidates from the broader category query.
+      const candidates = candidateUrls(results, fallback ? CANDIDATES_PER_QUERY : 1, slot, text);
       candidateCount += candidates.length;
       if (candidates.length === 0) {
         failures.add('discovery_empty');
@@ -608,6 +777,8 @@ export function liveCatalog(
       sessionId = browser.sessionId;
       for (const candidate of candidates) {
         context.signal.throwIfAborted();
+        if (attemptedCandidates.has(candidate)) continue;
+        attemptedCandidates.add(candidate);
         if (collected.length >= OFFERS_PER_SLOT) break;
         if (!pageCache.has(candidate) && !share.claim(slot.id)) {
           failures.add('budget_exhausted');

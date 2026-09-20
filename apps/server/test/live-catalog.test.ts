@@ -141,7 +141,7 @@ it('builds a readable recall query without operators or serialized constraints',
     text: 'top olive shirt',
     country: 'CA',
   });
-  expect(shirt).toBe('men top olive shirt size M Canada');
+  expect(shirt).toBe('men shirt top olive size M Canada');
   expect(shirt).not.toContain('inurl');
   expect(shirt).not.toContain('{');
   expect(buildSearchQuery({ slot: setup.slots[0]!, text: 'desk oak writing', country: 'US' })).toBe(
@@ -153,7 +153,7 @@ it('builds a readable recall query without operators or serialized constraints',
   );
   expect(
     buildSearchQuery({ slot: outfit.slots[0]!, text: 'top', country: 'CA', fallback: true }),
-  ).toBe('men top Canada');
+  ).toBe('men shirt Canada');
 });
 
 it('verifies a JSON-LD storefront without any Shopify endpoint', async () => {
@@ -206,6 +206,53 @@ it('verifies a JSON-LD storefront without any Shopify endpoint', async () => {
   await catalog.close();
   expect(close).toHaveBeenCalledTimes(1);
 });
+
+it.each([
+  {
+    domain: 'outfit' as const,
+    category: 'top',
+    queryText: 'olive top',
+    wrongTitle: 'Discount leather sandals',
+    wrongUrl: 'https://shop.example/products/leather-sandals',
+    rightTitle: 'Olive linen shirt',
+    rightUrl: 'https://shop.example/products/olive-linen-shirt',
+  },
+  {
+    domain: 'setup' as const,
+    category: 'desk',
+    queryText: 'oak writing desk',
+    wrongTitle: 'Discount table lamp',
+    wrongUrl: 'https://home.example/products/table-lamp',
+    rightTitle: 'Oak writing desk',
+    rightUrl: 'https://home.example/products/oak-writing-desk',
+  },
+])(
+  'ranks the relevant $domain category before spending browser budget',
+  async ({ domain, category, queryText, wrongTitle, wrongUrl, rightTitle, rightUrl }) => {
+    const brief = briefWithSlots([{ category }], domain);
+    const { readPage, openBrowser } = fakeBrowser((url) => {
+      if (url !== rightUrl) return undefined;
+      return {
+        html: jsonLdPage({ title: rightTitle, sku: 'RIGHT-1', price: '80.00', currency: 'CAD' }),
+      };
+    });
+    const searchProducts = vi.fn(async () => [
+      { title: wrongTitle, url: wrongUrl },
+      { title: rightTitle, url: rightUrl },
+    ]);
+    const catalog = liveCatalog(
+      brief,
+      { BROWSERBASE_API_KEY: 'test-only' },
+      { searchProducts, openBrowser },
+    );
+
+    const offers = await catalog.search(query(brief, 0, queryText), liveContext());
+
+    expect(offers.map((offer) => offer.title)).toEqual([rightTitle]);
+    expect(readPage).toHaveBeenCalledTimes(1);
+    expect(readPage).toHaveBeenCalledWith(rightUrl, expect.any(AbortSignal));
+  },
+);
 
 it('falls back to product.js and resolves the storefront currency once per merchant', async () => {
   const brief = briefWithSlots([{ category: 'top', constraints: [{ kind: 'size', value: 'M' }] }]);
@@ -305,10 +352,10 @@ it('gives every slot a verified offer under a constrained fetch budget', async (
       catalog.search({ ...query(brief, index, `${slot.category} olive`) }, context),
     ),
   );
-  // Twelve fetch units split evenly: three verified product pages for each of the four slots.
-  expect(results.map((offers) => offers.length)).toEqual([3, 3, 3, 3]);
-  expect(budget.usage().fetch).toBe(12);
-  expect(readPage).toHaveBeenCalledTimes(12);
+  // Every slot gets a strong verified product before extra budget is spent on redundant pages.
+  expect(results.map((offers) => offers.length)).toEqual([1, 1, 1, 1]);
+  expect(budget.usage().fetch).toBe(4);
+  expect(readPage).toHaveBeenCalledTimes(4);
 });
 
 it('reports a starved slot as budget exhausted instead of silently empty', async () => {
