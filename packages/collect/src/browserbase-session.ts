@@ -5,8 +5,12 @@ export type BrowserbasePageText = {
   finalUrl: string;
   title: string;
   text: string;
+  /** Serialized document, so JSON-LD, embedded state and meta tags can be read deterministically. */
+  html: string;
   sessionId: string;
 };
+
+const MAX_PAGE_CHARS = 750_000;
 
 export type BrowserbaseCatalogBrowser = {
   sessionId: string;
@@ -57,16 +61,18 @@ export const openBrowserbaseCatalogBrowser: BrowserbaseCatalogBrowserFactory = a
       try {
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 12_000 });
         readSignal.throwIfAborted();
-        const [finalUrl, title, text] = await Promise.all([
+        const [finalUrl, title, text, html] = await Promise.all([
           page.url(),
           page.title(),
           page.evaluate<string>("document.body?.innerText ?? ''"),
+          page.evaluate<string>("document.documentElement?.outerHTML ?? ''"),
         ]);
         return {
           requestedUrl: url,
           finalUrl,
           title,
-          text: String(text).slice(0, 750_000),
+          text: String(text).slice(0, MAX_PAGE_CHARS),
+          html: String(html).slice(0, MAX_PAGE_CHARS),
           sessionId,
         };
       } finally {

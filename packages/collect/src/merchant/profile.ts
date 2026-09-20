@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import { type MerchantIdentity, newId, type ProductOffer, type SampleOrigin } from '@sei/contracts';
 import type { ShoppingContext } from '@sei/core';
+import { extractJsonLdBlocks, productNamesFromJsonLd } from '../jsonld';
 import { type CatalogHit, normalizeCatalogHits } from '../normalize';
 import {
   assertPublicHttpsUrl,
@@ -32,36 +33,6 @@ export type MerchantProfileDeps = SafeFetchDeps & {
   extractOffers?: (input: { domain: string; bodyText: string; finalUrl: string }) => CatalogHit[];
 };
 
-function clean(value: unknown, limit = 240): string {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : '';
-}
-
-function extractJsonLd(text: string): unknown[] {
-  const blocks = [
-    ...text.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi),
-  ];
-  const out: unknown[] = [];
-  for (const match of blocks) {
-    try {
-      const parsed = JSON.parse(match[1] ?? 'null');
-      if (parsed) out.push(parsed);
-    } catch {
-      // ignore malformed JSON-LD
-    }
-  }
-  return out;
-}
-
-function productNamesFromJsonLd(value: unknown): string[] {
-  if (!value || typeof value !== 'object') return [];
-  if (Array.isArray(value)) return value.flatMap(productNamesFromJsonLd);
-  const record = value as Record<string, unknown>;
-  const types = Array.isArray(record['@type']) ? record['@type'] : [record['@type']];
-  const own =
-    types.includes('Product') && typeof record.name === 'string' ? [clean(record.name, 120)] : [];
-  return [...own, ...Object.values(record).flatMap(productNamesFromJsonLd)].filter(Boolean);
-}
-
 function hasShopifySignals(text: string): boolean {
   return (
     /cdn\.shopify\.com/i.test(text) ||
@@ -75,7 +46,7 @@ function defaultExtractOffers(input: {
   bodyText: string;
   finalUrl: string;
 }): CatalogHit[] {
-  const jsonLd = extractJsonLd(input.bodyText);
+  const jsonLd = extractJsonLdBlocks(input.bodyText);
   const names = [...new Set(jsonLd.flatMap(productNamesFromJsonLd))].slice(0, 8);
   // Generic Product JSON-LD is a claim about products, not proof of Shopify or demand.
   return names.map((name, index) => ({
@@ -132,7 +103,7 @@ export async function profileMerchantCatalog(
     domain,
   };
 
-  const merchantClaims = productNamesFromJsonLd(extractJsonLd(bodyText)).slice(0, 12);
+  const merchantClaims = productNamesFromJsonLd(extractJsonLdBlocks(bodyText)).slice(0, 12);
 
   if (offers.length === 0 && !deps.extractOffers) {
     // Unavailable catalog — still return identity with empty offers only when extractor finds nothing

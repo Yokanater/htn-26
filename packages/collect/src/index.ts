@@ -45,6 +45,14 @@ export {
   MAX_OFFERS_PER_SLOT,
 } from './injected-catalog';
 export {
+  cleanJsonLdText,
+  collectJsonLdNodes,
+  extractJsonLdBlocks,
+  hasJsonLdType,
+  jsonLdTypes,
+  productNamesFromJsonLd,
+} from './jsonld';
+export {
   type MerchantProfileDeps,
   type MerchantProfileResult,
   profileMerchantCatalog,
@@ -62,6 +70,17 @@ export {
   normalizeMerchantDomain,
   offerIdentityKey,
 } from './normalize';
+export {
+  currencyExponent,
+  extractProductFacts,
+  factsFromShopifyProductJson,
+  hasShopifyPageSignals,
+  normalizeAvailability,
+  type ProductPageAvailability,
+  type ProductPageFacts,
+  type ProductPageStrategy,
+  type ProductPageVariant,
+} from './product-page';
 export {
   evidenceIdentityKey,
   stablePrefixedId,
