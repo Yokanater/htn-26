@@ -93,6 +93,21 @@ Known limits, all requiring a human decision or spike:
 - Demand projection, consent and merchant profiling (S3/S4) are not mounted; the merchant card
   remains explicitly synthetic. No live provider was called during integration.
 
+## S3/S4 L4 integration — 2026-09-19
+
+S3 demand ledger routes and the S4 fixture merchant workspace are mounted behind their milestone
+flags. Process memory is still the store: sessions, demand rows, merchant profiles and drafts reset
+on restart. `STORE=file` / Postgres remain unspiked.
+
+The optional live merchant profiler (`MERCHANT_CATALOG_PROVIDER=live`) is DI-tested with injected
+fetch and DNS. It is not a human live-provider spike and does not call Browserbase, Shopify, OpenAI,
+or public DNS from tests. Seed and allowlisted demo newcomers stay in-memory. A live catalog profile
+does not promote seed cohorts to live demand: opportunities and drafts keep `sampleOrigin: 'seed'`
+and public merchants are always `inferred_supply_fit` with `observedPairSupport: null`.
+
+L2 opportunity mapping and L3 proposal LLM are still missing. S5 approve/execute stays parked
+until an explicit go/no-go plus Admin API / S5-L1-1 / S5-L3-1. This is not a deploy.
+
 ## Final merge verification — 2026-09-19
 
 Combined local `codex/s1-integration` (`db72beb`) with remote

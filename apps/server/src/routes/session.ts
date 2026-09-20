@@ -18,16 +18,18 @@ export function sessionRoutes(providers: AppProviders): Hono {
     }
     return c.json({ owner: true });
   });
-  routes.delete('/session', (c) => {
+  routes.delete('/session', async (c) => {
     const ownerId = getCookie(c, SESSION_COOKIE);
     if (providers.sessions.valid(ownerId)) {
       // Revoke first so a run finishing mid-delete cannot store anything for this owner.
       providers.sessions.revoke(ownerId);
-      const briefIds = new Set([
-        ...providers.intake.deleteOwner(ownerId),
-        ...providers.runs.deleteOwner(ownerId),
-      ]);
-      for (const briefId of briefIds) providers.checkpoints.dropBrief(briefId);
+      const runBriefIds = providers.runs.deleteOwner(ownerId);
+      const intakeBriefIds = providers.intake.deleteOwner(ownerId);
+      await providers.demand.deleteSession(ownerId);
+      await providers.merchantWorkspace.deleteSession(ownerId);
+      for (const briefId of new Set([...runBriefIds, ...intakeBriefIds])) {
+        providers.checkpoints.dropBrief(briefId);
+      }
     }
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ deleted: true });

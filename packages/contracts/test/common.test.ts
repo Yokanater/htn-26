@@ -40,6 +40,7 @@ describe('newId', () => {
         'agg_',
         'mer_',
         'opp_',
+        'draft_',
       ].sort(),
     );
   });

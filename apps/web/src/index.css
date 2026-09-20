@@ -712,6 +712,10 @@ h2 em {
   color: #9c392b;
   font-size: 9px;
 }
+.form-error .text-button {
+  margin-top: 6px;
+  color: #9c392b;
+}
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -1114,6 +1118,126 @@ h2 em {
   font-size: 9px;
   line-height: 1.6;
 }
+.merchant-url-form {
+  max-width: 590px;
+  margin-top: 32px;
+  padding: 9px 9px 9px 17px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--white);
+}
+.merchant-url-form label span {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+.merchant-url-form input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+}
+.merchant-url-form .primary {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 9px;
+}
+.merchant-opportunity-list {
+  margin: 0 0 70px;
+}
+.merchant-opportunity-list h2,
+.merchant-draft-editor h2 {
+  margin: 8px 0 22px;
+  font:
+    400 28px / 1.2 Georgia,
+    serif;
+}
+.opportunity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.opportunity-card {
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+}
+.synthetic-label {
+  color: var(--green);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.opportunity-card h3 {
+  margin: 0;
+  font:
+    400 22px / 1.25 Georgia,
+    serif;
+}
+.opportunity-card > p,
+.opportunity-unknowns {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+.opportunity-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.opportunity-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 9px;
+}
+.opportunity-card dt {
+  color: var(--muted);
+}
+.opportunity-card dd {
+  margin: 0;
+  font-weight: 700;
+}
+.merchant-draft-editor {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 80px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+}
+.merchant-draft-editor label {
+  display: grid;
+  gap: 7px;
+  font-size: 9px;
+  font-weight: 700;
+}
+.merchant-draft-editor textarea {
+  min-height: 96px;
+  padding: 11px;
+  border: 1px solid #cad6cf;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 500;
+}
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
 footer {
   max-width: 1380px;
   margin: auto;
@@ -1183,7 +1307,8 @@ footer small {
     padding: 60px 0;
   }
   .slot-list,
-  .merchant-principles {
+  .merchant-principles,
+  .opportunity-grid {
     grid-template-columns: 1fr;
   }
   .review-heading {
@@ -1238,11 +1363,13 @@ footer small {
   .upload-disabled > small {
     display: none;
   }
-  .merchant-form-preview {
+  .merchant-form-preview,
+  .merchant-url-form {
     grid-template-columns: 1fr;
     padding: 14px;
   }
-  .merchant-form-preview button {
+  .merchant-form-preview button,
+  .merchant-url-form .primary {
     min-height: 40px;
     justify-content: center;
   }

@@ -33,6 +33,7 @@ export const ID_PREFIXES = {
   aggregate: 'agg_',
   merchant: 'mer_',
   opportunity: 'opp_',
+  draft: 'draft_',
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

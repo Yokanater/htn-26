@@ -1,5 +1,5 @@
 /** Composition root: providers are wired here once, in dependency order. Owner: L4. */
-import { createInjectedShoppingCatalog } from '@sei/collect';
+import { createInjectedShoppingCatalog, type MerchantProfileDeps } from '@sei/collect';
 import type { IntentBrief } from '@sei/contracts';
 import {
   type CollectionMatcher,
@@ -23,6 +23,7 @@ import {
   type OpenAiIntentModelOptions,
 } from '@sei/reason';
 import { loadSeedOffers } from './replay';
+import { DemandLedger } from './services/demand';
 import { ContainerImageNormalizer } from './services/image';
 import { SipsImageNormalizer } from './services/image-normalizer';
 import {
@@ -32,6 +33,13 @@ import {
   InterpreterIntentDraftService,
 } from './services/intake';
 import { liveCatalog } from './services/live-catalog';
+import {
+  createFakeMerchantCatalog,
+  createLiveMerchantCatalog,
+  type MerchantProfiler,
+  merchantCatalogMode,
+} from './services/merchant-catalog';
+import { MerchantWorkspaceStore } from './services/merchant-workspace';
 import { PrivateCheckpointStore, RunRegistry } from './services/runs';
 import { OwnerSessions } from './services/session';
 
@@ -41,10 +49,13 @@ export interface AppProviders {
   intent: IntentDraftService;
   imageNormalizer: ImageNormalizer | null;
   catalog: ShoppingCatalog | ((brief: IntentBrief) => Pick<ShoppingCatalog, 'search'>);
+  merchantCatalog: MerchantProfiler;
   matcher: CollectionMatcher;
   checkpoints: PrivateCheckpointStore;
   runs: RunRegistry;
   runner: CollectionRunner;
+  demand: DemandLedger;
+  merchantWorkspace: MerchantWorkspaceStore;
   now: () => Date;
 }
 
@@ -55,6 +66,14 @@ export interface ProviderOptions {
   runner?: Partial<
     Omit<CollectionRunnerOptions, 'enabled' | 'openCatalog' | 'matcher' | 'onEvent'>
   >;
+  /**
+   * Construction-time L1 merchant profiler deps (fetch + DNS lookup + optional extractOffers).
+   * Required when MERCHANT_CATALOG_PROVIDER=live unless `overrides.merchantCatalog` is set.
+   * Tests inject fakes; do not fall back to global fetch.
+   */
+  merchantProfile?: MerchantProfileDeps;
+  /** Live public-profile cap; defaults to L1 fetch timeout (8s). */
+  merchantProfileTimeoutMs?: number;
   /** Replace individual providers; everything else is still built from the environment. */
   overrides?: Partial<AppProviders>;
 }
@@ -123,13 +142,28 @@ function createCatalog(env: EnvLike): AppProviders['catalog'] {
   throw new Error(`Unsupported CATALOG_PROVIDER "${provider}" (expected "fake" or "browserbase")`);
 }
 
+function createMerchantCatalog(env: EnvLike, options: ProviderOptions): MerchantProfiler {
+  const mode = merchantCatalogMode(env);
+  if (mode === 'fake') return createFakeMerchantCatalog();
+  if (!options.merchantProfile) {
+    throw new Error(
+      'MERCHANT_CATALOG_PROVIDER=live requires merchantProfile (injected fetch and DNS lookup)',
+    );
+  }
+  return createLiveMerchantCatalog(options.merchantProfile, {
+    timeoutMs: options.merchantProfileTimeoutMs,
+  });
+}
+
 export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {}): AppProviders {
   const overrides = options.overrides ?? {};
   const now = overrides.now ?? (() => new Date());
   const runs = overrides.runs ?? new RunRegistry();
   const checkpoints = overrides.checkpoints ?? new PrivateCheckpointStore();
   const catalog = overrides.catalog ?? createCatalog(env);
+  const merchantCatalog = overrides.merchantCatalog ?? createMerchantCatalog(env, options);
   const matcher = overrides.matcher ?? createCollectionMatcher();
+  const mode = merchantCatalogMode(env);
   return {
     sessions: overrides.sessions ?? new OwnerSessions(),
     intake: overrides.intake ?? new IntakeStore(),
@@ -141,6 +175,7 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
           : new ContainerImageNormalizer()
         : overrides.imageNormalizer,
     catalog,
+    merchantCatalog,
     matcher,
     checkpoints,
     runs,
@@ -158,6 +193,8 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
         checkpoints,
         onEvent: (event) => runs.publish(event),
       }),
+    demand: overrides.demand ?? new DemandLedger({ now }),
+    merchantWorkspace: overrides.merchantWorkspace ?? new MerchantWorkspaceStore({ now, mode }),
     now,
   };
 }
