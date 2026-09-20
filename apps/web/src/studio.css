@@ -1,5 +1,106 @@
 /* biome-ignore-all lint/style/noDescendingSpecificity: independent component selectors follow the page order. */
 /* Studio presentation. Existing workflow and feature gates remain in their components. */
+footer > .footer-note {
+  display: block;
+  max-width: 460px;
+}
+.footer-note small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #52655b;
+}
+@media (max-width: 900px) {
+  footer > .footer-note {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+  }
+}
+.brand.rainforest-logo {
+  position: relative;
+  width: 180px;
+  height: 42px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.rainforest-logo img {
+  position: absolute;
+  width: 220px;
+  max-width: none;
+  height: auto;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.home-clean .hero {
+  min-height: 540px;
+  padding-block: 72px 48px;
+  gap: 48px;
+  align-items: center;
+}
+.home-clean .hero h1 {
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -2px;
+}
+.home-clean .hero .lede {
+  max-width: 410px;
+  font-size: 17px;
+  line-height: 1.7;
+}
+.home-clean .inspiration-board {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  transform: none;
+}
+.home-clean .board-studies {
+  gap: 12px;
+}
+.home-clean .visual-study {
+  border-radius: 16px;
+  box-shadow: none;
+  transform: none;
+}
+.home-clean .visual-study > span {
+  font-size: 13px;
+  font-weight: 500;
+}
+.home-notes {
+  border-top: 1px solid #dfe5ea;
+  padding: 24px 0 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 40px;
+  color: #647181;
+  font-size: 13px;
+}
+.home-notes p {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+}
+.home-notes svg {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .home-clean .hero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding-block: 40px 28px;
+    gap: 28px;
+  }
+  .home-clean .hero h1 {
+    letter-spacing: -1px;
+  }
+  .home-clean .visual-study {
+    min-height: 180px;
+  }
+}
 :root {
   --ink: #202b36;
   --green: #147d78;
@@ -54,7 +155,12 @@ main {
 }
 .brand {
   font-size: 26px;
+  font-weight: 620;
   letter-spacing: -1px;
+}
+.primary,
+.text-button {
+  font-weight: 550;
 }
 .compact-review.brief-editor-shell {
   padding: 0;
@@ -318,7 +424,7 @@ main {
 }
 .site-header nav button {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 9px 22px;
 }
 .session-status,
@@ -349,7 +455,7 @@ h2,
 .signal-preview h2,
 .merchant-principles h3 {
   font-family: "Avenir Next", "Inter", ui-sans-serif, system-ui, sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.045em;
 }
 h1 em,
@@ -1113,23 +1219,10 @@ footer small {
     animation: studio-enter 450ms ease both;
   }
   .slot-card {
-    animation: studio-enter 420ms ease both;
-    transition:
-      transform 200ms ease,
-      box-shadow 200ms ease;
-  }
-  .slot-card:nth-child(2) {
-    animation-delay: 60ms;
-  }
-  .slot-card:nth-child(3) {
-    animation-delay: 120ms;
-  }
-  .slot-card:nth-child(4) {
-    animation-delay: 180ms;
+    transition: border-color 180ms ease;
   }
   .slot-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 25px #202b360b;
+    border-color: #147d78;
   }
   .intake-study .studio-artwork {
     animation: studio-enter 500ms ease both;

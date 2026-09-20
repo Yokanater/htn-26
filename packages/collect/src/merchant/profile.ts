@@ -56,6 +56,7 @@ export async function profileMerchantCatalog(
   const initial = await assertPublicHttpsUrl(publicUrl, deps.lookup);
   const fetched = await fetchPublicHttps(initial.href, deps, {
     signal: context.signal,
+    timeoutMs: 45_000,
     acceptContentTypes: ['text/html', 'application/json', 'text/plain'],
     // Shopify theme HTML can exceed 512 KB after decompression even when the transfer is small.
     // Keep a decoded-body cap, aligned with catalog pages, rather than trusting Content-Length.

@@ -235,6 +235,12 @@ export function createDemandAggregator(): DemandAggregator {
         ...base,
         status: 'available',
         eligibleSessions: band(aggregate.eligibleSessions, minimumSessions),
+        pairSupport: aggregate.pairs
+          .filter((pair) => pair.supportingSessions >= minimumSessions)
+          .map((pair) => ({
+            merchantIds: pair.merchantIds,
+            support: band(pair.supportingSessions, minimumSessions),
+          })),
         merchantSupport: (aggregate.merchantSupport ?? [])
           .filter((entry) => entry.supportingSessions >= minimumSessions)
           .map((entry) => ({

@@ -32,9 +32,19 @@ export interface DemandProjectionDeps {
 
 export class DemandProjectionService {
   readonly #deps: DemandProjectionDeps;
+  readonly #publishedWindows = new Map<SampleOrigin, { end: string; ids: string[] }>();
 
   constructor(deps: DemandProjectionDeps) {
     this.#deps = deps;
+  }
+
+  async merchantSummaries(): Promise<MerchantDemandSummary[]> {
+    const end = this.#window().end.toISOString();
+    const previous = this.#publishedWindows.get('live');
+    if (previous?.end === end) return previous.ids.flatMap((id) => this.published(id) ?? []);
+    const summaries = await this.refresh('live');
+    this.#publishedWindows.set('live', { end, ids: summaries.map((s) => s.aggregateId) });
+    return summaries.filter((s) => s.status === 'available');
   }
 
   /**

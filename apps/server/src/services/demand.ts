@@ -6,6 +6,7 @@ import {
   DemandEventSchema,
 } from '@sei/contracts';
 import type { DemandStore } from '@sei/core';
+import type { PrivateDatabase } from './persistence';
 
 export class ConsentConflictError extends Error {
   constructor() {
@@ -41,12 +42,20 @@ function sameChoice(a: DemandEvent, b: DemandEvent): boolean {
  * A production multi-instance deployment must replace this with a transactional adapter.
  */
 export class PrivateDemandLedger implements DemandStore {
-  readonly #consents = new Map<string, ConsentRecord>();
-  readonly #events = new Map<string, DemandEvent[]>();
-  readonly #idempotency = new Map<string, Map<string, DemandEvent>>();
+  readonly #consents: Map<string, ConsentRecord>;
+  readonly #events: Map<string, DemandEvent[]>;
+  readonly #idempotency: Map<string, Map<string, DemandEvent>>;
   readonly #snapshots = new Map<string, { generation: number; value: unknown }>();
   readonly #deletedSessions = new Set<string>();
   #generation = 1;
+
+  constructor(database?: PrivateDatabase) {
+    this.#consents = database?.map<ConsentRecord>('consents') ?? new Map();
+    this.#events = new Map();
+    this.#idempotency = database?.map<Map<string, DemandEvent>>('idempotency') ?? new Map();
+    for (const [sessionId, events] of this.#idempotency)
+      this.#events.set(sessionId, [...events.values()]);
+  }
 
   async getConsent(sessionId: string): Promise<ConsentRecord | null> {
     const record = this.#consents.get(sessionId);
@@ -70,17 +79,16 @@ export class PrivateDemandLedger implements DemandStore {
   async append(event: DemandEvent, idempotencyKey: string): Promise<'inserted' | 'duplicate'> {
     const parsed = DemandEventSchema.parse(event);
     if (this.#deletedSessions.has(parsed.sessionId)) throw new SessionDeletedError();
-    const keys = this.#idempotency.get(parsed.sessionId) ?? new Map<string, DemandEvent>();
+    const keys = new Map(this.#idempotency.get(parsed.sessionId));
     const existing = keys.get(idempotencyKey);
     if (existing) {
       if (!sameChoice(existing, parsed)) throw new IdempotencyConflictError();
       return 'duplicate';
     }
-    const events = this.#events.get(parsed.sessionId) ?? [];
-    events.push(structuredClone(parsed));
+    const events = [...(this.#events.get(parsed.sessionId) ?? []), structuredClone(parsed)];
     keys.set(idempotencyKey, structuredClone(parsed));
-    this.#events.set(parsed.sessionId, events);
     this.#idempotency.set(parsed.sessionId, keys);
+    this.#events.set(parsed.sessionId, events);
     this.#invalidateSnapshots();
     return 'inserted';
   }

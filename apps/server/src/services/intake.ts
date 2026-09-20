@@ -8,6 +8,7 @@ import {
   type ShoppingDomain,
 } from '@sei/contracts';
 import type { IntentInterpreter } from '@sei/core';
+import type { PrivateDatabase } from './persistence';
 
 export const ASSET_MAX_BYTES = 8 * 1024 * 1024;
 export const ASSET_TTL_MS = 24 * 60 * 60 * 1000;
@@ -47,7 +48,11 @@ interface BriefRecord {
 
 export class IntakeStore {
   readonly #assets = new Map<string, AssetRecord>();
-  readonly #briefs = new Map<string, BriefRecord>();
+  readonly #briefs: Map<string, BriefRecord>;
+
+  constructor(database?: PrivateDatabase) {
+    this.#briefs = database?.map<BriefRecord>('briefs') ?? new Map();
+  }
 
   putAsset(ownerId: string, normalized: NormalizedImage, now = new Date()): InspirationAsset {
     const asset = InspirationAssetSchema.parse({

@@ -78,16 +78,19 @@ describe('MerchantWorkspace', () => {
     const profile = { ...profileFor('setup'), sampleOrigin: 'live' };
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const path = String(input);
-        if (path === '/api/merchants/profile') return Response.json(profile);
+        if (path === '/api/merchants/profile') {
+          expect(JSON.parse(String(init?.body))).toEqual({ url: 'public-store.shop' });
+          return Response.json(profile);
+        }
         if (path.endsWith('/catalog')) return Response.json([]);
         return Response.json({ opportunities: [] });
       }),
     );
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
-      target: { value: 'https://public-store.shop/' },
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public store URL' }), {
+      target: { value: 'public-store.shop' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
     expect(await screen.findByRole('heading', { name: 'Products and brands' })).toBeTruthy();
@@ -133,7 +136,7 @@ describe('MerchantWorkspace', () => {
       expect(screen.getByText(/Merchant intelligence/i)).toBeTruthy();
       expect(fetchMock).not.toHaveBeenCalled();
 
-      fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+      fireEvent.change(screen.getByRole('textbox', { name: 'Public store URL' }), {
         target: { value: `https://${profile.merchant.domain}/` },
       });
       fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
@@ -179,7 +182,7 @@ describe('MerchantWorkspace', () => {
       }),
     );
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public store URL' }), {
       target: { value: 'https://outfit-brand-1.example/' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
@@ -207,7 +210,7 @@ describe('MerchantWorkspace', () => {
       }),
     );
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public store URL' }), {
       target: { value: 'https://outfit-brand-1.example/' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
@@ -243,7 +246,7 @@ describe('MerchantWorkspace', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public store URL' }), {
       target: { value: `https://${outfit.merchant.domain}/` },
     });
     fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
@@ -251,7 +254,7 @@ describe('MerchantWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: /Create collaboration draft/ }));
     expect(await screen.findByDisplayValue(opportunity.proposedExperiment)).toBeTruthy();
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public store URL' }), {
       target: { value: 'https://not-a-seed.com/' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
@@ -315,7 +318,7 @@ describe('MerchantWorkspace', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderWithClient(<MerchantWorkspace back={() => undefined} />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS store URL' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public store URL' }), {
       target: { value: 'https://outfit-brand-1.example/' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Analyze store/ }));
@@ -368,7 +371,7 @@ describe('merchant surface gating', () => {
         <App />
       </QueryClientProvider>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /I run a Shopify store/ }));
+    fireEvent.click(screen.getByRole('button', { name: /I run a shop/ }));
     expect(await screen.findByText(/Merchant profiling unlocks with S4/)).toBeTruthy();
     expect(fetchMock.mock.calls.every(([input]) => !String(input).includes('/api/merchants'))).toBe(
       true,

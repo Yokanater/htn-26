@@ -29,6 +29,7 @@ export function ShoppingResults({
 }) {
   const [saved, setSaved] = useState<ProductOffer[]>([]);
   const [evidence, setEvidence] = useState<ProductOffer | null>(null);
+  const recordedChoices = Boolean(flags?.FEATURE_DEMAND_LEDGER && onDecision);
   const current = deriveRunView(brief, runId, events).result;
   const result =
     current && current.status !== 'superseded' && current.status !== 'cancelled'
@@ -69,7 +70,7 @@ export function ShoppingResults({
     <ProductTile
       offer={offer}
       selected={saved.some((i) => i.id === offer.id)}
-      onSelect={() => toggle(offer)}
+      onSelect={recordedChoices ? undefined : () => toggle(offer)}
       onOpenEvidence={() => setEvidence(offer)}
     />
   );
@@ -82,7 +83,11 @@ export function ShoppingResults({
             From idea to <em>real finds.</em>
           </h1>
           <p>
-            {brief.sampleOrigin === 'seed' ? 'Synthetic demo products' : 'Store-sourced products'}{' '}
+            {brief.sampleOrigin === 'seed'
+              ? 'Synthetic demo products'
+              : brief.sampleOrigin === 'replay'
+                ? 'Recorded Shopify products'
+                : 'Store-sourced products'}{' '}
             for your confirmed brief. Search is limited to three minutes.
           </p>
         </div>
@@ -98,7 +103,30 @@ export function ShoppingResults({
         renderOffer={tile}
         onCancel={onCancel}
         flags={flags}
-        onDecision={onDecision}
+        onDecision={
+          onDecision
+            ? async (dto) => {
+                const response = await onDecision(dto);
+                if (response.ok) {
+                  const ids = new Set(dto.selections.map((s) => s.offerId));
+                  const products = result?.result.offers.filter((p) => ids.has(p.id)) ?? [];
+                  if (dto.kind === 'item_rejected')
+                    setSaved((items) => items.filter((p) => !ids.has(p.id)));
+                  else if (dto.kind === 'item_accepted') {
+                    const slot = dto.selections[0]?.slotId;
+                    const alternatives = new Set(
+                      result?.result.candidates.find((c) => c.slotId === slot)?.offerIds ?? [],
+                    );
+                    setSaved((items) => [
+                      ...items.filter((p) => !alternatives.has(p.id) && !ids.has(p.id)),
+                      ...products,
+                    ]);
+                  } else setSaved(products);
+                }
+                return response;
+              }
+            : undefined
+        }
         onRefreshBrief={onRefreshBrief}
       />
       {current && (
@@ -134,8 +162,14 @@ export function ShoppingResults({
       )}
       {saved.length > 0 && (
         <section className="saved-collection">
-          <h2>Your shortlist · {saved.length}</h2>
-          <p>Saved for this visit. Download your list to keep it.</p>
+          <h2>
+            {recordedChoices ? 'Your selected items' : 'Your shortlist'} · {saved.length}
+          </h2>
+          <p>
+            {recordedChoices
+              ? 'Your choices are recorded. Download a copy for yourself.'
+              : 'Saved for this visit. Download your list to keep it.'}
+          </p>
           {saved.map((offer) => (
             <p key={offer.id}>
               <a href={offer.productUrl} target="_blank" rel="noreferrer">

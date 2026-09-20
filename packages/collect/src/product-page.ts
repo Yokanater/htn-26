@@ -7,7 +7,12 @@
 
 import { cleanJsonLdText, collectJsonLdNodes, extractJsonLdBlocks, hasJsonLdType } from './jsonld';
 
-export type ProductPageStrategy = 'json_ld' | 'shopify_state' | 'meta_tags' | 'shopify_js';
+export type ProductPageStrategy =
+  | 'json_ld'
+  | 'shopify_state'
+  | 'meta_tags'
+  | 'shopify_js'
+  | 'model_page_text';
 
 export type ProductPageAvailability = 'available' | 'unavailable' | 'unknown';
 

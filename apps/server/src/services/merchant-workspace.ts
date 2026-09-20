@@ -1,5 +1,5 @@
 /**
- * Owner-scoped merchant demo workspace. Owner: L4 (S4-L4-1 / live opt-in).
+ * Owner-scoped merchant demo workspace. Owner: L4 (S4-L4-1).
  * Bindings are MerchantWorkspaceAccess, not store ownership.
  * Seed and allowlisted newcomers stay in-memory. Live public hosts use L1 via merchantCatalog.
  * Demand and drafts stay seed even when the catalog profile is live.
@@ -158,7 +158,7 @@ export class MerchantWorkspaceStore {
       throw new MerchantUrlError();
     }
     this.#assertWritable(ownerId);
-    const sampleOrigin: SampleOrigin = kind === 'public' ? 'live' : 'seed';
+    let sampleOrigin: SampleOrigin = kind === 'public' ? 'live' : 'seed';
     const resolved =
       kind === 'public'
         ? await catalog.profileMerchant(parsed.href, {
@@ -167,6 +167,9 @@ export class MerchantWorkspaceStore {
             consume() {},
           })
         : this.#fromMemory(parsed.host, kind);
+    // An injected recorded catalog must not be relabeled as live storefront evidence.
+    if (resolved.offers.length && resolved.offers.every((offer) => offer.sampleOrigin === 'replay'))
+      sampleOrigin = 'replay';
     if (this.beforePersist) await this.beforePersist();
     return this.#serialized(ownerId, () => {
       this.#assertWritable(ownerId);

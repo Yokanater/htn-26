@@ -1,6 +1,6 @@
 /**
- * Dedicated merchant profiler port. Owner: L4 (S4 live opt-in).
- * Not `@sei/core` ShoppingCatalog: this takes the original HTTPS URL, not a bare host.
+ * Dedicated merchant profiler port. Owner: L4 (S4 live catalog).
+ * Not `@sei/core` ShoppingCatalog: this takes a normalized HTTPS URL, not a bare host.
  * Live mode wraps L1 `profileMerchantCatalog`; seed/newcomer inventory stays in-memory.
  */
 import {
@@ -14,7 +14,7 @@ import type { EnvLike, ShoppingContext } from '@sei/core';
 import { loadMerchantCatalogOffers } from '../replay';
 import type { MerchantCatalogMode } from './merchant-url';
 
-export const MERCHANT_PROFILE_TIMEOUT_MS = 60_000;
+export const MERCHANT_PROFILE_TIMEOUT_MS = 240_000;
 const LIVE_FETCH_CAP = 4;
 
 export type { MerchantCatalogMode };
@@ -38,7 +38,7 @@ export class MerchantProfilerError extends Error {
 }
 
 export function merchantCatalogMode(env: EnvLike): MerchantCatalogMode {
-  const provider = env.MERCHANT_CATALOG_PROVIDER?.trim().toLowerCase() || 'fake';
+  const provider = env.MERCHANT_CATALOG_PROVIDER?.trim().toLowerCase() || 'live';
   if (provider === 'fake' || provider === 'live') return provider;
   throw new Error(
     `Unsupported MERCHANT_CATALOG_PROVIDER "${provider}" (expected "fake" or "live")`,

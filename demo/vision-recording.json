@@ -1,0 +1,49 @@
+{
+  "sha256": "def7686dbc1d0d906c45b898a18e8748b4e0e0fcbccf51febbd8920a3e58ae88",
+  "capturedAt": "2026-09-20T07:35:21.167Z",
+  "model": "gpt-4.1-mini",
+  "draft": {
+    "slots": [
+      {
+        "category": "footwear",
+        "description": "pair of sports sneakers",
+        "visualAttributes": ["grey", "knitted fabric", "white sole", "lace-up"],
+        "requiredSuggested": false,
+        "confidence": "high",
+        "region": {
+          "x": 98,
+          "y": 99,
+          "width": 294,
+          "height": 342
+        }
+      },
+      {
+        "category": "accessory",
+        "description": "pair of ankle socks",
+        "visualAttributes": ["dark grey", "knitted fabric", "ankle length"],
+        "requiredSuggested": false,
+        "confidence": "high",
+        "region": {
+          "x": 407,
+          "y": 203,
+          "width": 148,
+          "height": 210
+        }
+      },
+      {
+        "category": "bag",
+        "description": "backpack",
+        "visualAttributes": ["black", "fabric", "zippered pocket", "top handle"],
+        "requiredSuggested": false,
+        "confidence": "high",
+        "region": {
+          "x": 656,
+          "y": 90,
+          "width": 296,
+          "height": 385
+        }
+      }
+    ],
+    "ambiguityNote": null
+  }
+}

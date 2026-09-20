@@ -47,6 +47,7 @@ import {
   type ResearchCatalogFactory,
 } from './services/merchant-research';
 import { MerchantWorkspaceStore } from './services/merchant-workspace';
+import { PrivateDatabase } from './services/persistence';
 import { PrivateCheckpointStore, RunRegistry } from './services/runs';
 import { OwnerSessions } from './services/session';
 
@@ -172,16 +173,22 @@ function createMerchantCatalog(env: EnvLike, options: ProviderOptions): Merchant
 export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {}): AppProviders {
   const overrides = options.overrides ?? {};
   const now = overrides.now ?? (() => new Date());
-  const runs = overrides.runs ?? new RunRegistry();
   const checkpoints = overrides.checkpoints ?? new PrivateCheckpointStore();
   const catalog = overrides.catalog ?? createCatalog(env, options.runner?.caps?.fetch);
   const merchantCatalog = overrides.merchantCatalog ?? createMerchantCatalog(env, options);
   const matcher = overrides.matcher ?? createCollectionMatcher();
   const mode = merchantCatalogMode(env);
-  const intake = overrides.intake ?? new IntakeStore();
-  const demand = overrides.demand ?? new PrivateDemandLedger();
+  const database =
+    env.STORE === 'file' || env.STORE === 'sqlite'
+      ? new PrivateDatabase(
+          env.DATABASE_PATH || new URL('../../../.data/intent.sqlite', import.meta.url).pathname,
+        )
+      : undefined;
+  const intake = overrides.intake ?? new IntakeStore(database);
+  const runs = overrides.runs ?? new RunRegistry(database);
+  const demand = overrides.demand ?? new PrivateDemandLedger(database);
   return {
-    sessions: overrides.sessions ?? new OwnerSessions(),
+    sessions: overrides.sessions ?? new OwnerSessions(database),
     intake,
     intent: overrides.intent ?? createIntentService(env, options.intentModel, now),
     imageNormalizer:

@@ -238,6 +238,48 @@ describe.each(['outfit', 'setup'] as const)('%s demand projection', (domain) => 
     expect(summary.gaps ?? []).toEqual([]);
   });
 
+  it('publishes saved-together pair bands only above threshold and removes them on withdrawal', () => {
+    const aggregator = createDemandAggregator();
+    const base = input(domain, 6);
+    const events = [
+      ...base.events,
+      ...[1, 2, 3, 4, 5].map((seq) =>
+        selected(seq, 'collection_saved', [selection(1), selection(2, 'slot_2')]),
+      ),
+      selected(6, 'collection_saved', [selection(1), selection(3, 'slot_2')]),
+    ];
+    const summary = aggregator.summarize(aggregator.aggregate({ ...base, events })[0], 5);
+    expect(summary.pairSupport).toEqual([
+      { merchantIds: ['mer_1', 'mer_2'], support: { min: 5, max: 10 } },
+    ]);
+    expect(MerchantDemandSummarySchema.safeParse(summary).success).toBe(true);
+    const after = aggregator.summarize(
+      aggregator.aggregate({
+        ...base,
+        events,
+        consents: [consent(1, { state: 'withdrawn' }), ...[2, 3, 4, 5, 6].map((n) => consent(n))],
+      })[0],
+      5,
+    );
+    expect(after.status).toBe('available');
+    expect(after.pairSupport).toEqual([]);
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...after,
+        pairSupport: [{ merchantIds: ['mer_1', 'mer_2'], support: { min: 4, max: 5 } }],
+      }).success,
+    ).toBe(false);
+    expect(
+      MerchantDemandSummarySchema.safeParse({
+        ...summary,
+        status: 'insufficient_evidence',
+        eligibleSessions: null,
+        merchantSupport: [],
+        gaps: [],
+      }).success,
+    ).toBe(false);
+  });
+
   it('keeps the cohort ID but changes the version when a withdrawal changes the contents', () => {
     const base = input(domain, 6);
     const before = createDemandAggregator().aggregate(base)[0];

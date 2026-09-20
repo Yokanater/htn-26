@@ -26,6 +26,19 @@ const Product = z.object({
 function category(type: string, title: string): string {
   const categories: Array<[string, RegExp]> = [
     ['socks', /\b(socks?|hosiery)\b/],
+    ['supplements', /\b(protein|creatine|supplements?|pre[- ]?workout|electrolytes?)\b/],
+    [
+      'fitness equipment',
+      /\b(pull[- ]?up bars?|dumbbells?|kettlebells?|resistance bands?|weight benches?|gym equipment|training equipment)\b/,
+    ],
+    ['recovery equipment', /\b(foam rollers?|massage guns?|recovery equipment)\b/],
+    ['skincare', /\b(skincare|serums?|moisturi[sz]ers?|cleansers?|sunscreens?)\b/],
+    [
+      'makeup',
+      /\b(makeup|cosmetics?|lip|lipsticks?|mascaras?|foundations?|concealers?|blush|bronzers?|highlighters?|eyeshadows?)\b/,
+    ],
+    ['fragrance', /\b(fragrances?|perfumes?|eau de parfum|colognes?)\b/],
+    ['beauty tools', /\b(beauty tools?|makeup brushes?|applicators?|sponges?|mirrors?)\b/],
     ['lighting', /\b(lamps?|lighting|pendants?)\b/],
     ['desk', /\b(desks?|workstations?)\b/],
     ['bag', /\b(bags?|backpacks?|totes?|handbags?)\b/],
@@ -33,8 +46,15 @@ function category(type: string, title: string): string {
       'footwear',
       /\b(shoes?|boots?|sneakers?|sandals?|heels?|flats?|ballerinas?|loafers?|pumps?)\b/,
     ],
-    ['bottom', /\b(pants?|jeans?|trousers?|shorts?|skirts?)\b/],
-    ['top', /\b(shirts?|jackets?|tops?|blouses?|sweaters?|hoodies?|coats?)\b/],
+    [
+      'bottom',
+      /\b(pants?|jeans?|trousers?|shorts?|skirts?|leggings?|joggers?|tights?|underwear|boxers?)\b/,
+    ],
+    [
+      'top',
+      /\b(shirts?|jackets?|tops?|blouses?|sweaters?|hoodies?|coats?|pullovers?|sports bras?|bras?|tanks?|tees?|t-shirts?|crop tops?)\b/,
+    ],
+    ['accessories', /\b(accessories|headwear|caps?|hats?|beanies?|water bottles?)\b/],
     ['furniture', /\b(chairs?|tables?|sofas?|shelving)\b/],
     ['headphones', /\b(headphones?|earbuds?)\b/],
   ];
@@ -61,7 +81,7 @@ export async function readStorefrontCatalog(
     const url = `${origin}/products.json?limit=50&page=${page}`;
     const fetched = await fetchPublicHttps(url, deps, {
       signal: context.signal,
-      timeoutMs: 15_000,
+      timeoutMs: 45_000,
       maxBytes: 2_000_000,
       acceptContentTypes: ['application/json'],
     });

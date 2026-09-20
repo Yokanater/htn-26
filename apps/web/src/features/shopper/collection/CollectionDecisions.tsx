@@ -334,7 +334,10 @@ function StaleRecovery({
   if (!shown || shown.briefRevision === stale.revision) {
     return (
       <div role="alert">
-        <p>Your brief changed after these results were shown, so “{action}” was not recorded.</p>
+        <p>
+          These results are no longer current, so “{action}” was not recorded. Reload your
+          requirements and search again.
+        </p>
         {onRefreshBrief ? (
           <button onClick={onRefreshBrief} type="button">
             Load latest version

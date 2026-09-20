@@ -10,11 +10,16 @@ import {
   type ResearchedBrand,
 } from '@sei/contracts';
 import type { EnvLike, ShoppingCatalog, ShoppingContext } from '@sei/core';
+import { createPairingPlanner, createProductPageReader, type PairingPlanner } from '@sei/reason';
 import { loadSeedOffers } from '../replay';
 import { liveCatalog } from './live-catalog';
 
 type ResearchCatalog = Pick<ShoppingCatalog, 'search'> & { close(): Promise<void> };
-export type ResearchCatalogFactory = (brief: IntentBrief, sourceDomain: string) => ResearchCatalog;
+export type ResearchCatalogFactory = (
+  brief: IntentBrief,
+  sourceDomain: string,
+  signal?: AbortSignal,
+) => ResearchCatalog;
 
 export class MerchantResearchError extends Error {
   constructor(
@@ -27,76 +32,7 @@ export class MerchantResearchError extends Error {
   }
 }
 
-const PAIRINGS: Record<
-  string,
-  { domain: 'outfit' | 'setup'; complements: string[]; reason: string }
-> = {
-  footwear: {
-    domain: 'outfit',
-    complements: ['bag', 'socks'],
-    reason: 'Pair shoes with a bag or socks for a coordinated outfit.',
-  },
-  top: {
-    domain: 'outfit',
-    complements: ['bottom', 'bag'],
-    reason: 'Pair a top with bottoms or a bag to complete an outfit.',
-  },
-  bottom: {
-    domain: 'outfit',
-    complements: ['top', 'footwear'],
-    reason: 'Pair bottoms with a top or shoes.',
-  },
-  bag: {
-    domain: 'outfit',
-    complements: ['footwear', 'top'],
-    reason: 'Pair a bag with shoes or a top.',
-  },
-  socks: {
-    domain: 'outfit',
-    complements: ['footwear', 'bag'],
-    reason: 'Pair socks with shoes; a bag is another possible add-on.',
-  },
-  accessories: {
-    domain: 'outfit',
-    complements: ['top', 'bag'],
-    reason: 'Add accessories to a clothing or bag collection.',
-  },
-  desk: {
-    domain: 'setup',
-    complements: ['lighting', 'chair'],
-    reason: 'Combine a desk, task lighting and seating for a workspace.',
-  },
-  lighting: {
-    domain: 'setup',
-    complements: ['desk', 'chair'],
-    reason: 'Pair task lighting with a desk or seating.',
-  },
-  chair: {
-    domain: 'setup',
-    complements: ['desk', 'lighting'],
-    reason: 'Combine seating with a desk or task lighting.',
-  },
-  furniture: {
-    domain: 'setup',
-    complements: ['lighting', 'rug'],
-    reason: 'Pair furniture with lighting or a rug for a room setup.',
-  },
-  headphones: {
-    domain: 'setup',
-    complements: ['desk', 'lighting'],
-    reason: 'Pair headphones with desk accessories for a work setup.',
-  },
-  camera: {
-    domain: 'setup',
-    complements: ['tripod', 'bag'],
-    reason: 'Pair a camera with a tripod or protective bag.',
-  },
-  kitchenware: {
-    domain: 'setup',
-    complements: ['tableware', 'kitchen linens'],
-    reason: 'Pair kitchenware with tableware or kitchen linens.',
-  },
-};
+type Pairing = { domain: 'outfit' | 'setup'; complements: string[]; reason: string };
 
 /** Prefer the store's category over ambiguous title words such as "short" in a sock name. */
 export function researchCategory(raw: string): string {
@@ -114,6 +50,27 @@ export function researchCategory(raw: string): string {
   if (/\b(chairs?|seating)\b/.test(value)) return 'chair';
   if (/\b(tops?|shirts?|jackets?|coats?|sweaters?|blouses?)\b/.test(value)) return 'top';
   if (/\b(bottoms?|pants?|trousers?|jeans?|shorts?|skirts?)\b/.test(value)) return 'bottom';
+  if (/\b(leggings?|joggers?|tights?|underwear|boxers?)\b/.test(value)) return 'bottom';
+  if (/\b(sports bras?|bras?|pullovers?|tanks?|tees?|t-shirts?|crop tops?)\b/.test(value))
+    return 'top';
+  if (/\b(protein|creatine|supplements?|pre[- ]?workout|electrolytes?)\b/.test(value))
+    return 'supplements';
+  if (
+    /\b(pull[- ]?up bars?|dumbbells?|kettlebells?|resistance bands?|gym equipment|training equipment)\b/.test(
+      value,
+    )
+  )
+    return 'fitness equipment';
+  if (/\b(skincare|serums?|moisturi[sz]ers?|cleansers?|sunscreens?)\b/.test(value))
+    return 'skincare';
+  if (
+    /\b(makeup|cosmetics?|lip|lipsticks?|mascaras?|foundations?|concealers?|blush|bronzers?|highlighters?|eyeshadows?)\b/.test(
+      value,
+    )
+  )
+    return 'makeup';
+  if (/\b(beauty tools?|makeup brushes?|applicators?|sponges?|mirrors?)\b/.test(value))
+    return 'beauty tools';
   return value;
 }
 
@@ -144,6 +101,26 @@ export function distinctProducts(offers: readonly ProductOffer[]): ProductOffer[
   return [...products.values()];
 }
 
+function interleave(groups: readonly ProductOffer[][]): ProductOffer[] {
+  const result: ProductOffer[] = [];
+  const longest = Math.max(0, ...groups.map((group) => group.length));
+  for (let index = 0; index < longest; index++) {
+    for (const group of groups) {
+      const offer = group[index];
+      if (offer) result.push(offer);
+    }
+  }
+  return result;
+}
+
+function examples(products: readonly ProductOffer[]): string {
+  return products
+    .slice(0, 2)
+    .map((product) => product.title)
+    .join(' and ')
+    .slice(0, 180);
+}
+
 function groups(
   offers: ProductOffer[],
   reason: (products: ProductOffer[]) => string,
@@ -158,18 +135,59 @@ function groups(
     .map((products) => ({ merchant: products[0]!.merchant, products, reason: reason(products) }));
 }
 
+function priceComparison(own: ProductOffer[], rivals: ProductOffer[], currency: string): string {
+  const amounts = (products: ProductOffer[]) =>
+    products
+      .flatMap((p) =>
+        p.price?.currency === currency && p.price.amount > 0 ? [p.price.amount] : [],
+      )
+      .sort((a, b) => a - b);
+  const a = amounts(own),
+    b = amounts(rivals);
+  if (!a.length || !b.length) return 'Price positioning is unverified.';
+  const format = new Intl.NumberFormat('en', { style: 'currency', currency });
+  const ratio = b[Math.floor(b.length / 2)]! / a[Math.floor(a.length / 2)]!;
+  const position =
+    ratio < 0.5
+      ? 'Lower-priced alternative'
+      : ratio > 2
+        ? 'Premium alternative'
+        : 'Similar price tier';
+  return `${position}: sampled prices ${format.format(b[0]! / 100)}–${format.format(b[b.length - 1]! / 100)}.`;
+}
+
 export function createMerchantResearch(
   env: EnvLike,
-  options: { openCatalog?: ResearchCatalogFactory; now?: () => Date; timeoutMs?: number } = {},
+  options: {
+    openCatalog?: ResearchCatalogFactory;
+    now?: () => Date;
+    timeoutMs?: number;
+    categoryTimeoutMs?: number;
+    cleanupTimeoutMs?: number;
+    planner?: PairingPlanner;
+    minimumResults?: number;
+    recordedOffers?: ProductOffer[];
+  } = {},
 ) {
   let busy = false;
   const openCatalog: ResearchCatalogFactory =
     options.openCatalog ??
-    ((brief, sourceDomain) => {
+    ((brief, sourceDomain, signal) => {
       const attempts = new Map<string, number>();
+      const model =
+        env.OPENAI_MODEL_PAIRINGS || env.OPENAI_MODEL_REASONING || env.OPENAI_MODEL_VISION;
       return liveCatalog(brief, env, {
-        fetchBudget: 24,
-        minimumBrands: 3,
+        fetchBudget: 90,
+        minimumBrands: 6,
+        searchResultsPerQuery: 10,
+        candidatesPerQuery: 6,
+        offersPerSlot: 12,
+        plannedQueries: true,
+        browserSignal: signal,
+        readProductText:
+          env.OPENAI_API_KEY && model
+            ? createProductPageReader({ apiKey: env.OPENAI_API_KEY, model })
+            : undefined,
         searchProducts: (input) => {
           const query = input.query.replace(/\bfootwear\b/gi, 'shoes');
           const attempt = attempts.get(query) ?? 0;
@@ -186,7 +204,9 @@ export function createMerchantResearch(
       offers: ProductOffer[],
       request: MerchantResearchRequest,
       callerSignal: AbortSignal,
+      onProgress?: (progress: { stage: string; completed: number; total: number }) => void,
     ): Promise<MerchantResearch> {
+      onProgress?.({ stage: 'Planning catalog-specific pairings', completed: 0, total: 0 });
       if (busy)
         throw new MerchantResearchError(
           'MERCHANT_RESEARCH_BUSY',
@@ -211,8 +231,23 @@ export function createMerchantResearch(
           422,
           'Choose a category from your store catalog.',
         );
-      const pairing = PAIRINGS[category];
-      const complements = pairing?.complements ?? [];
+      let pairing: Pairing | undefined =
+        source.sampleOrigin === 'live'
+          ? undefined
+          : {
+              domain: category === 'top' || category === 'footwear' ? 'outfit' : 'setup',
+              complements: [
+                ...new Set(
+                  (options.recordedOffers ?? loadSeedOffers()).map((p) =>
+                    researchCategory(p.category),
+                  ),
+                ),
+              ]
+                .filter((c) => c !== category)
+                .slice(0, 5),
+              reason: 'Synthetic catalog pairing for demonstration.',
+            };
+      let complements = pairing?.complements ?? [];
       const live = source.sampleOrigin === 'live';
       if (live && !options.openCatalog && !env.BROWSERBASE_API_KEY?.trim())
         throw new MerchantResearchError(
@@ -221,22 +256,94 @@ export function createMerchantResearch(
           'Brand search is not configured on this server.',
         );
       busy = true;
-      const timeout = AbortSignal.timeout(options.timeoutMs ?? 150_000);
+      const timeout = AbortSignal.timeout(options.timeoutMs ?? 600_000);
       const signal = AbortSignal.any([callerSignal, timeout]);
       let catalog: ResearchCatalog | undefined;
       const gaps: string[] = [];
-      const categories = [...complements, category];
+      let failedSearches = 0;
       try {
+        const queries = new Map<string, string>();
+        const reasons = new Map<string, string>();
+        let competitorReason = `Comparable ${category} products`;
+        if (live || (source.sampleOrigin === 'replay' && options.planner)) {
+          const model =
+            env.OPENAI_MODEL_PAIRINGS?.trim() ||
+            env.OPENAI_MODEL_REASONING?.trim() ||
+            env.OPENAI_MODEL_VISION?.trim();
+          const planner =
+            options.planner ??
+            (env.OPENAI_API_KEY && model
+              ? createPairingPlanner({ apiKey: env.OPENAI_API_KEY, model })
+              : undefined);
+          if (!planner)
+            throw new MerchantResearchError(
+              'MERCHANT_RESEARCH_DISABLED',
+              503,
+              'Configure OpenAI to plan catalog-specific pairings.',
+            );
+          try {
+            const sample =
+              own.length <= 40
+                ? own
+                : Array.from(
+                    { length: 40 },
+                    (_, i) => own[Math.floor((i * (own.length - 1)) / 39)]!,
+                  );
+            const plan = await planner(sample, category, request.currency, signal);
+            if (plan.competitor) {
+              queries.set(category, plan.competitor.query);
+              competitorReason = plan.competitor.reason;
+            }
+            complements = [...new Set(plan.ideas.map((idea) => researchCategory(idea.category)))]
+              .filter((target) => target !== category)
+              .slice(0, 5);
+            for (const idea of plan.ideas) {
+              queries.set(researchCategory(idea.category), idea.query);
+              reasons.set(researchCategory(idea.category), idea.reason);
+            }
+            pairing = {
+              domain: plan.domain,
+              complements,
+              reason: 'Products selected for complementary uses and compatible prices.',
+            };
+          } catch {
+            throw new MerchantResearchError(
+              'MERCHANT_RESEARCH_UNAVAILABLE',
+              503,
+              'Pairing planning could not finish. Please try again.',
+            );
+          }
+        }
+        const categories = [category, ...complements];
+        const audienceText = own.map((p) => `${p.title} ${p.category} ${p.productUrl}`).join(' ');
+        const mixedAudience =
+          /\bwom[ae]n(?:s|'s)?\b/i.test(audienceText) && /\bm[ae]n(?:s|'s)?\b/i.test(audienceText);
+        const rivalQuery = (queries.get(category) ?? category)
+          .replace(/\b(?:wom[ae]n|m[ae]n)(?:s|'s)?\b/gi, '')
+          .trim();
+        const searchSlots = mixedAudience
+          ? [
+              { category, description: `mens ${rivalQuery}` },
+              { category, description: `womens ${rivalQuery}` },
+              ...complements.map((target) => ({
+                category: target,
+                description: queries.get(target) ?? target,
+              })),
+            ]
+          : categories.map((target) => ({
+              category: target,
+              description: queries.get(target) ?? target,
+            }));
         const brief = IntentBriefSchema.parse({
           id: 'brief_merchant_research',
           revision: 1,
           status: 'confirmed',
           domain: pairing?.domain ?? 'setup',
           input: { kind: 'text', text: `Public catalog research for ${category}.` },
-          slots: categories.map((target, index) => ({
+          slots: searchSlots.map((target, index) => ({
             id: `slot_merchant_${index}`,
-            category: target,
-            description: target,
+            category: target.category,
+            description: target.description,
             required: true,
             visualAttributes: [],
             constraints: [],
@@ -248,10 +355,10 @@ export function createMerchantResearch(
           createdAt: (options.now?.() ?? new Date()).toISOString(),
         });
         const remaining: Record<string, number> = {
-          catalog_query: 6,
-          fetch: 24,
-          browser_session: 1,
-          model_call: 0,
+          catalog_query: searchSlots.length * 3,
+          fetch: 90,
+          browser_session: 2,
+          model_call: 12,
         };
         const context: ShoppingContext = {
           signal,
@@ -262,102 +369,200 @@ export function createMerchantResearch(
             if (remaining[resource]! < 0) throw new Error('Merchant research budget exhausted');
           },
         };
-        catalog = live
-          ? openCatalog(brief, source.merchant.domain)
-          : {
-              search: async (query) =>
-                loadSeedOffers().filter(
-                  (offer) => researchCategory(offer.category) === researchCategory(query.text),
-                ),
-              close: async () => {},
-            };
+        catalog =
+          live || (source.sampleOrigin === 'replay' && options.openCatalog)
+            ? openCatalog(brief, source.merchant.domain, signal)
+            : {
+                search: async (query) =>
+                  loadSeedOffers().filter(
+                    (offer) => researchCategory(offer.category) === researchCategory(query.text),
+                  ),
+                close: async () => {},
+              };
         const found = new Map<string, ProductOffer[]>();
-        for (const slot of brief.slots) {
-          if (signal.aborted) {
-            gaps.push('Search stopped before all categories were checked.');
-            break;
+        const activeCatalog = catalog;
+        let nextSlot = 0;
+        let completed = 0;
+        onProgress?.({
+          stage: 'Searching stores and checking products',
+          completed,
+          total: brief.slots.length,
+        });
+        const worker = async () => {
+          while (nextSlot < brief.slots.length) {
+            const slot = brief.slots[nextSlot++]!;
+            if (signal.aborted) {
+              gaps.push('Search stopped before all categories were checked.');
+              break;
+            }
+            try {
+              const categorySignal = AbortSignal.any([
+                signal,
+                AbortSignal.timeout(options.categoryTimeoutMs ?? 120_000),
+              ]);
+              const result = await untilAborted(
+                activeCatalog.search(
+                  {
+                    slotId: slot.id,
+                    text: slot.category,
+                    country: request.country,
+                    currency: request.currency,
+                    limit: 8,
+                  },
+                  { ...context, signal: categorySignal },
+                ),
+                categorySignal,
+              );
+              signal.throwIfAborted();
+              const verified = distinctProducts(result).filter((offer) => {
+                try {
+                  const url = new URL(offer.productUrl);
+                  return (
+                    offer.sampleOrigin === source.sampleOrigin &&
+                    !sameStore(offer.merchant.domain, source.merchant.domain) &&
+                    host(url.hostname) === host(offer.merchant.domain) &&
+                    url.protocol === 'https:' &&
+                    !/\/(blogs?|articles?|news|stories)(\/|$)/i.test(url.pathname) &&
+                    offer.evidence.some(
+                      (item) =>
+                        item.field === 'product_record' ||
+                        (item.field === 'source_strategy' && item.method === 'browser'),
+                    ) &&
+                    researchCategory(offer.category) === slot.category
+                  );
+                } catch {
+                  return false;
+                }
+              });
+              found.set(
+                slot.category,
+                distinctProducts(interleave([found.get(slot.category) ?? [], verified])),
+              );
+              if (verified.length === 0)
+                gaps.push(`No products from other stores found for ${slot.category}.`);
+            } catch (error) {
+              console.warn(
+                '[merchant-research]',
+                JSON.stringify({
+                  event: 'category_search_failed',
+                  category: slot.category,
+                  errorName:
+                    typeof error === 'object' && error !== null && 'name' in error
+                      ? String(error.name)
+                      : typeof error,
+                }),
+              );
+              failedSearches += 1;
+              gaps.push(`Could not finish the ${slot.category} search.`);
+            } finally {
+              completed += 1;
+              onProgress?.({
+                stage: 'Searching stores and checking products',
+                completed,
+                total: brief.slots.length,
+              });
+            }
           }
-          try {
-            const result = await untilAborted(
-              catalog.search(
-                {
-                  slotId: slot.id,
-                  text: slot.category,
-                  country: request.country,
-                  currency: request.currency,
-                  limit: 8,
-                },
-                context,
-              ),
-              signal,
-            );
-            signal.throwIfAborted();
-            const verified = distinctProducts(result).filter((offer) => {
-              try {
-                const url = new URL(offer.productUrl);
-                return (
-                  offer.sampleOrigin === source.sampleOrigin &&
-                  !sameStore(offer.merchant.domain, source.merchant.domain) &&
-                  host(url.hostname) === host(offer.merchant.domain) &&
-                  url.protocol === 'https:' &&
-                  !/\/(blogs?|articles?|news|stories)(\/|$)/i.test(url.pathname) &&
-                  offer.evidence.some(
-                    (item) =>
-                      item.field === 'product_record' ||
-                      (item.field === 'source_strategy' && item.method === 'browser'),
-                  ) &&
-                  researchCategory(offer.category) === slot.category
-                );
-              } catch {
-                return false;
-              }
-            });
-            found.set(slot.category, verified);
-            if (verified.length === 0)
-              gaps.push(`No products from other stores found for ${slot.category}.`);
-          } catch {
-            gaps.push(`Could not finish the ${slot.category} search.`);
-          }
-        }
+        };
+        await Promise.all([worker(), worker()]);
+        onProgress?.({
+          stage: 'Comparing prices and assembling results',
+          completed,
+          total: brief.slots.length,
+        });
         if (callerSignal.aborted) throw callerSignal.reason;
+        if (failedSearches === brief.slots.length) {
+          if (timeout.aborted) {
+            throw new MerchantResearchError(
+              'MERCHANT_RESEARCH_TIMEOUT',
+              504,
+              'Product and brand research took too long. Try the search again.',
+            );
+          }
+          throw new MerchantResearchError(
+            'MERCHANT_RESEARCH_UNAVAILABLE',
+            503,
+            'The catalog provider could not complete this search. Try again.',
+          );
+        }
         if (!pairing)
           gaps.push(
             'No bundle categories are configured for this product type. Competitor search is available.',
           );
-        const complementary = complements.flatMap((target) => found.get(target) ?? []);
+        const anchors = own.filter(
+          (p) =>
+            researchCategory(p.category) === category &&
+            p.availability !== 'unavailable' &&
+            p.price?.currency === request.currency &&
+            p.price.amount > 0,
+        );
+        const compatibleAnchor = (offer: ProductOffer) =>
+          anchors
+            .filter(
+              (p) =>
+                offer.price &&
+                offer.price.currency === p.price!.currency &&
+                offer.price.amount > 0 &&
+                offer.price.amount <= p.price!.amount * 3,
+            )
+            .sort(
+              (a, b) =>
+                Math.abs(a.price!.amount - offer.price!.amount) -
+                Math.abs(b.price!.amount - offer.price!.amount),
+            )[0];
+        const complementary = interleave(
+          complements.map((target) => (found.get(target) ?? []).filter((p) => compatibleAnchor(p))),
+        );
+        if (
+          complements.some((target) => (found.get(target) ?? []).some((p) => !compatibleAnchor(p)))
+        )
+          gaps.push(
+            'Products with unknown prices, different currencies or prices above 3× the store item were excluded.',
+          );
         const partners = groups(
           complementary,
           (products) =>
-            `Sells ${[...new Set(products.map((product) => product.category))].join(' and ')} to pair with your ${category}.`,
+            `Complements your ${category} catalog with ${[
+              ...new Set(products.map((product) => product.category)),
+            ].join(' and ')}; examples found include ${examples(products)}.`,
         );
         const competitors = groups(
           found.get(category) ?? [],
-          () => `Sells ${category}, the category selected for comparison.`,
+          (products) =>
+            `${competitorReason} Based on ${products.length} verified products; examples found include ${examples(products)}. ${priceComparison(anchors, products, request.currency)}`,
         );
-        const ownProduct =
-          own.find(
-            (offer) =>
-              researchCategory(offer.category) === category && offer.availability === 'available',
-          ) ?? own.find((offer) => researchCategory(offer.category) === category)!;
+        const ownProducts = own.filter(
+          (offer) =>
+            researchCategory(offer.category) === category && offer.availability !== 'unavailable',
+        );
+        if (ownProducts.length === 0) {
+          ownProducts.push(own.find((offer) => researchCategory(offer.category) === category)!);
+        }
         const bundles = complementary
-          .filter(
-            (offer) =>
-              ownProduct.availability !== 'unavailable' && offer.availability !== 'unavailable',
-          )
+          .filter((offer) => ownProducts.length > 0 && offer.availability !== 'unavailable')
           .slice(0, 6)
           .map((offer) => ({
-            ownProduct,
+            ownProduct: compatibleAnchor(offer)!,
             complementaryProduct: offer,
-            reason: pairing?.reason ?? `Combine ${category} with ${offer.category}.`,
-            itemSubtotal:
-              ownProduct.price && offer.price && ownProduct.price.currency === offer.price.currency
-                ? {
-                    amount: ownProduct.price.amount + offer.price.amount,
-                    currency: offer.price.currency,
-                  }
-                : null,
+            reason:
+              reasons.get(researchCategory(offer.category)) ??
+              pairing?.reason ??
+              `Combine ${category} with ${offer.category}.`,
+            itemSubtotal: {
+              amount: compatibleAnchor(offer)!.price!.amount + offer.price!.amount,
+              currency: offer.price!.currency,
+            },
           }));
         if (timeout.aborted) gaps.push('Time limit reached. These are the results found so far.');
+        const minimum = options.minimumResults ?? 3;
+        if (
+          live &&
+          (bundles.length < minimum || partners.length < minimum || competitors.length < minimum)
+        ) {
+          gaps.push(
+            `Limited coverage: found ${bundles.length} bundles, ${partners.length} complementary brands and ${competitors.length} rivals. Target: at least ${minimum} in each section. Only source-backed products are shown.`,
+          );
+        }
         return MerchantResearchSchema.parse({
           merchantId: source.merchant.id,
           sampleOrigin: source.sampleOrigin,
@@ -378,7 +583,13 @@ export function createMerchantResearch(
         });
       } finally {
         try {
-          await catalog?.close();
+          if (catalog)
+            await untilAborted(
+              catalog.close(),
+              AbortSignal.timeout(options.cleanupTimeoutMs ?? 3000),
+            );
+        } catch {
+          console.warn('[merchant-research]', JSON.stringify({ event: 'cleanup_failed' }));
         } finally {
           busy = false;
         }

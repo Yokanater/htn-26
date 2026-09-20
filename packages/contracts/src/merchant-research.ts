@@ -26,7 +26,7 @@ export const MerchantResearchSchema = z.strictObject({
   createdAt: z.iso.datetime(),
   status: z.enum(['ready', 'partial', 'empty']),
   category: z.string().min(1),
-  complementaryCategories: z.array(z.string().min(1)).max(2),
+  complementaryCategories: z.array(z.string().min(1)).max(5),
   comparisonProducts: z.array(ProductOfferSchema).max(150),
   bundles: z
     .array(

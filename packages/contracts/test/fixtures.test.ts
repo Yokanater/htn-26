@@ -10,6 +10,7 @@ import {
   DemandAggregateSchema,
   DemandEventSchema,
   IntentBriefSchema,
+  MerchantDemandSummarySchema,
   MerchantOpportunitySchema,
   MerchantResearchSchema,
   ProductOfferSchema,
@@ -26,6 +27,7 @@ const SCHEMAS: Record<string, ZodType> = {
   'aggregate.json': DemandAggregateSchema,
   'opportunity.json': MerchantOpportunitySchema,
   'merchant-research.json': MerchantResearchSchema,
+  'merchant-demand-summary.json': MerchantDemandSummarySchema,
 };
 
 function walk(dir: string): string[] {

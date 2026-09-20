@@ -1,5 +1,5 @@
 /**
- * Syntax-only merchant URL parse. Owner: L4 (S4-L4-1 / live opt-in).
+ * Syntax-only merchant URL parse. Owner: L4 (S4-L4-1).
  * Seed `.example` hosts cannot pass real DNS checks; this rejects unsafe URLs before L1.
  */
 import { isIP } from 'node:net';
@@ -11,7 +11,7 @@ const BLOCKED_NAMES = /(^localhost$|\.localhost$|\.local$|\.internal$)/i;
 export class MerchantUrlError extends Error {
   readonly code = 'INVALID_URL';
   constructor() {
-    super('Enter a public HTTPS store URL without credentials or private hosts.');
+    super('Enter a public store domain or HTTPS URL without credentials or private hosts.');
     this.name = 'MerchantUrlError';
   }
 }
@@ -28,7 +28,8 @@ export class MerchantCatalogDisabledError extends Error {
 }
 
 export function parseMerchantUrl(raw: string): { href: string; host: string } {
-  const href = raw.trim();
+  const input = raw.trim();
+  const href = /^[a-z][a-z\d+.-]*:\/\//i.test(input) ? input : `https://${input}`;
   let url: URL;
   try {
     url = new URL(href);
@@ -43,7 +44,7 @@ export function parseMerchantUrl(raw: string): { href: string; host: string } {
   if (isIP(host)) throw new MerchantUrlError();
   if (host.startsWith('.') || host.endsWith('.') || host.includes('..'))
     throw new MerchantUrlError();
-  return { href, host };
+  return { href: url.href, host };
 }
 
 export function parseMerchantHost(raw: string): string {

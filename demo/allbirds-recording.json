@@ -1,0 +1,585 @@
+{
+  "capturedAt": "2026-09-20T07:40:48.309Z",
+  "anchor": "www.allbirds.com",
+  "notice": "Public catalog recording. Rehearsal choices are not real purchases or live demand.",
+  "offers": [
+    {
+      "id": "offer_553f73d63715130bd5f70db0c3",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "7218356060240",
+      "variantId": "41334293889104",
+      "title": "Men's Strider Explore - Natural Black (Dark Grey Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-strider-explore",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/A11768_25Q4_Strider-Explore-Natural-Black-Dark-Grey-Sole_PDP_LEFT.png?v=1759336475",
+      "price": {
+        "amount": 13000,
+        "currency": "USD"
+      },
+      "availability": "unavailable",
+      "shipsTo": null,
+      "attributes": {
+        "size": "8"
+      },
+      "evidence": [
+        {
+          "id": "ev_de33d79b5926714a0e8585215f",
+          "field": "product_record",
+          "value": "Men's Strider Explore - Natural Black (Dark Grey Sole) (7218356060240/41334293889104)",
+          "url": "https://www.allbirds.com/products/mens-strider-explore.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_11c1a8cc680e276b69aead0056",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "7205191974992",
+      "variantId": "41271176822864",
+      "title": "Men's Dasher NZ - Anthracite (Dark Anthracite Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-dasher-nz-anthracite",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/A12416_26Q1_Dasher-NZ-Anthracite-Dark-Anthr_PDP_LEFT.png?v=1768948005",
+      "price": {
+        "amount": 14000,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "9"
+      },
+      "evidence": [
+        {
+          "id": "ev_1e31f4b6f80cbea730eea20a0f",
+          "field": "product_record",
+          "value": "Men's Dasher NZ - Anthracite (Dark Anthracite Sole) (7205191974992/41271176822864)",
+          "url": "https://www.allbirds.com/products/mens-dasher-nz-anthracite.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_ffcdfcf1884da0983116c6b29d",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "7199699927120",
+      "variantId": "41243839561808",
+      "title": "Men's Strider - Medium Grey (Blizzard Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-strider-medium-grey",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/A11729_25Q3_Strider-Medium-Grey-Blizzard-Sole_PDP_LEFT.png?v=1754951480",
+      "price": {
+        "amount": 13000,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "9"
+      },
+      "evidence": [
+        {
+          "id": "ev_88e43786f7632c7f6537913326",
+          "field": "product_record",
+          "value": "Men's Strider - Medium Grey (Blizzard Sole) (7199699927120/41243839561808)",
+          "url": "https://www.allbirds.com/products/mens-strider-medium-grey.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_82fcd22db8da260179055338f4",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "6643980468304",
+      "variantId": "39656140243024",
+      "title": "Men's Tree Dasher 2 - Natural Black (Blizzard Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-tree-dashers",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/AA000YM_SHOE_LEFT_GLOBAL_MENS_TREE_DASHER_2.0_Natural_Black_Blizzard_48bbccd1-a0ef-475d-a3c1-af945ece7fbc.png?v=1751061059",
+      "price": {
+        "amount": 14000,
+        "currency": "USD"
+      },
+      "availability": "unavailable",
+      "shipsTo": null,
+      "attributes": {
+        "size": "8"
+      },
+      "evidence": [
+        {
+          "id": "ev_9bbb728ce36f7e019778b8694e",
+          "field": "product_record",
+          "value": "Men's Tree Dasher 2 - Natural Black (Blizzard Sole) (6643980468304/39656140243024)",
+          "url": "https://www.allbirds.com/products/mens-tree-dashers.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_a6efff57eec945c7a9cf082cb9",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "7199711461456",
+      "variantId": "41243886321744",
+      "title": "Men's Wool Strider - Rugged Beige (Natural White Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-wool-strider-rugged-beige",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/A11840_25Q3_Wool-Strider-Rugged-Beige-Natural-White-Sole_PDP_LEFT__1.png?v=1754953087",
+      "price": {
+        "amount": 13000,
+        "currency": "USD"
+      },
+      "availability": "unavailable",
+      "shipsTo": null,
+      "attributes": {
+        "size": "8"
+      },
+      "evidence": [
+        {
+          "id": "ev_8251fa250f6e32e6cd7b8a7a7d",
+          "field": "product_record",
+          "value": "Men's Wool Strider - Rugged Beige (Natural White Sole) (7199711461456/41243886321744)",
+          "url": "https://www.allbirds.com/products/mens-wool-strider-rugged-beige.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_0173ae2491ce751c8e45da2b2f",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "7199700189264",
+      "variantId": "41243842183248",
+      "title": "Men's Strider - Natural Black (Natural Black Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-strider-natural-black",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/A11791_25Q3_Strider-Natural-Black-Natural-Black-Sole_PDP_LEFT__1.png?v=1754951783",
+      "price": {
+        "amount": 13000,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "12.5"
+      },
+      "evidence": [
+        {
+          "id": "ev_2f3638c03aace3926cd4773f55",
+          "field": "product_record",
+          "value": "Men's Strider - Natural Black (Natural Black Sole) (7199700189264/41243842183248)",
+          "url": "https://www.allbirds.com/products/mens-strider-natural-black.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_c6c37ae13ff7fa6f873dd3a0bd",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "7199683346512",
+      "variantId": "41243757936720",
+      "title": "Men's Strider - Rugged Beige (Stony Cream Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-strider-rugged-beige",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/A11847_25Q3_Strider-Rugged-Beige-Stony-Cream-Sole_PDP_LEFT__1.png?v=1754951981",
+      "price": {
+        "amount": 13000,
+        "currency": "USD"
+      },
+      "availability": "unavailable",
+      "shipsTo": null,
+      "attributes": {
+        "size": "8"
+      },
+      "evidence": [
+        {
+          "id": "ev_a58a821d6f63a12f581b78b02d",
+          "field": "product_record",
+          "value": "Men's Strider - Rugged Beige (Stony Cream Sole) (7199683346512/41243757936720)",
+          "url": "https://www.allbirds.com/products/mens-strider-rugged-beige.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_47fc4021ac1994a5b736f1d834",
+      "merchant": {
+        "id": "mer_d4b5b2499a2c579e91762e768a",
+        "name": "allbirds.com",
+        "domain": "www.allbirds.com"
+      },
+      "productId": "7199681085520",
+      "variantId": "41243749285968",
+      "title": "Men's Strider - Natural Black (Blizzard Sole)",
+      "category": "footwear",
+      "productUrl": "https://www.allbirds.com/products/mens-strider-natural-black-blizzard",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1104/4168/files/A11746_25Q3_Strider-Natural-Black-Blizzard-Sole_PDP_LEFT__1.png?v=1754951623",
+      "price": {
+        "amount": 13000,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "11.5"
+      },
+      "evidence": [
+        {
+          "id": "ev_4325d33db3265c7e6b276175e5",
+          "field": "product_record",
+          "value": "Men's Strider - Natural Black (Blizzard Sole) (7199681085520/41243749285968)",
+          "url": "https://www.allbirds.com/products/mens-strider-natural-black-blizzard.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_adcc3a1e61b3f2a9005e164465",
+      "merchant": {
+        "id": "mer_006ab840749e6c54398daa58b8",
+        "name": "darntough.com",
+        "domain": "darntough.com"
+      },
+      "productId": "8409641975994",
+      "variantId": "45954558722234",
+      "title": "Women's Micro Crew Cushioned Ultra-Lightweight Running Socks",
+      "category": "socks",
+      "productUrl": "https://darntough.com/products/womens-merino-wool-run-micro-crew-cushioned-ultra-lightweight-running-socks",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1354/8177/files/1072_Black.png?v=1780667814",
+      "price": {
+        "amount": 2300,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "Cushion"
+      },
+      "evidence": [
+        {
+          "id": "ev_ad3f17d347087ff5af0c0ea313",
+          "field": "product_record",
+          "value": "Women's Micro Crew Cushioned Ultra-Lightweight Running Socks (8409641975994/45954558722234)",
+          "url": "https://darntough.com/products/womens-merino-wool-run-micro-crew-cushioned-ultra-lightweight-running-socks.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_70f26d47f80f16dd1898630410",
+      "merchant": {
+        "id": "mer_006ab840749e6c54398daa58b8",
+        "name": "darntough.com",
+        "domain": "darntough.com"
+      },
+      "productId": "8409641844922",
+      "variantId": "45954557870266",
+      "title": "Men's Run Micro Crew Cushioned Ultra-Lightweight Running Socks",
+      "category": "socks",
+      "productUrl": "https://darntough.com/products/mens-merino-wool-run-micro-crew-cushioned-ultra-lightweight-running-socks",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1354/8177/files/1071_White.png?v=1780667815",
+      "price": {
+        "amount": 2300,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "Cushion"
+      },
+      "evidence": [
+        {
+          "id": "ev_bc10b84f291501abe94f61b5d2",
+          "field": "product_record",
+          "value": "Men's Run Micro Crew Cushioned Ultra-Lightweight Running Socks (8409641844922/45954557870266)",
+          "url": "https://darntough.com/products/mens-merino-wool-run-micro-crew-cushioned-ultra-lightweight-running-socks.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_d299463d3d68923ba095659af0",
+      "merchant": {
+        "id": "mer_b6d5531a3e9681e1976bf437a3",
+        "name": "stanley1913.com",
+        "domain": "www.stanley1913.com"
+      },
+      "productId": "14973522215272",
+      "variantId": "53974578069864",
+      "title": "Halloween Quencher® H2.0 Flowstate™ Tumbler | 40 OZ",
+      "category": "bottle",
+      "productUrl": "https://www.stanley1913.com/products/halloween-quencher®-h2-0-flowstate™-tumbler-40-oz",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheQuencherH2.0FlowstateTumbler-40oz1.18L-BordeauxLace-Front.png?v=1788889112",
+      "price": {
+        "amount": 5000,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "Bordeaux Lace"
+      },
+      "evidence": [
+        {
+          "id": "ev_c826cc5585f8c0dc2f65dc1500",
+          "field": "product_record",
+          "value": "Halloween Quencher® H2.0 Flowstate™ Tumbler | 40 OZ (14973522215272/53974578069864)",
+          "url": "https://www.stanley1913.com/products/halloween-quencher®-h2-0-flowstate™-tumbler-40-oz.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_cb67f3c2508db8c5afb5f2036b",
+      "merchant": {
+        "id": "mer_b6d5531a3e9681e1976bf437a3",
+        "name": "stanley1913.com",
+        "domain": "www.stanley1913.com"
+      },
+      "productId": "14973635068264",
+      "variantId": "53974835593576",
+      "title": "Halloween Quencher®  H2.0 Flowstate™ Tumbler | 20 OZ",
+      "category": "bottle",
+      "productUrl": "https://www.stanley1913.com/products/halloween-quencher®-h2-0-flowstate™-tumbler-20-oz",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-The_Quencher_H2.0_Flowstate_Tumbler-20_oz_0.59_L-Bordeaux_Lace-Front.png?v=1788558019",
+      "price": {
+        "amount": 4000,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "Bordeaux Lace"
+      },
+      "evidence": [
+        {
+          "id": "ev_b8b4fc96f040cdac6ced41fc88",
+          "field": "product_record",
+          "value": "Halloween Quencher®  H2.0 Flowstate™ Tumbler | 20 OZ (14973635068264/53974835593576)",
+          "url": "https://www.stanley1913.com/products/halloween-quencher®-h2-0-flowstate™-tumbler-20-oz.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_901aaf194f75aed8162f0312f5",
+      "merchant": {
+        "id": "mer_c53c56e30654f41e1d439a68e5",
+        "name": "vessi.com",
+        "domain": "vessi.com"
+      },
+      "productId": "7531928584277",
+      "variantId": "42940691218517",
+      "title": "Men's Stormburst Low Top - Dark Olive Camo",
+      "category": "footwear",
+      "productUrl": "https://vessi.com/products/mens-stormburst-low-top-dark-olive-camo",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/2496/2470/files/StormburstLow-DarkOlive_Camo-Left.png?v=1788456899",
+      "price": {
+        "amount": 24200,
+        "currency": "CAD"
+      },
+      "availability": "unavailable",
+      "shipsTo": null,
+      "attributes": {
+        "size": "Dark Olive Camo"
+      },
+      "evidence": [
+        {
+          "id": "ev_6f6aac1e9119b97113429c7391",
+          "field": "product_record",
+          "value": "Men's Stormburst Low Top - Dark Olive Camo (7531928584277/42940691218517)",
+          "url": "https://vessi.com/products/mens-stormburst-low-top-dark-olive-camo.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_7d60f38f35018c45e57b8623ad",
+      "merchant": {
+        "id": "mer_8abea51d4ab9910147ba8a7be0",
+        "name": "rothys.com",
+        "domain": "www.rothys.com"
+      },
+      "productId": "7642707591262",
+      "variantId": "42762945888350",
+      "title": "The Ivy Sneaker - ReVelvet™ Cinnamon",
+      "category": "footwear",
+      "productUrl": "https://www.rothys.com/products/womens-ivy-sneaker-revelvet-cinnamon",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0877/4986/files/521_ReVelvetRunner_ReVelvetCinnamonStripe_PrimaryOverhead_6262_f0aa7de5-cebe-44c7-bf96-d9d79f2bca11.jpg?v=1788056162",
+      "price": {
+        "amount": 14500,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "ReVelvet™ Cinnamon"
+      },
+      "evidence": [
+        {
+          "id": "ev_1527816b292efdc2e92f9c9c8e",
+          "field": "product_record",
+          "value": "The Ivy Sneaker - ReVelvet™ Cinnamon (7642707591262/42762945888350)",
+          "url": "https://www.rothys.com/products/womens-ivy-sneaker-revelvet-cinnamon.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_b743b173ef2b1310e4c7c8973d",
+      "merchant": {
+        "id": "mer_cf703415c37dffd4465afdd2b9",
+        "name": "thursdayboots.com",
+        "domain": "thursdayboots.com"
+      },
+      "productId": "7748876468314",
+      "variantId": "42801439080538",
+      "title": "Premier Low Top | Cactus",
+      "category": "footwear",
+      "productUrl": "https://thursdayboots.com/products/mens-premier-low-top-sneaker-dark-olive-cactus",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0419/1525/files/1024x1024-Men-Premier-LowTop-Cactus-111835-3.4.jpg?v=1768949206",
+      "price": {
+        "amount": 19000,
+        "currency": "CAD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "6"
+      },
+      "evidence": [
+        {
+          "id": "ev_fa204a9342568e232b4bc401c0",
+          "field": "product_record",
+          "value": "Premier Low Top | Cactus (7748876468314/42801439080538)",
+          "url": "https://thursdayboots.com/products/mens-premier-low-top-sneaker-dark-olive-cactus.js",
+          "capturedAt": "2026-09-20T07:34:50.682Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_0d424fd8a786881b431ce412a7",
+      "merchant": {
+        "id": "mer_a181fa3ccb1bfef049460261f2",
+        "name": "topodesigns.com",
+        "domain": "topodesigns.com"
+      },
+      "productId": "8217514573877",
+      "variantId": "45906145706037",
+      "title": "Rover Pack Tech",
+      "category": "bag",
+      "productUrl": "https://topodesigns.com/products/rover-pack-tech-navy",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0277/0693/products/Rover-Pack-Tech-Navy-1.jpg?v=1709757940",
+      "price": {
+        "amount": 14900,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "Navy"
+      },
+      "evidence": [
+        {
+          "id": "ev_fcc30f45596b83b5ab06506da3",
+          "field": "product_record",
+          "value": "Rover Pack Tech (8217514573877/45906145706037)",
+          "url": "https://topodesigns.com/products/rover-pack-tech-navy.js",
+          "capturedAt": "2026-09-20T07:40:48.309Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    },
+    {
+      "id": "offer_b482ec82bdc2307d8fbf71fbb7",
+      "merchant": {
+        "id": "mer_a181fa3ccb1bfef049460261f2",
+        "name": "topodesigns.com",
+        "domain": "topodesigns.com"
+      },
+      "productId": "8217514541109",
+      "variantId": "45906145607733",
+      "title": "Rover Pack Tech",
+      "category": "bag",
+      "productUrl": "https://topodesigns.com/products/rover-pack-tech-black",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0277/0693/products/Rover-Pack-Tech-Black-1.jpg?v=1709757940",
+      "price": {
+        "amount": 14900,
+        "currency": "USD"
+      },
+      "availability": "available",
+      "shipsTo": null,
+      "attributes": {
+        "size": "Black"
+      },
+      "evidence": [
+        {
+          "id": "ev_78ecd99290a5e0b7ea3dbc698e",
+          "field": "product_record",
+          "value": "Rover Pack Tech (8217514541109/45906145607733)",
+          "url": "https://topodesigns.com/products/rover-pack-tech-black.js",
+          "capturedAt": "2026-09-20T07:40:48.309Z",
+          "method": "fetch"
+        }
+      ],
+      "sampleOrigin": "replay"
+    }
+  ]
+}

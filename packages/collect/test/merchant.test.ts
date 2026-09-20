@@ -221,6 +221,38 @@ describe('profileMerchantCatalog', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
+  it('normalizes detailed Shopify apparel taxonomies into readable merchant categories', async () => {
+    const productTypes = [
+      ['Womens>apparel>sports Bras>v_neck', 'V-neck sports bra', 'top'],
+      ['Mens>apparel>underwear>boxer', 'Training boxer', 'bottom'],
+      ['Womens>apparel>leggings>full_length', 'Full-length leggings', 'bottom'],
+      ['Unisex>accessories>headwear>cap', 'Training cap', 'accessories'],
+      ['Beauty>Makeup>Lip', 'Matte lip color', 'makeup'],
+    ] as const;
+    const fetch = vi.fn(async (input: string | URL | Request) =>
+      String(input).includes('/products.json')
+        ? Response.json({
+            products: productTypes.map(([productType, title], index) => ({
+              id: index + 1,
+              handle: `product-${index}`,
+              title,
+              product_type: productType,
+              variants: [{ id: index + 100, available: true }],
+            })),
+          })
+        : new Response('<html>Shopify.theme = {};</html>', {
+            headers: { 'content-type': 'text/html' },
+          }),
+    );
+    const result = await profileMerchantCatalog('https://store.example/', context(), {
+      fetch,
+      lookup: async () => [{ address: '93.184.216.34' }],
+    });
+    expect(result.offers.map((offer) => offer.category)).toEqual(
+      productTypes.map(([, , normalized]) => normalized),
+    );
+  });
+
   it('canonicalizes through a safe redirect', async () => {
     const lookup = vi.fn(async () => [{ address: '93.184.216.34' }]);
     const fetchImpl = vi

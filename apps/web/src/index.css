@@ -24,6 +24,7 @@ body {
 }
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -59,8 +60,8 @@ header {
   align-items: center;
   gap: 9px;
   font-size: 21px;
-  font-weight: 760;
-  letter-spacing: -1px;
+  font-weight: 620;
+  letter-spacing: -0.7px;
 }
 .brand b {
   color: var(--green);

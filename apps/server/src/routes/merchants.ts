@@ -1,5 +1,9 @@
 /** Merchant demo profile. Owner: L4 (S4-L4-1). Design v3 §8. Not store ownership. */
+
+import { randomUUID } from 'node:crypto';
+import type { MerchantResearch } from '@sei/contracts';
 import {
+  MerchantDemandSummarySchema,
   MerchantOpportunityListSchema,
   MerchantProfileRequestSchema,
   MerchantResearchRequestSchema,
@@ -12,7 +16,7 @@ import { getCookie } from 'hono/cookie';
 import { errorBody, SESSION_ENDED } from '../errors';
 import type { AppProviders } from '../providers';
 import { MerchantProfilerError } from '../services/merchant-catalog';
-import { MerchantResearchError } from '../services/merchant-research';
+import { MerchantResearchError, researchCategory } from '../services/merchant-research';
 import { MerchantCatalogDisabledError, MerchantUrlError } from '../services/merchant-url';
 import { MerchantNotFoundError, MerchantSessionDeletedError } from '../services/merchant-workspace';
 import { SESSION_COOKIE } from '../services/session';
@@ -31,6 +35,88 @@ function isAbortError(error: unknown): boolean {
 
 export function merchantRoutes(providers: AppProviders): Hono {
   const routes = new Hono();
+  const jobs = new Map<
+    string,
+    {
+      owner: string;
+      merchant: string;
+      fingerprint: string;
+      request: string;
+      expires: number;
+      controller: AbortController;
+      result?: MerchantResearch;
+      progress?: { stage: string; completed: number; total: number };
+      error?: { code: string; message: string };
+      done: boolean;
+    }
+  >();
+  routes.get('/merchants/:id/research/jobs/:jobId', (c) => {
+    const owner = getCookie(c, SESSION_COOKIE);
+    const job = jobs.get(c.req.param('jobId'));
+    if (!providers.sessions.valid(owner)) return c.json(SESSION_ENDED, 401);
+    if (!job || job.owner !== owner || job.merchant !== c.req.param('id'))
+      return c.json(NOT_FOUND, 404);
+    if (job.expires < Date.now()) {
+      job.controller.abort();
+      jobs.delete(c.req.param('jobId'));
+      return c.json(errorBody('RESEARCH_EXPIRED', 'Search expired. Start a new search.'), 410);
+    }
+    try {
+      if (
+        JSON.stringify(providers.merchantWorkspace.catalogOffers(owner, job.merchant)) !==
+        job.fingerprint
+      ) {
+        job.controller.abort();
+        return c.json(
+          errorBody('STALE_PROFILE', 'Store profile changed. Start a new search.'),
+          409,
+        );
+      }
+    } catch {
+      job.controller.abort();
+      return c.json(NOT_FOUND, 404);
+    }
+    return c.json(
+      job.done
+        ? job.error
+          ? { status: 'failed', error: job.error }
+          : { status: 'complete', result: job.result }
+        : { status: 'running', progress: job.progress },
+    );
+  });
+  routes.delete('/merchants/:id/research/jobs/:jobId', (c) => {
+    const owner = getCookie(c, SESSION_COOKIE);
+    const job = jobs.get(c.req.param('jobId'));
+    if (!providers.sessions.valid(owner)) return c.json(SESSION_ENDED, 401);
+    if (!job || job.owner !== owner || job.merchant !== c.req.param('id'))
+      return c.json(NOT_FOUND, 404);
+    job.controller.abort();
+    jobs.delete(c.req.param('jobId'));
+    return c.json({ cancelled: true });
+  });
+
+  routes.get('/merchants/:id/demand', async (c) => {
+    const ownerId = getCookie(c, SESSION_COOKIE);
+    if (!providers.sessions.valid(ownerId)) return c.json(SESSION_ENDED, 401);
+    try {
+      const offers = providers.merchantWorkspace.catalogOffers(ownerId, c.req.param('id'));
+      const categories = new Set(offers.map((p) => researchCategory(p.category)));
+      const summaries = await providers.demandProjection.merchantSummaries();
+      if (!providers.sessions.valid(ownerId)) return c.json(SESSION_ENDED, 401);
+      return c.json(
+        MerchantDemandSummarySchema.array().parse(
+          summaries.filter(
+            (s) =>
+              s.status === 'available' &&
+              s.cohort.categories.some((category) => categories.has(researchCategory(category))),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (error instanceof MerchantNotFoundError) return c.json(NOT_FOUND, 404);
+      throw error;
+    }
+  });
 
   routes.post('/merchants/profile', async (c) => {
     const ownerId = getCookie(c, SESSION_COOKIE);
@@ -110,6 +196,70 @@ export function merchantRoutes(providers: AppProviders): Hono {
     try {
       const offers = providers.merchantWorkspace.catalogOffers(ownerId, c.req.param('id'));
       const fingerprint = JSON.stringify(offers);
+      if (c.req.header('Prefer') === 'respond-async') {
+        for (const [id, job] of jobs)
+          if (job.expires < Date.now()) {
+            job.controller.abort();
+            jobs.delete(id);
+          }
+        const requestKey = JSON.stringify(request.data);
+        for (const [jobId, job] of jobs)
+          if (
+            job.owner === ownerId &&
+            job.merchant === c.req.param('id') &&
+            job.fingerprint === fingerprint &&
+            job.request === requestKey &&
+            !job.done
+          )
+            return c.json({ jobId }, 202);
+        if (jobs.size >= 100)
+          return c.json(errorBody('BUSY', 'Search service is busy. Try again shortly.'), 503);
+        const jobId = randomUUID();
+        const job: typeof jobs extends Map<string, infer V> ? V : never = {
+          owner: ownerId,
+          merchant: c.req.param('id'),
+          fingerprint,
+          request: requestKey,
+          expires: Date.now() + 15 * 60_000,
+          controller: new AbortController(),
+          done: false,
+        };
+        jobs.set(jobId, job);
+        const watch = setInterval(() => {
+          if (!providers.sessions.valid(ownerId) || job.expires < Date.now()) {
+            job.controller.abort();
+            jobs.delete(jobId);
+          }
+        }, 2000);
+        watch.unref();
+        void providers.merchantResearch
+          .research(offers, request.data, job.controller.signal, (progress) => {
+            job.progress = progress;
+          })
+          .then((result) => {
+            if (!job.controller.signal.aborted)
+              job.result = MerchantResearchSchema.parse({ ...result, merchantId: job.merchant });
+          })
+          .catch((error) => {
+            console.warn(
+              '[merchant-research]',
+              JSON.stringify({
+                event: 'job_failed',
+                errorName: error instanceof Error ? error.name : typeof error,
+                code: error instanceof MerchantResearchError ? error.code : 'RESEARCH_FAILED',
+              }),
+            );
+            job.error =
+              error instanceof MerchantResearchError
+                ? { code: error.code, message: error.message }
+                : { code: 'RESEARCH_FAILED', message: 'Search could not finish. Please retry.' };
+          })
+          .finally(() => {
+            job.done = true;
+            clearInterval(watch);
+          });
+        return c.json({ jobId }, 202);
+      }
       const result = await providers.merchantResearch.research(
         offers,
         request.data,

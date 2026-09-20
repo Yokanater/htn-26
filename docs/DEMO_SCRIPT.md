@@ -1,5 +1,10 @@
 # Demo v3 — both sides of confirmed intent
 
+For the current user-requested, real-store Allbirds walkthrough, use
+[the isolated rehearsal guide](../demo/README.md). It runs on 5174 with live image interpretation,
+recorded Shopify products and explicitly labeled replay demand. The older milestone notes below
+are historical context, not the configuration or provenance of that rehearsal.
+
 Use outfits and room/desk setups equally in rehearsals. Three minutes is a presentation target,
 not an assertion of the event's current judging format. Check current rules with organizers.
 
@@ -39,8 +44,8 @@ Edit requirements to invalidate the old search, or cancel and retry. Clothing si
 
 This is a working shopper slice plus a fixture-backed merchant workspace: S4 uses labeled synthetic
 cohorts, not live snapshots. Merchant views stay **synthetic/demo** for demand. A live public store
-URL is a human spike behind `MERCHANT_CATALOG_PROVIDER=live` and does **not** make seed bands live
-demand. Offline S2 checks cover outfit and general-product fixtures, ownership, and revisions.
+uses the default merchant catalog provider and does **not** make seed bands live demand. Offline S2
+checks cover outfit and general-product fixtures, ownership, and revisions.
 
 ## Merchant workspace (S4 fixtures)
 
@@ -52,8 +57,9 @@ same in-memory merchant catalog: inferred complementary supply fit, public produ
 catalogs, and no inherited pair support. Drafts are versioned prose, not approved actions. Shopper
 Browserbase search, if enabled, does not profile merchants.
 
-Live public catalog profiling is opt-in (`MERCHANT_CATALOG_PROVIDER=live`). Runtime wiring uses
-public HTTPS fetch and DNS; offline tests inject both. No private `.env` is edited by agents.
+Live public catalog profiling is the default (`MERCHANT_CATALOG_PROVIDER=live`). Seed-only offline
+servers can opt out with `MERCHANT_CATALOG_PROVIDER=fake`. Runtime wiring uses public HTTPS fetch
+and DNS; offline tests inject both. No private `.env` is edited by agents.
 The profiler requires actual same-store `/products.json` inventory, not Product metadata from
 an article. It samples at most three pages of 50 products, up to 20 variants per product and 300
 normalized variants total. Repeated pages stop early. Overall timeout is 60 seconds; individual

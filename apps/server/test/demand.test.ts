@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   CollectionMatchSchema,
   type DemandEvent,
@@ -10,7 +12,9 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { PrivateDemandLedger } from '../src/services/demand';
 import { IntakeStore } from '../src/services/intake';
+import { PrivateDatabase } from '../src/services/persistence';
 import { RunRegistry } from '../src/services/runs';
+import { OwnerSessions } from '../src/services/session';
 
 const S3 = { MILESTONES: 's1,s2,s3' };
 const fixture = (domain: string, file: string) =>
@@ -21,12 +25,18 @@ const json = (cookie: string) => ({ cookie, 'content-type': 'application/json' }
 const session = async (app: ReturnType<typeof createApp>) =>
   (await app.request('/api/session')).headers.get('set-cookie')!.split(';')[0]!;
 
-async function setup(domain: 'outfit' | 'setup') {
-  const intake = new IntakeStore();
-  const runs = new RunRegistry();
-  const demand = new PrivateDemandLedger();
+async function setup(domain: 'outfit' | 'setup', database?: PrivateDatabase) {
+  const intake = new IntakeStore(database);
+  const runs = new RunRegistry(database);
+  const demand = new PrivateDemandLedger(database);
   const now = new Date('2026-09-19T15:00:00Z');
-  const app = createApp(S3, { intake, runs, demand, now: () => now });
+  const app = createApp(S3, {
+    intake,
+    runs,
+    demand,
+    sessions: new OwnerSessions(database),
+    now: () => now,
+  });
   const cookie = await session(app);
   const ownerId = cookie.split('=')[1]!;
   const brief = IntentBriefSchema.parse(fixture(domain, 'brief'));
@@ -73,6 +83,44 @@ async function setup(domain: 'outfit' | 'setup') {
 }
 
 describe.each(['outfit', 'setup'] as const)('S3 %s private demand API', (domain) => {
+  it('accepts displayed products after restart and durably erases completed runs', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'decision-restart-'));
+    const path = join(dir, 'state.sqlite');
+    let database = new PrivateDatabase(path);
+    try {
+      const state = await setup(domain, database);
+      database.db.close();
+      database = new PrivateDatabase(path);
+      const runs = new RunRegistry(database);
+      const app = createApp(S3, {
+        runs,
+        intake: new IntakeStore(database),
+        demand: new PrivateDemandLedger(database),
+        sessions: new OwnerSessions(database),
+      });
+      const response = await app.request(`/api/briefs/${state.brief.id}/decisions`, {
+        method: 'POST',
+        headers: json(state.cookie),
+        body: JSON.stringify({
+          idempotencyKey: 'accept-after-restart',
+          briefRevision: state.brief.revision,
+          runId: state.runId,
+          matchId: state.match.id,
+          kind: 'item_accepted',
+          selections: state.selections.slice(0, 1),
+          rejectionReason: null,
+        }),
+      });
+      expect(response.status).toBe(201);
+      await app.request('/api/session', { method: 'DELETE', headers: json(state.cookie) });
+      database.db.close();
+      database = new PrivateDatabase(path);
+      expect(new RunRegistry(database).get(state.ownerId, state.runId)).toBeNull();
+    } finally {
+      database.db.close();
+      rmSync(dir, { recursive: true });
+    }
+  });
   it('records displayed choices, derives private fields, and deduplicates retries', async () => {
     const state = await setup(domain);
     const consent = await state.app.request('/api/consent', {

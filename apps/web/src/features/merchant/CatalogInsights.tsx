@@ -1,11 +1,12 @@
 import type { ProductOffer } from '@sei/contracts';
+import { categoryLabel } from './category-label';
 
 export function CatalogInsights({ offers }: { offers: ProductOffer[] }) {
   const products = [...new Map(offers.map((offer) => [offer.productId, offer])).values()];
-  const groups = [...new Set(products.map((offer) => offer.category))]
+  const groups = [...new Set(products.map((offer) => categoryLabel(offer.category)))]
     .map((category) => ({
       category,
-      count: products.filter((offer) => offer.category === category).length,
+      count: products.filter((offer) => categoryLabel(offer.category) === category).length,
     }))
     .sort((a, b) => b.count - a.count);
   return (

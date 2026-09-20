@@ -1,4 +1,4 @@
-import type { BrowserbasePageText } from '@sei/collect';
+import type { BrowserbasePageText, BrowserbaseProductSearch } from '@sei/collect';
 import { type IntentBrief, IntentBriefSchema } from '@sei/contracts';
 import type { ShoppingContext } from '@sei/core';
 import { createCollectionMatcher } from '@sei/enrich';
@@ -117,6 +117,63 @@ const query = (brief: IntentBrief, index = 0, text = 'olive shirt') => ({
   country: 'CA',
   currency: 'CAD',
   limit: 8,
+});
+
+it('recovers an unstructured product page through the injected text reader', async () => {
+  const brief = briefWithSlots([{ category: 'socks' }]);
+  const browser = fakeBrowser(() => ({
+    text: 'Training Socks CAD 20.00 Add to cart',
+    html: '<main>Training Socks CAD 20.00 Add to cart</main>',
+  }));
+  const readProductText = vi.fn(async () => ({
+    title: 'Training Socks',
+    amount: 20,
+    currency: 'CAD',
+    quote: 'CAD 20.00',
+  }));
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test' },
+    {
+      plannedQueries: true,
+      openBrowser: browser.openBrowser,
+      readProductText,
+      searchProducts: async () => [
+        { title: 'Training Socks', url: 'https://store.example/products/socks' },
+      ],
+    },
+  );
+  const offers = await catalog.search(query(brief), liveContext());
+  expect(offers[0]?.price).toEqual({ amount: 2000, currency: 'CAD' });
+  expect(offers[0]?.availability).toBe('unknown');
+  expect(
+    offers[0]?.evidence.some((e) => e.field === 'source_strategy' && e.value === 'model_page_text'),
+  ).toBe(true);
+  expect(readProductText).toHaveBeenCalledOnce();
+  await catalog.close();
+});
+
+it('keeps complement search context from turning socks into leggings and broadens sparse searches', async () => {
+  const brief = briefWithSlots([
+    { category: 'socks', description: 'socks for compression leggings' },
+  ]);
+  const searchProducts = vi.fn<BrowserbaseProductSearch>(async () => [
+    { title: 'Training Socks', url: 'https://store.example/products/training-socks' },
+  ]);
+  const { openBrowser } = fakeBrowser(() => ({
+    html: jsonLdPage({ title: 'Training Socks', sku: 'socks', price: '20', currency: 'CAD' }),
+  }));
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test' },
+    { plannedQueries: true, minimumBrands: 3, searchProducts, openBrowser },
+  );
+  const results = await catalog.search(query(brief), liveContext());
+  expect(results.length).toBeGreaterThan(0);
+  expect(results[0]?.category).toBe('socks');
+  expect(searchProducts).toHaveBeenCalledTimes(3);
+  expect(searchProducts.mock.calls[2]?.[0]).toMatchObject({ query: 'socks Canada CAD' });
+  await catalog.close();
 });
 
 it('researches all five photo items, rejects wrong product types and departments, and preserves slots through matching', async () => {
@@ -772,6 +829,44 @@ it('requires explicit credentials for live catalog composition', () => {
   ).toBe('function');
 });
 
+it('merchant results reserve space for distinct products rather than variants', async () => {
+  const brief = briefWithSlots([{ category: 'top' }]);
+  const { openBrowser } = fakeBrowser((url) => ({
+    html: `<script type="application/ld+json">${JSON.stringify({
+      '@type': 'Product',
+      name: 'Training shirt',
+      productID: new URL(url).hostname,
+      offers: Array.from({ length: 8 }, (_, i) => ({
+        '@type': 'Offer',
+        sku: `variant-${i}`,
+        price: '30',
+        priceCurrency: 'CAD',
+        availability: 'https://schema.org/InStock',
+        size: String(i),
+      })),
+    })}</script>`,
+  }));
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test' },
+    {
+      plannedQueries: true,
+      minimumBrands: 3,
+      offersPerSlot: 3,
+      openBrowser,
+      searchProducts: async () =>
+        ['one', 'two', 'three'].map((name) => ({
+          title: 'Training shirt',
+          url: `https://${name}.example/products/shirt`,
+        })),
+    },
+  );
+  const offers = await catalog.search(query(brief), liveContext());
+  expect(new Set(offers.map((p) => p.merchant.domain)).size).toBe(3);
+  expect(offers).toHaveLength(3);
+  await catalog.close();
+});
+
 it.each(['footwear', 'desk'])(
   'merchant research keeps verifying several brands for %s in one session',
   async (category) => {
@@ -809,3 +904,30 @@ it.each(['footwear', 'desk'])(
     expect(close).toHaveBeenCalledOnce();
   },
 );
+
+it('retries one transient browser session failure within the two-session run cap', async () => {
+  const brief = briefWithSlots([{ category: 'top', description: 'training top' }]);
+  const browser = fakeBrowser(() => ({
+    html: jsonLdPage({ title: 'Training top', sku: 'top-1', price: '60', currency: 'CAD' }),
+  }));
+  const openBrowser = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('temporary session failure'))
+    .mockImplementation(browser.openBrowser);
+  const catalog = liveCatalog(
+    brief,
+    { BROWSERBASE_API_KEY: 'test-only' },
+    {
+      openBrowser,
+      searchProducts: async () => [
+        { title: 'Training top', url: 'https://shop.example/products/training-top' },
+      ],
+    },
+  );
+  const context = liveContext();
+  const offers = await catalog.search(query(brief, 0, 'training top'), context);
+  expect(offers).toHaveLength(1);
+  expect(openBrowser).toHaveBeenCalledTimes(2);
+  expect(context.consume).toHaveBeenCalledWith('browser_session', 1);
+  await catalog.close();
+});

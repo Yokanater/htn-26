@@ -13,6 +13,7 @@ import type {
   CollectionRunHandle,
   CollectionRunResult,
 } from '@sei/pipeline';
+import type { PrivateDatabase } from './persistence';
 
 export const MAX_RUNS_PER_OWNER = 20;
 
@@ -43,6 +44,13 @@ export function isSuperseded(record: RunRecord, latestRevision: number | null): 
 export class RunRegistry {
   readonly #records = new Map<string, RunRecord>();
   #starting: string | null = null;
+  readonly #completed: Map<string, Omit<RunRecord, 'handle' | 'waiters'>>;
+
+  constructor(database?: PrivateDatabase) {
+    this.#completed = database?.map('completed_runs') ?? new Map();
+    for (const [id, record] of this.#completed)
+      this.#records.set(id, { ...record, handle: null, waiters: new Set() });
+  }
 
   /** Starts (or rejoins) a run for `ownerId`; `begin` calls the runner. */
   start(ownerId: string, begin: () => CollectionRunHandle): RunRecord {
@@ -102,8 +110,9 @@ export class RunRegistry {
       briefIds.add(record.briefId);
       record.handle?.cancel();
       record.done = true;
-      record.closedReason ??= 'deleted';
+      record.closedReason = 'deleted';
       this.#records.delete(runId);
+      this.#completed.delete(runId);
       this.#notify(record);
     }
     return [...briefIds];
@@ -127,6 +136,10 @@ export class RunRegistry {
   }
 
   #notify(record: RunRecord): void {
+    if (record.done && record.result && record.closedReason !== 'deleted') {
+      const { handle: _handle, waiters: _waiters, ...snapshot } = record;
+      this.#completed.set(record.runId, snapshot);
+    }
     const waiters = [...record.waiters];
     record.waiters.clear();
     for (const wake of waiters) wake();
@@ -139,6 +152,7 @@ export class RunRegistry {
       if (owned.length <= MAX_RUNS_PER_OWNER) return;
       if (!record.done) continue;
       this.#records.delete(record.runId);
+      this.#completed.delete(record.runId);
       owned.splice(owned.indexOf(record), 1);
     }
   }

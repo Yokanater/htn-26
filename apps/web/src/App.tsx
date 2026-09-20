@@ -7,7 +7,6 @@ import {
   LockKeyhole,
   PackageSearch,
   RefreshCw,
-  ScanSearch,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
@@ -25,61 +24,23 @@ type Surface = 'home' | 'shopper' | 'merchant';
 
 function Brand() {
   return (
-    <span className="brand">
-      <span className="brand-mark" aria-hidden>
-        <i />
-        <i />
-      </span>
-      rainforest
+    <span className="brand rainforest-logo">
+      <img src="/brand/rainforest-logo.png" alt="rainforest" width="1940" height="800" />
     </span>
-  );
-}
-
-function FlowMap() {
-  return (
-    <div
-      className="flow-map"
-      role="img"
-      aria-label="Shopper intent becomes private aggregate merchant evidence"
-    >
-      <div className="flow-node">
-        <ScanSearch aria-hidden />
-        <span>inspiration</span>
-      </div>
-      <div className="flow-line">
-        <i />
-        <i />
-        <i />
-      </div>
-      <div className="flow-node">
-        <CircleGauge aria-hidden />
-        <span>confirmed signal</span>
-      </div>
-      <div className="flow-line">
-        <i />
-        <i />
-        <i />
-      </div>
-      <div className="flow-node">
-        <Store aria-hidden />
-        <span>merchant action</span>
-      </div>
-    </div>
   );
 }
 
 function Home({ enter }: { enter: (surface: Surface) => void }) {
   return (
-    <main>
+    <main className="home-clean">
       <section className="hero">
         <div>
-          <p className="eyebrow">ONE IDEA · A WHOLE COLLECTION</p>
+          <p className="eyebrow">FOR YOUR LOOK. FOR YOUR SPACE.</p>
           <h1>
             Find what belongs <em>together.</em>
           </h1>
           <p className="lede">
-            Turn an outfit or room inspiration into a real collection across stores. With
-            permission, those choices help independent shops build better collaborations.
+            Bring an image or an idea. Find real products that fit together, across stores.
           </p>
           <div className="hero-actions">
             <button className="primary" type="button" onClick={() => enter('shopper')}>
@@ -91,77 +52,29 @@ function Home({ enter }: { enter: (surface: Surface) => void }) {
           </div>
         </div>
         <div className="inspiration-board">
-          <div className="board-heading">
-            <span>A little inspiration</span>
-            <span>Endless possibilities</span>
-          </div>
           <div className="board-studies">
             <div className="visual-study outfit-study">
               <StudioArtwork />
-              <span>
-                Everyday, considered.<small>Outfit study</small>
-              </span>
+              <span>Your next look</span>
             </div>
             <div className="visual-study setup-study">
               <StudioArtwork domain="setup" />
-              <span>
-                Space to settle in.<small>Room study</small>
-              </span>
+              <span>Your kind of space</span>
             </div>
           </div>
-          <div className="board-caption">
-            <span className="palette-dots" aria-hidden>
-              <i />
-              <i />
-              <i />
-            </span>{' '}
-            Your taste. A collection that fits.
-          </div>
         </div>
       </section>
 
-      <section className="role-section" aria-labelledby="choose-path">
-        <p className="eyebrow">TWO SIDES · ONE USEFUL LOOP</p>
-        <h2 id="choose-path">Where are you starting?</h2>
-        <div className="role-grid">
-          <button className="role-card" type="button" onClick={() => enter('shopper')}>
-            <span className="role-icon">
-              <ShoppingBag aria-hidden />
-            </span>
-            <small>01</small>
-            <strong>I’m building a look or space</strong>
-            <span>Bring an image or describe the idea. Confirm what matters before we search.</span>
-            <i>
-              Build my collection <ArrowRight aria-hidden />
-            </i>
-          </button>
-          <button className="role-card merchant" type="button" onClick={() => enter('merchant')}>
-            <span className="role-icon">
-              <Store aria-hidden />
-            </span>
-            <small>02</small>
-            <strong>I run a Shopify store</strong>
-            <span>
-              See the aggregate combinations shoppers actually ask for—and where your catalog fits.
-            </span>
-            <i>
-              Explore merchant insights <ArrowRight aria-hidden />
-            </i>
-          </button>
-        </div>
-      </section>
-
-      <section className="loop-section">
-        <div>
-          <p className="eyebrow">PRIVATE BY DESIGN</p>
-          <h2>From personal taste to a useful pattern.</h2>
-          <p>
-            Images stay private. Merchant views use coarse, consented aggregates—never individual
-            histories.
-          </p>
-        </div>
-        <FlowMap />
-      </section>
+      <div className="home-notes">
+        <p>
+          <Store size={18} aria-hidden /> For shops: discover bundles, complementary brands and
+          rivals.
+        </p>
+        <p>
+          <LockKeyhole size={18} aria-hidden /> Your uploads stay private. Sharing demand insights
+          is your choice.
+        </p>
+      </div>
     </main>
   );
 }
@@ -299,7 +212,7 @@ function BriefReview({
   );
 }
 
-function ShopperWorkspace({ back }: { back: () => void }) {
+function ShopperWorkspace({ back, demo = false }: { back: () => void; demo?: boolean }) {
   const [domain, setDomain] = useState<ShoppingDomain>('outfit');
   const [selection, setSelection] = useState<MediaSelection | null>(null);
   const [brief, setBrief] = useState<IntentBrief | null>(null);
@@ -317,7 +230,12 @@ function ShopperWorkspace({ back }: { back: () => void }) {
       }
       return json<IntentBrief>('/api/briefs', {
         method: 'POST',
-        body: JSON.stringify({ domain, ...source, country: 'CA', currency: 'CAD' }),
+        body: JSON.stringify({
+          domain,
+          ...source,
+          country: demo ? 'US' : 'CA',
+          currency: demo ? 'USD' : 'CAD',
+        }),
       });
     },
     onSuccess: setBrief,
@@ -407,7 +325,7 @@ function ShopperWorkspace({ back }: { back: () => void }) {
               <MediaIntake
                 label={domain === 'outfit' ? 'Outfit inspiration' : 'Room or desk inspiration'}
                 textLabel="Your collection idea"
-                initialMode="text"
+                initialMode={demo ? 'image' : 'text'}
                 disabled={create.isPending}
                 onSelectionChange={setSelection}
               />
@@ -539,6 +457,12 @@ function MerchantComingSoon({ back }: { back: () => void }) {
 
 export function App() {
   const [surface, setSurface] = useState<Surface>('home');
+  const demo = useQuery({
+    queryKey: ['demo'],
+    queryFn: () => json<{ enabled?: boolean; notice?: string; storeUrl?: string }>('/api/demo'),
+    retry: false,
+    staleTime: Infinity,
+  });
   const capabilities = useQuery({
     queryKey: ['capabilities'],
     queryFn: () => json<{ flags?: Record<string, boolean> }>('/api/capabilities'),
@@ -578,17 +502,25 @@ export function App() {
             <p>Shopper intake is currently disabled.</p>
           </main>
         ) : (
-          <ShopperWorkspace back={() => setSurface('home')} />
+          <ShopperWorkspace back={() => setSurface('home')} demo={demo.data?.enabled === true} />
         ))}
       {surface === 'merchant' &&
         (capabilities.data?.flags?.FEATURE_MERCHANT_OPPORTUNITIES === true ? (
-          <MerchantWorkspace back={() => setSurface('home')} />
+          <MerchantWorkspace
+            back={() => setSurface('home')}
+            initialUrl={demo.data?.enabled ? demo.data.storeUrl : undefined}
+          />
         ) : (
           <MerchantComingSoon back={() => setSurface('home')} />
         ))}
       <footer>
         <Brand />
-        <span>Personal inspiration. Shared only by choice.</span>
+        <span className="footer-note">
+          Personal inspiration. Shared only by choice.
+          {demo.data?.enabled && (
+            <small>Recorded catalog · insights include synthetic sample data, not purchases.</small>
+          )}
+        </span>
       </footer>
     </div>
   );

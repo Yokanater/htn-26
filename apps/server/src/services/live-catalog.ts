@@ -33,6 +33,7 @@ import {
 import type { ProductQuery, ShoppingCatalog, ShoppingContext } from '@sei/core';
 import { offerIntentText, productIntentFit, requestedAudience, slotSearchTerms } from '@sei/core';
 import { BudgetExhaustedError, DEFAULT_RUN_CAPS } from '@sei/pipeline';
+import type { ProductPageReader } from '@sei/reason';
 
 const SEARCH_RESULTS_PER_QUERY = 6;
 const CANDIDATES_PER_QUERY = 3;
@@ -178,6 +179,33 @@ const CATEGORY_PROFILES: Record<string, CategoryProfile> = {
     positive: ['rug', 'carpet', 'floor mat'],
     negative: ['desk', 'lamp', 'lighting', 'chair', 'shelf', 'cabinet'],
   },
+  supplements: {
+    positive: ['supplement', 'protein powder', 'creatine', 'pre-workout', 'electrolyte'],
+    negative: ['shoe', 'sneaker', 'shirt', 'shorts', 'leggings'],
+  },
+  'fitness equipment': {
+    positive: [
+      'fitness equipment',
+      'pull-up bar',
+      'dumbbell',
+      'kettlebell',
+      'resistance band',
+      'weight bench',
+    ],
+    negative: ['shoe', 'sneaker', 'shirt', 'shorts', 'leggings'],
+  },
+  skincare: {
+    positive: ['skincare', 'serum', 'moisturizer', 'cleanser', 'sunscreen'],
+    negative: ['shirt', 'shoe', 'bag'],
+  },
+  makeup: {
+    positive: ['makeup', 'cosmetic', 'lipstick', 'mascara', 'foundation', 'concealer', 'blush'],
+    negative: ['shirt', 'shoe', 'bag'],
+  },
+  'beauty tools': {
+    positive: ['beauty tool', 'makeup brush', 'applicator', 'makeup sponge', 'vanity mirror'],
+    negative: ['shirt', 'shoe', 'bag'],
+  },
 };
 
 const RANK_STOP_WORDS = new Set(
@@ -230,6 +258,7 @@ function categorySearchTerms(slot: IntentSlot): string[] {
 
 export type LiveCatalogDeps = {
   searchProducts?: BrowserbaseProductSearch;
+  browserSignal?: AbortSignal;
   openBrowser?: BrowserbaseCatalogBrowserFactory;
   lookup?: DnsLookup;
   now?: () => Date;
@@ -237,6 +266,13 @@ export type LiveCatalogDeps = {
   fetchBudget?: number;
   /** Merchant comparisons need several stores; shopper matching retains its single strong result. */
   minimumBrands?: number;
+  /** Merchant research can inspect a wider discovery result set without changing shopper defaults. */
+  searchResultsPerQuery?: number;
+  candidatesPerQuery?: number;
+  offersPerSlot?: number;
+  /** Preserve catalog-specific planner queries for merchant research. */
+  plannedQueries?: boolean;
+  readProductText?: ProductPageReader;
   /** Page reads in flight at once; stays at or below the runner's configured concurrency. */
   verifyConcurrency?: number;
 };
@@ -482,6 +518,17 @@ const log = (level: 'info' | 'warn', payload: Record<string, unknown>): void => 
   (level === 'warn' ? console.warn : console.info)('[catalog]', JSON.stringify(payload));
 };
 
+/** Provider-safe diagnostics: never include messages, request bodies, URLs, or credentials. */
+function providerErrorMetadata(error: unknown): Record<string, unknown> {
+  if (typeof error !== 'object' || error === null) return { errorType: typeof error };
+  const value = error as { name?: unknown; status?: unknown; code?: unknown };
+  return {
+    errorName: typeof value.name === 'string' ? value.name : 'UnknownError',
+    ...(typeof value.status === 'number' ? { providerStatus: value.status } : {}),
+    ...(typeof value.code === 'string' ? { providerCode: value.code } : {}),
+  };
+}
+
 /** Search discovers pages; verified public page facts supply every displayed product fact. */
 export function liveCatalog(
   brief: IntentBrief,
@@ -492,6 +539,9 @@ export function liveCatalog(
   const openBrowser = deps.openBrowser ?? openBrowserbaseCatalogBrowser;
   const lookup: DnsLookup = deps.lookup ?? ((host) => resolveDns(host, { all: true }));
   const now = deps.now ?? (() => new Date());
+  const searchResultsPerQuery = deps.searchResultsPerQuery ?? SEARCH_RESULTS_PER_QUERY;
+  const candidatesPerQuery = deps.candidatesPerQuery ?? CANDIDATES_PER_QUERY;
+  const offersPerSlot = deps.offersPerSlot ?? OFFERS_PER_SLOT;
   const share = createFetchShare(
     brief.slots,
     deps.fetchBudget ?? DEFAULT_RUN_CAPS.fetch,
@@ -504,21 +554,33 @@ export function liveCatalog(
   const offersBySlot = new Map<string, number>();
   let browserPromise: Promise<BrowserbaseCatalogBrowser> | undefined;
 
-  const getBrowser = (context: ShoppingContext) => {
-    if (!browserPromise) {
-      context.consume('browser_session', 1);
-      browserPromise = openBrowser({
-        apiKey: env.BROWSERBASE_API_KEY!,
-        signal: context.signal,
-      }).then((browser) => {
-        log('info', { event: 'browserbase_session_opened', sessionId: browser.sessionId });
-        return browser;
-      });
-      browserPromise.catch(() => {
+  const getBrowser = async (context: ShoppingContext) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (!browserPromise) {
+        context.consume('browser_session', 1);
+        browserPromise = openBrowser({
+          apiKey: env.BROWSERBASE_API_KEY!,
+          signal: deps.browserSignal ?? context.signal,
+        }).then((browser) => {
+          log('info', { event: 'browserbase_session_opened', sessionId: browser.sessionId });
+          return browser;
+        });
+      }
+      try {
+        return await browserPromise;
+      } catch (error) {
         browserPromise = undefined;
-      });
+        const willRetry = !context.signal.aborted && attempt === 0;
+        log('warn', {
+          event: 'browserbase_session_failed',
+          attempt: attempt + 1,
+          willRetry,
+          ...providerErrorMetadata(error),
+        });
+        if (!willRetry) throw error;
+      }
     }
-    return browserPromise;
+    throw new Error('Browser session could not be opened.');
   };
 
   /** Same-origin Shopify `product.js`, tried only after the page itself yielded no offer. */
@@ -602,7 +664,7 @@ export function liveCatalog(
         const page = await share.lane(() => browser.readPage(safe.href, context.signal));
         const settled = await assertPublicHttpsUrl(page.finalUrl, lookup);
         const direct = extractProductFacts({ html: page.html, finalUrl: settled.href });
-        if (direct && direct.variants.length > 0) {
+        if (direct?.variants.some((v) => v.amountMinorUnits !== null)) {
           return {
             ok: true,
             facts: direct,
@@ -611,7 +673,11 @@ export function liveCatalog(
           };
         }
         const fallback = await shopifyJsFacts(settled, page.html, slot, context, browser);
-        if (fallback && 'facts' in fallback) {
+        if (
+          fallback &&
+          'facts' in fallback &&
+          fallback.facts.variants.some((v) => v.amountMinorUnits !== null)
+        ) {
           return {
             ok: true,
             facts: fallback.facts,
@@ -619,7 +685,48 @@ export function liveCatalog(
             host: settled.hostname,
           };
         }
-        if (fallback) return { ok: false, failure: fallback.failure };
+        if (deps.readProductText && page.text.trim()) {
+          try {
+            context.consume('model_call', 1);
+            const extracted = await deps.readProductText(page.text, context.signal);
+            if (extracted)
+              return {
+                ok: true,
+                pageUrl: withoutQuery(settled.href),
+                host: settled.hostname,
+                facts: {
+                  strategy: 'model_page_text',
+                  productId: null,
+                  title: extracted.title,
+                  imageUrl: null,
+                  currency: extracted.currency,
+                  canonicalUrl: settled.href,
+                  shopifySignalsPresent: false,
+                  variants: [
+                    {
+                      variantId: null,
+                      title: null,
+                      amountMinorUnits: Math.round(extracted.amount * 100),
+                      currency: extracted.currency,
+                      availability: 'unknown',
+                      attributes: { price_source_quote: extracted.quote },
+                      imageUrl: null,
+                    },
+                  ],
+                },
+              };
+          } catch (error) {
+            if (context.signal.aborted) throw error;
+          }
+        }
+        if (fallback && 'failure' in fallback) return { ok: false, failure: fallback.failure };
+        if (direct && direct.variants.length > 0)
+          return {
+            ok: true,
+            facts: direct,
+            pageUrl: withoutQuery(settled.href),
+            host: settled.hostname,
+          };
         return { ok: false, failure: direct ? 'no_explicit_offer' : 'unsupported_product_page' };
       } catch (error) {
         return { ok: false, failure: classifyFailure(error, context.signal) };
@@ -702,6 +809,7 @@ export function liveCatalog(
   };
 
   const rank = (slot: IntentSlot, offers: readonly ProductOffer[]): ProductOffer[] => {
+    if (deps.plannedQueries) slot = { ...slot, description: slot.category, visualAttributes: [] };
     const audience = detectAudience(slot);
     const requested = slot.constraints.find((constraint) => constraint.kind === 'size');
     const normalize = (value: string) =>
@@ -732,25 +840,36 @@ export function liveCatalog(
       );
     };
     const perProduct = new Map<string, number>();
-    return (
-      [...offers]
-        // An explicitly requested audience excludes the opposite one; nothing else is filtered.
-        .filter(
-          (offer) =>
-            !audience?.conflict?.test(offer.title) &&
-            !isCategoryConflict(slot, offer.title) &&
-            !productIntentFit(slot, offerIntentText(offer)).conflict &&
-            (!offer.price || offer.price.currency === brief.currency),
-        )
-        .sort((left, right) => score(right) - score(left) || left.id.localeCompare(right.id))
-        .filter((offer) => {
-          const key = `${offer.merchant.id}:${offer.productId}`;
-          const count = perProduct.get(key) ?? 0;
-          perProduct.set(key, count + 1);
-          return count < OFFERS_PER_PRODUCT;
-        })
-        .slice(0, OFFERS_PER_SLOT)
-    );
+    const ranked = [...offers]
+      // An explicitly requested audience excludes the opposite one; nothing else is filtered.
+      .filter(
+        (offer) =>
+          !audience?.conflict?.test(offer.title) &&
+          !isCategoryConflict(slot, offer.title) &&
+          !productIntentFit(slot, offerIntentText(offer)).conflict &&
+          (!offer.price || offer.price.currency === brief.currency),
+      )
+      .sort((left, right) => score(right) - score(left) || left.id.localeCompare(right.id))
+      .filter((offer) => {
+        const key = `${offer.merchant.id}:${offer.productId}`;
+        const count = perProduct.get(key) ?? 0;
+        perProduct.set(key, count + 1);
+        return count < (deps.plannedQueries ? 1 : OFFERS_PER_PRODUCT);
+      });
+    if (!deps.plannedQueries) return ranked.slice(0, offersPerSlot);
+    // Merchant research needs different stores, not a row of sizes from one product.
+    const stores = new Map<string, ProductOffer[]>();
+    for (const offer of ranked) {
+      const domain = offer.merchant.domain.replace(/^www\./, '');
+      const products = stores.get(domain) ?? [];
+      products.push(offer);
+      stores.set(domain, products);
+    }
+    const diverse: ProductOffer[] = [];
+    for (let index = 0; diverse.length < ranked.length; index++) {
+      for (const products of stores.values()) if (products[index]) diverse.push(products[index]!);
+    }
+    return diverse.slice(0, offersPerSlot);
   };
 
   const hasStrongOffer = (slot: IntentSlot, offers: readonly ProductOffer[]): boolean =>
@@ -799,9 +918,11 @@ export function liveCatalog(
     let sessionId: string | null = null;
     const attemptedCandidates = new Set<string>();
 
-    for (const fallback of [false, true] as const) {
+    for (const attempt of deps.plannedQueries ? [0, 1, 2] : [0, 1]) {
+      const fallback = attempt > 0;
       if (fallback) {
-        if (enoughBrands(slot, collected) || fallbackUsed.has(slot.id)) break;
+        if (enoughBrands(slot, collected) || (!deps.plannedQueries && fallbackUsed.has(slot.id)))
+          break;
         try {
           context.consume('catalog_query', 1);
         } catch {
@@ -816,30 +937,49 @@ export function liveCatalog(
         failures.add('budget_exhausted');
         break;
       }
-      const text = buildSearchQuery({
-        slot,
-        text: query.text,
-        country: query.country,
-        fallback,
-      });
+      const audiencePrefix = slot.description.match(/^(mens|womens)\s/i)?.[0] ?? '';
+      const text = deps.plannedQueries
+        ? `${attempt === 2 ? `${audiencePrefix}${slot.category}` : slot.description.slice(0, 300)} ${countryName(query.country)} ${brief.currency}`
+        : buildSearchQuery({
+            slot,
+            text: query.text,
+            country: query.country,
+            fallback,
+          });
       let results: BrowserbaseProductSearchResult[];
       try {
         results = await searchProducts({
           apiKey,
           query: text,
-          limit: SEARCH_RESULTS_PER_QUERY,
+          limit: searchResultsPerQuery,
           signal: context.signal,
         });
       } catch (error) {
         const failure = classifyFailure(error, context.signal);
+        log('warn', {
+          event: 'catalog_search_failed',
+          slotId: slot.id,
+          category: slot.category,
+          failure,
+          ...providerErrorMetadata(error),
+        });
         if (failure === 'cancelled') throw error;
         failures.add(failure);
         continue;
       }
       // Try the best precise results before broadening. Reserve one read for a retry if weak.
-      const candidates = candidateUrls(results, SEARCH_RESULTS_PER_QUERY, slot, text, query.country)
+      const matchingSlot = deps.plannedQueries
+        ? { ...slot, description: slot.category, visualAttributes: [] }
+        : slot;
+      const candidates = candidateUrls(
+        results,
+        searchResultsPerQuery,
+        matchingSlot,
+        text,
+        query.country,
+      )
         .filter((url) => !attemptedCandidates.has(url))
-        .slice(0, CANDIDATES_PER_QUERY);
+        .slice(0, candidatesPerQuery);
       candidateCount += candidates.length;
       if (candidates.length === 0) {
         failures.add('discovery_empty');
@@ -853,7 +993,7 @@ export function liveCatalog(
         if (enoughBrands(slot, collected)) break;
         if (!fallback && attemptedCandidates.size >= Math.max(1, share.perSlot - 1)) break;
         attemptedCandidates.add(candidate);
-        if (collected.length >= OFFERS_PER_SLOT) break;
+        if (collected.length >= offersPerSlot) break;
         if (!pageCache.has(candidate) && !share.claim(slot.id)) {
           failures.add('budget_exhausted');
           log('warn', {
@@ -890,17 +1030,29 @@ export function liveCatalog(
           ? await merchantCurrency(outcome.host, outcome.pageUrl, slot, context, browser)
           : null;
         const built = buildOffers({
-          slot,
+          slot: matchingSlot,
           outcome,
           currency,
           sampleOrigin: context.sampleOrigin,
         });
         if (built.length === 0) {
           failures.add('no_explicit_offer');
+          log('warn', {
+            event: 'product_filtered',
+            category: slot.category,
+            host: outcome.host,
+            requestedCurrency: brief.currency,
+            currencies: [
+              ...new Set(
+                outcome.facts.variants.map((v) => v.currency ?? outcome.facts.currency ?? currency),
+              ),
+            ],
+            variants: outcome.facts.variants.length,
+          });
           continue;
         }
         verifiedCount += 1;
-        collected.push(...built);
+        collected.push(...(deps.plannedQueries ? built.slice(0, 1) : built));
       }
     }
 

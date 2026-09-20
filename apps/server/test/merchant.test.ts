@@ -12,11 +12,13 @@ import { createApp } from '../src/app';
 import { defaultProviders } from '../src/providers';
 import { loadDemoNewcomerHosts, loadSeedOffers } from '../src/replay';
 import { PrivateDemandLedger } from '../src/services/demand';
-import { classifyMerchantHost } from '../src/services/merchant-url';
+import { MERCHANT_PROFILE_TIMEOUT_MS, merchantCatalogMode } from '../src/services/merchant-catalog';
+import { classifyMerchantHost, parseMerchantUrl } from '../src/services/merchant-url';
 import { MerchantWorkspaceStore } from '../src/services/merchant-workspace';
 
 type App = ReturnType<typeof createApp>;
 const S4 = { MILESTONES: 's1,s2,s3,s4' };
+const FAKE = { ...S4, MERCHANT_CATALOG_PROVIDER: 'fake' } as const;
 const S3 = { MILESTONES: 's1,s2,s3' };
 
 const SEED_URLS = {
@@ -32,6 +34,50 @@ const json = (cookie: string, extra: Record<string, string> = {}) => ({
 const session = async (app: App) =>
   (await app.request('/api/session')).headers.get('set-cookie')?.split(';')[0] ?? '';
 const ownerIdOf = (cookie: string) => cookie.replace(/^sei_owner=/, '');
+
+it('returns a background job immediately, deduplicates it, isolates progress and cancels work', async () => {
+  const providers = defaultProviders(FAKE);
+  let aborted = false;
+  const research = vi
+    .spyOn(providers.merchantResearch, 'research')
+    .mockImplementation(async (_offers, _request, signal, progress) => {
+      progress?.({ stage: 'Checking products', completed: 1, total: 6 });
+      return await new Promise((_resolve, reject) =>
+        signal.addEventListener(
+          'abort',
+          () => {
+            aborted = true;
+            reject(new Error('cancelled'));
+          },
+          { once: true },
+        ),
+      );
+    });
+  const app = createApp(FAKE, providers);
+  const cookie = await session(app);
+  const created = await profile(app, cookie, SEED_URLS.outfit);
+  const base = `/api/merchants/${created.profile!.merchant.id}/research`;
+  const start = () =>
+    app.request(base, {
+      method: 'POST',
+      headers: json(cookie, { Prefer: 'respond-async' }),
+      body: JSON.stringify({ country: 'CA', currency: 'CAD' }),
+    });
+  const response = await start();
+  expect(response.status).toBe(202);
+  const job = (await response.json()) as { jobId: string };
+  expect(await (await start()).json()).toEqual(job);
+  expect(research).toHaveBeenCalledOnce();
+  const path = `${base}/jobs/${job.jobId}`;
+  expect(await (await app.request(path, { headers: { cookie } })).json()).toMatchObject({
+    status: 'running',
+    progress: { completed: 1, total: 6 },
+  });
+  expect((await app.request(path, { headers: { cookie: await session(app) } })).status).toBe(404);
+  expect((await app.request(path, { method: 'DELETE', headers: { cookie } })).status).toBe(200);
+  expect(aborted).toBe(true);
+  expect((await app.request(path, { headers: { cookie } })).status).toBe(404);
+});
 
 const PublicMerchantJson = z.union([
   MerchantWorkspaceProfileSchema,
@@ -205,6 +251,16 @@ describe.each([
 });
 
 describe('S4 merchant isolation and safety', () => {
+  it('defaults every server to live merchant catalogs and normalizes bare domains to HTTPS', () => {
+    expect(merchantCatalogMode(S4)).toBe('live');
+    expect(merchantCatalogMode({ ...S4, MERCHANT_CATALOG_PROVIDER: '' })).toBe('live');
+    expect(MERCHANT_PROFILE_TIMEOUT_MS).toBe(240_000);
+    expect(parseMerchantUrl('store.example.com/collections/all')).toEqual({
+      href: 'https://store.example.com/collections/all',
+      host: 'store.example.com',
+    });
+  });
+
   it('keeps shopper Browserbase search off the merchant profiler and never hits the network for seed URLs', async () => {
     const merchantCatalog = throwingMerchantCatalog();
     const catalog = () => ({
@@ -221,7 +277,7 @@ describe('S4 merchant isolation and safety', () => {
 
   it('rejects an unknown non-allowlisted domain without calling merchantCatalog', async () => {
     const merchantCatalog = throwingMerchantCatalog();
-    const app = createApp(S4, { merchantCatalog });
+    const app = createApp(FAKE, { merchantCatalog });
     const cookie = await session(app);
     const created = await profile(app, cookie, 'https://not-a-seed.com/');
     expect(created.response.status).toBe(503);
@@ -231,7 +287,7 @@ describe('S4 merchant isolation and safety', () => {
 
   it('rejects unsafe URLs before domain extraction', async () => {
     const merchantCatalog = throwingMerchantCatalog();
-    const app = createApp(S4, { merchantCatalog });
+    const app = createApp(FAKE, { merchantCatalog });
     const cookie = await session(app);
     for (const url of [
       'http://outfit-brand-1.example/',
@@ -544,13 +600,13 @@ describe.each([
     partnerEvidence: 'ev_setup_2',
   },
 ])('S4 $domain live public merchant profiler', (c) => {
-  it('profiles the original URL and never fabricates a seed partner for a live store', async () => {
+  it('profiles a bare domain as HTTPS by default and never fabricates a seed partner', async () => {
     const deps = liveProfileDeps(c.domain);
-    const providers = defaultProviders(LIVE, { merchantProfile: deps });
+    const providers = defaultProviders(S4, { merchantProfile: deps });
     const spy = vi.spyOn(providers.merchantCatalog, 'profileMerchant');
-    const app = createApp(LIVE, providers);
+    const app = createApp(S4, providers);
     const cookie = await session(app);
-    const created = await profile(app, cookie, c.url);
+    const created = await profile(app, cookie, c.url.replace('https://', ''));
     expect(created.response.status).toBe(201);
     expect(created.profile?.sampleOrigin).toBe('live');
     expect(created.profile?.workspace).toBe('synthetic_demo');
@@ -582,7 +638,7 @@ describe.each([
 
   it('reports disabled live analysis for a valid URL in fake mode without invoking L1', async () => {
     const deps = liveProfileDeps(c.domain);
-    const app = createApp(S4, undefined, { merchantProfile: deps });
+    const app = createApp(FAKE, undefined, { merchantProfile: deps });
     const cookie = await session(app);
     const created = await profile(app, cookie, c.url);
     expect(created.response.status).toBe(503);

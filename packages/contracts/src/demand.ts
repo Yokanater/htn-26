@@ -174,6 +174,14 @@ export const MerchantDemandSummarySchema = z
     status: z.enum(['insufficient_evidence', 'available']),
     minimumSessions: z.number().int().min(5),
     eligibleSessions: SupportBandSchema.nullable(),
+    pairSupport: z
+      .array(
+        z.strictObject({
+          merchantIds: z.tuple([idSchema('mer_'), idSchema('mer_')]),
+          support: SupportBandSchema,
+        }),
+      )
+      .optional(),
     /** Published as bands; every cell is suppressed below `minimumSessions`. */
     merchantSupport: z
       .array(z.strictObject({ merchantId: idSchema('mer_'), support: SupportBandSchema }))
@@ -195,7 +203,7 @@ export const MerchantDemandSummarySchema = z
       ctx.addIssue({ code: 'custom', message: 'Suppressed cohorts must not disclose counts' });
     if (
       summary.status === 'insufficient_evidence' &&
-      (summary.merchantSupport?.length || summary.gaps?.length)
+      (summary.merchantSupport?.length || summary.pairSupport?.length || summary.gaps?.length)
     )
       ctx.addIssue({
         code: 'custom',
@@ -203,6 +211,7 @@ export const MerchantDemandSummarySchema = z
       });
     for (const band of [
       ...(summary.merchantSupport ?? []).map((entry) => entry.support),
+      ...(summary.pairSupport ?? []).map((entry) => entry.support),
       ...(summary.gaps ?? []).map((gap) => gap.support),
     ]) {
       if (band.min < summary.minimumSessions)

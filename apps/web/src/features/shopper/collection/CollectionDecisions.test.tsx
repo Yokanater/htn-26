@@ -227,7 +227,7 @@ describe.each(['outfit', 'setup'] as const)('%s collection decisions', (domain) 
     const [first] = offers;
     await rejectWith(first!.title, 'Size');
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toMatch(/Your brief changed/);
+    expect(alert.textContent).toMatch(/results are no longer current/);
     fireEvent.click(within(alert).getByRole('button', { name: 'Load latest version' }));
     expect(onRefreshBrief).toHaveBeenCalledOnce();
     expect(slotGroup(brief.slots[0]!.category).dataset.decision).toBe('none');

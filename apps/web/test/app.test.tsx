@@ -24,8 +24,8 @@ it('presents shopper and merchant paths without claiming unfinished merchant act
   );
   renderApp();
   expect(screen.getByRole('heading', { name: /Find what belongs together/ })).toBeTruthy();
-  expect(screen.getByRole('button', { name: /I’m building a look or space/ })).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: /I run a Shopify store/ }));
+  expect(screen.getByRole('button', { name: /Start a collection/ })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /I run a shop/ }));
   expect(screen.getByRole('heading', { name: /See the demand between categories/ })).toBeTruthy();
   expect(screen.getByText(/Merchant profiling unlocks with S4/)).toBeTruthy();
   expect(screen.getByText('SYNTHETIC PREVIEW')).toBeTruthy();
@@ -99,7 +99,28 @@ it('renders the rainforest brand', () => {
     vi.fn(async () => Response.json({ owner: true })),
   );
   renderApp();
-  expect(screen.getAllByText('rainforest')).toHaveLength(2);
+  expect(screen.getAllByRole('img', { name: 'rainforest' })).toHaveLength(2);
+});
+
+it('keeps the recorded-catalog disclosure without a rehearsal banner or instructions', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) =>
+      Response.json(
+        String(input) === '/api/demo'
+          ? { enabled: true, notice: 'Rehearsal instructions', storeUrl: 'https://allbirds.com/' }
+          : { owner: true },
+      ),
+    ),
+  );
+  renderApp();
+  expect(
+    await screen.findByText(/Recorded catalog · insights include synthetic sample data/),
+  ).toBeTruthy();
+  expect(screen.queryByLabelText('Demo guide')).toBeNull();
+  expect(screen.queryByText(/rehearsal/i)).toBeNull();
+  expect(screen.queryByRole('link', { name: /Download the inspiration image/ })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Start a collection' })).toBeTruthy();
 });
 
 const CONFLICT_MESSAGE =

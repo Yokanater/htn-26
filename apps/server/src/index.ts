@@ -8,9 +8,15 @@ import { loadRootEnv, serverPort } from './env';
 
 loadRootEnv();
 
-const server = serve({ fetch: createApp(process.env).fetch, port: serverPort() }, (info) => {
-  console.log(`[server] listening on http://localhost:${info.port}`);
-});
+const server = serve(
+  {
+    fetch: createApp({ ...process.env, STORE: process.env.STORE || 'sqlite' }).fetch,
+    port: serverPort(),
+  },
+  (info) => {
+    console.log(`[server] listening on http://localhost:${info.port}`);
+  },
+);
 
 function shutdown(signal: string): void {
   console.log(`[server] ${signal} received, closing`);

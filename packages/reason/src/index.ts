@@ -3,3 +3,5 @@
  */
 export * from './intent';
 export * from './matching';
+export { createPairingPlanner, type PairingPlanner } from './pairings';
+export { createProductPageReader, type ProductPageReader } from './product-page';

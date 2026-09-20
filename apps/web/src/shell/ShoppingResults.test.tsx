@@ -161,5 +161,6 @@ it.each([
 
     const groups = await screen.findAllByRole('group', { name: /Your choice for/ });
     expect(groups.length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Shortlist' })).toBeNull();
   },
 );

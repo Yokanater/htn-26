@@ -158,7 +158,7 @@ export function CollectionPanel({ brief, onEdit }: { brief: IntentBrief; onEdit?
               // Only a stale brief is recoverable by reloading the current revision.
               return {
                 ok: false,
-                status: cause instanceof ApiError && cause.code === 'STALE_BRIEF' ? 409 : 400,
+                status: cause instanceof ApiError ? cause.status : 0,
               };
             }
           }}

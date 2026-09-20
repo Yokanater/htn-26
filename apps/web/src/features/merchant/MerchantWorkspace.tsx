@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { ApiError, json } from '../../shell/api';
 import { BrandResearch } from './BrandResearch';
 import { CatalogInsights } from './CatalogInsights';
+import { ShopperDemand } from './ShopperDemand';
 import './merchant.css';
 
 function bandLabel(band: { min: number; max: number } | null): string {
@@ -23,8 +24,14 @@ function bandLabel(band: { min: number; max: number } | null): string {
   return `${band.min}–${band.max}`;
 }
 
-export function MerchantWorkspace({ back }: { back: () => void }) {
-  const [url, setUrl] = useState('');
+export function MerchantWorkspace({
+  back,
+  initialUrl = '',
+}: {
+  back: () => void;
+  initialUrl?: string;
+}) {
+  const [url, setUrl] = useState(initialUrl);
   const [proposalText, setProposalText] = useState('');
   const [uncertaintiesText, setUncertaintiesText] = useState('');
   const [copied, setCopied] = useState(false);
@@ -162,10 +169,10 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
               <input
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://your-store.com"
+                placeholder="your-store.com"
                 required
                 autoComplete="url"
-                aria-label="Public HTTPS store URL"
+                aria-label="Public store URL"
               />
             </label>
             <button
@@ -187,25 +194,31 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
               <ArrowRight aria-hidden />
             </button>
           </form>
-          <div className="merchant-demo-actions">
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => setUrl('https://outfit-brand-1.example/')}
-            >
-              Try outfit demo
-            </button>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => setUrl('https://setup-brand-1.example/')}
-            >
-              Try setup demo
-            </button>
-          </div>
+          <details className="merchant-demo-disclosure">
+            <summary>Explore a sample store</summary>
+            <div className="merchant-demo-actions">
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setUrl('https://outfit-brand-1.example/')}
+              >
+                Try outfit demo
+              </button>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setUrl('https://setup-brand-1.example/')}
+              >
+                Try setup demo
+              </button>
+            </div>
+            <p className="coming-note">
+              Demo stores use sample data. No store connection or login required.
+            </p>
+          </details>
           {profileStore.isPending && (
             <p className="merchant-research-status" role="status">
-              Loading your store. This can take up to a minute.
+              Loading your store. Large catalogs can take up to four minutes.
             </p>
           )}
           {profileStore.error && (
@@ -213,39 +226,26 @@ export function MerchantWorkspace({ back }: { back: () => void }) {
               {profileStore.error.message}
             </p>
           )}
-          <p className="coming-note">
-            Demo stores use sample data. No store connection or login required.
-          </p>
         </div>
         {profile ? (
-          <div className="merchant-profile-chart">
+          <details className="merchant-profile-chart">
+            <summary>Catalog overview · {offers.length} sampled offers</summary>
             <p className="merchant-store-name">{profile.merchant.name}</p>
             <CatalogInsights offers={offers} />
-          </div>
-        ) : (
-          <section className="signal-preview" aria-label="Research overview">
-            <p className="eyebrow">STORE RESEARCH</p>
-            <h2>Find products and brands</h2>
-            <div className="signal-row">
-              <span>01</span>
-              <strong>Bundle products</strong>
-            </div>
-            <div className="signal-row">
-              <span>02</span>
-              <strong>Complementary brands</strong>
-            </div>
-            <div className="signal-row">
-              <span>03</span>
-              <strong>Competitor comparison</strong>
-            </div>
-          </section>
-        )}
+          </details>
+        ) : null}
       </section>
       {profile && (
-        <BrandResearch
-          key={profile.merchant.id + offers[0]?.evidence[0]?.capturedAt}
-          profile={profile}
-        />
+        <>
+          <BrandResearch
+            key={profile.merchant.id + offers[0]?.evidence[0]?.capturedAt}
+            profile={profile}
+          />
+          <details className="merchant-secondary" open={profile.sampleOrigin === 'replay'}>
+            <summary>Shopper demand insights</summary>
+            <ShopperDemand merchantId={profile.merchant.id} />
+          </details>
+        </>
       )}
       {opportunities.length > 0 && (
         <section className="merchant-opportunity-list" aria-label="Synthetic opportunities">
