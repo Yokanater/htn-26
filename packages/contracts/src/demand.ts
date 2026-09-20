@@ -82,6 +82,14 @@ export const DemandCohortSchema = z
   );
 export type DemandCohort = z.infer<typeof DemandCohortSchema>;
 
+/** Design v3 §6.2 keeps the denominator, merchant support, pair support and gaps separate. */
+export const DemandGapSchema = z.strictObject({
+  kind: z.enum(['unmet_requirement', 'rejection']),
+  /** A rejection reason code, or the confirmed category that nothing satisfied. */
+  reason: z.string().min(1),
+  sessions: z.number().int().nonnegative(),
+});
+
 /** Private exact counts: NEVER serialize this schema to a merchant. */
 export const DemandAggregateSchema = z
   .strictObject({
@@ -98,21 +106,52 @@ export const DemandAggregateSchema = z
         supportingSessions: z.number().int().nonnegative(),
       }),
     ),
+    /** Distinct sessions that explicitly selected at least one offer from the merchant. */
+    merchantSupport: z
+      .array(
+        z.strictObject({
+          merchantId: idSchema('mer_'),
+          supportingSessions: z.number().int().nonnegative(),
+        }),
+      )
+      .optional(),
+    gaps: z.array(DemandGapSchema).optional(),
   })
   .superRefine((aggregate, ctx) => {
-    if (aggregate.windowStart >= aggregate.windowEnd)
-      ctx.addIssue({ code: 'custom', message: 'Window must be increasing' });
+    const fail = (message: string) => ctx.addIssue({ code: 'custom', message });
+    if (aggregate.windowStart >= aggregate.windowEnd) fail('Window must be increasing');
+
+    const support = new Map<string, number>();
+    for (const entry of aggregate.merchantSupport ?? []) {
+      if (support.has(entry.merchantId)) fail('A merchant can only be counted once');
+      if (entry.supportingSessions > aggregate.eligibleSessions)
+        fail('Merchant support cannot exceed the denominator');
+      support.set(entry.merchantId, entry.supportingSessions);
+    }
+
     const seen = new Set<string>();
     for (const pair of aggregate.pairs) {
       const key = [...pair.merchantIds].sort().join('|');
       if (pair.merchantIds[0] === pair.merchantIds[1] || seen.has(key))
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Pair must contain two distinct merchants and occur once',
-        });
+        fail('Pair must contain two distinct merchants and occur once');
       if (pair.supportingSessions > aggregate.eligibleSessions)
-        ctx.addIssue({ code: 'custom', message: 'Pair support cannot exceed the denominator' });
+        fail('Pair support cannot exceed the denominator');
+      // A pairing cannot have more supporting sessions than either merchant in it.
+      for (const merchantId of pair.merchantIds) {
+        const merchantSupport = support.get(merchantId);
+        if (merchantSupport !== undefined && pair.supportingSessions > merchantSupport)
+          fail('Pair support cannot exceed either merchant support');
+      }
       seen.add(key);
+    }
+
+    const gapKeys = new Set<string>();
+    for (const gap of aggregate.gaps ?? []) {
+      const key = `${gap.kind}|${gap.reason}`;
+      if (gapKeys.has(key)) fail('A gap reason can only be counted once');
+      if (gap.sessions > aggregate.eligibleSessions)
+        fail('Gap sessions cannot exceed the denominator');
+      gapKeys.add(key);
     }
   });
 export type DemandAggregate = z.infer<typeof DemandAggregateSchema>;
@@ -135,12 +174,43 @@ export const MerchantDemandSummarySchema = z
     status: z.enum(['insufficient_evidence', 'available']),
     minimumSessions: z.number().int().min(5),
     eligibleSessions: SupportBandSchema.nullable(),
+    /** Published as bands; every cell is suppressed below `minimumSessions`. */
+    merchantSupport: z
+      .array(z.strictObject({ merchantId: idSchema('mer_'), support: SupportBandSchema }))
+      .optional(),
+    gaps: z
+      .array(
+        z.strictObject({
+          kind: DemandGapSchema.shape.kind,
+          reason: DemandGapSchema.shape.reason,
+          support: SupportBandSchema,
+        }),
+      )
+      .optional(),
   })
   .superRefine((summary, ctx) => {
     if (summary.windowStart >= summary.windowEnd)
       ctx.addIssue({ code: 'custom', message: 'Window must be increasing' });
     if (summary.status === 'insufficient_evidence' && summary.eligibleSessions !== null)
       ctx.addIssue({ code: 'custom', message: 'Suppressed cohorts must not disclose counts' });
+    if (
+      summary.status === 'insufficient_evidence' &&
+      (summary.merchantSupport?.length || summary.gaps?.length)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Suppressed cohorts must not disclose a breakdown',
+      });
+    for (const band of [
+      ...(summary.merchantSupport ?? []).map((entry) => entry.support),
+      ...(summary.gaps ?? []).map((gap) => gap.support),
+    ]) {
+      if (band.min < summary.minimumSessions)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Every published cell must meet the publication threshold',
+        });
+    }
     if (
       summary.status === 'available' &&
       (!summary.eligibleSessions || summary.eligibleSessions.min < summary.minimumSessions)

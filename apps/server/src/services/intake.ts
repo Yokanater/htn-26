@@ -85,6 +85,24 @@ export class IntakeStore {
     return brief;
   }
 
+  /** This owner's confirmed briefs, newest revision as stored. */
+  confirmedBriefs(ownerId: string): IntentBrief[] {
+    return [...this.#briefs.values()]
+      .filter((record) => record.ownerId === ownerId && record.brief.status === 'confirmed')
+      .map((record) => record.brief);
+  }
+
+  /**
+   * Resolves briefs for demand projection. Deliberately not owner-scoped, because a cohort
+   * spans sessions; this is an in-process seam and is never reachable from a route.
+   */
+  findBriefs(briefIds: readonly string[]): IntentBrief[] {
+    return briefIds.flatMap((id) => {
+      const record = this.#briefs.get(id);
+      return record ? [record.brief] : [];
+    });
+  }
+
   getBrief(ownerId: string, briefId: string): IntentBrief | null {
     const record = this.#briefs.get(briefId);
     return record?.ownerId === ownerId ? record.brief : null;

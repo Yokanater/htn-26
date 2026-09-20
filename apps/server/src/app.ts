@@ -13,6 +13,8 @@ import { errorBody } from './errors';
 import { type AppProviders, defaultProviders } from './providers';
 import { assetRoutes } from './routes/assets';
 import { briefRoutes } from './routes/briefs';
+import { consentRoutes } from './routes/consent';
+import { decisionRoutes } from './routes/decisions';
 import { eventRoutes } from './routes/events';
 import { matchRoutes } from './routes/matches';
 import { sessionRoutes } from './routes/session';
@@ -72,6 +74,10 @@ export function createApp(env: EnvLike = {}, injected?: Partial<AppProviders>): 
   if (flags.FEATURE_COLLECTION_MATCHING) {
     app.route('/api', matchRoutes(providers));
     app.route('/api', eventRoutes(providers));
+  }
+  if (flags.FEATURE_DEMAND_LEDGER) {
+    app.route('/api', consentRoutes(providers));
+    app.route('/api', decisionRoutes(providers));
   }
   return app;
 }

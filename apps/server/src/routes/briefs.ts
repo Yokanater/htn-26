@@ -4,6 +4,7 @@ import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { describeIntentFailure, SESSION_ENDED } from '../errors';
 import type { AppProviders } from '../providers';
+import { recordConfirmation } from '../services/confirmations';
 import { RevisionConflictError } from '../services/intake';
 import { SESSION_COOKIE } from '../services/session';
 
@@ -134,6 +135,21 @@ export function briefRoutes(providers: AppProviders): Hono {
       providers.intake.saveBrief(ownerId, next.data, expectedRevision);
       // A new revision supersedes any search still running for the old one.
       providers.runner.invalidate(next.data.id, next.data.revision);
+      // It also changes what any cohort built on the old revision meant. The ledger cannot
+      // observe a brief edit, so published evidence is dropped until it is recomputed.
+      providers.demandProjection.invalidate();
+      // A shopper who already opted in and then confirms another revision belongs in the
+      // denominator too, so the observation is recorded here as well as on consent grant.
+      const consent = await providers.demand.getConsent(ownerId);
+      if (consent) {
+        await recordConfirmation(
+          providers.demand,
+          ownerId,
+          next.data,
+          consent,
+          providers.now().toISOString(),
+        );
+      }
       return c.json(next.data);
     } catch (error) {
       if (error instanceof RevisionConflictError)

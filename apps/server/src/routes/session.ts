@@ -18,7 +18,7 @@ export function sessionRoutes(providers: AppProviders): Hono {
     }
     return c.json({ owner: true });
   });
-  routes.delete('/session', (c) => {
+  routes.delete('/session', async (c) => {
     const ownerId = getCookie(c, SESSION_COOKIE);
     if (providers.sessions.valid(ownerId)) {
       // Revoke first so a run finishing mid-delete cannot store anything for this owner.
@@ -28,6 +28,7 @@ export function sessionRoutes(providers: AppProviders): Hono {
         ...providers.runs.deleteOwner(ownerId),
       ]);
       for (const briefId of briefIds) providers.checkpoints.dropBrief(briefId);
+      await providers.demand.deleteSession(ownerId);
     }
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ deleted: true });

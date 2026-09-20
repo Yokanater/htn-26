@@ -7,7 +7,7 @@ import {
   featureFlags,
   type ShoppingCatalog,
 } from '@sei/core';
-import { createCollectionMatcher } from '@sei/enrich';
+import { createCollectionMatcher, createDemandAggregator } from '@sei/enrich';
 import {
   type CollectionRunner,
   type CollectionRunnerOptions,
@@ -23,6 +23,8 @@ import {
   type OpenAiIntentModelOptions,
 } from '@sei/reason';
 import { loadSeedOffers } from './replay';
+import { PrivateDemandLedger } from './services/demand';
+import { DemandProjectionService } from './services/demand-projection';
 import { ContainerImageNormalizer } from './services/image';
 import { SipsImageNormalizer } from './services/image-normalizer';
 import {
@@ -45,6 +47,9 @@ export interface AppProviders {
   checkpoints: PrivateCheckpointStore;
   runs: RunRegistry;
   runner: CollectionRunner;
+  demand: PrivateDemandLedger;
+  /** Projects the private ledger into consent-gated published snapshots (S3). */
+  demandProjection: DemandProjectionService;
   now: () => Date;
 }
 
@@ -135,9 +140,11 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
   const checkpoints = overrides.checkpoints ?? new PrivateCheckpointStore();
   const catalog = overrides.catalog ?? createCatalog(env);
   const matcher = overrides.matcher ?? createCollectionMatcher();
+  const intake = overrides.intake ?? new IntakeStore();
+  const demand = overrides.demand ?? new PrivateDemandLedger();
   return {
     sessions: overrides.sessions ?? new OwnerSessions(),
-    intake: overrides.intake ?? new IntakeStore(),
+    intake,
     intent: overrides.intent ?? createIntentService(env, options.intentModel, now),
     imageNormalizer:
       overrides.imageNormalizer === undefined
@@ -149,6 +156,18 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
     matcher,
     checkpoints,
     runs,
+    demand,
+    demandProjection:
+      overrides.demandProjection ??
+      new DemandProjectionService({
+        ledger: demand,
+        briefs: (ids) => intake.findBriefs(ids),
+        aggregator: createDemandAggregator(),
+        minimumSessions: positiveInt(env.DEMAND_MIN_SESSIONS, 5),
+        snapshotMinutes: positiveInt(env.DEMAND_SNAPSHOT_MINUTES, 15),
+        retentionDays: positiveInt(env.DEMAND_RETENTION_DAYS, 30),
+        now,
+      }),
     runner:
       overrides.runner ??
       createCollectionRunner({
@@ -165,4 +184,10 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
       }),
     now,
   };
+}
+
+/** Reads a positive integer policy value, falling back when unset or malformed. */
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const value = Number(raw?.trim());
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
