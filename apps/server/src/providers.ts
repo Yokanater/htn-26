@@ -49,7 +49,9 @@ export interface AppProviders {
   intake: IntakeStore;
   intent: IntentDraftService;
   imageNormalizer: ImageNormalizer | null;
-  catalog: ShoppingCatalog | ((brief: IntentBrief) => Pick<ShoppingCatalog, 'search'>);
+  catalog:
+    | ShoppingCatalog
+    | ((brief: IntentBrief) => Pick<ShoppingCatalog, 'search'> & { close?(): Promise<void> });
   merchantCatalog: MerchantProfiler;
   matcher: CollectionMatcher;
   checkpoints: PrivateCheckpointStore;
@@ -204,7 +206,13 @@ export function defaultProviders(env: EnvLike = {}, options: ProviderOptions = {
         enabled: featureFlags(env).FEATURE_COLLECTION_MATCHING === true,
         openCatalog:
           typeof catalog === 'function'
-            ? async (_signal, brief) => ({ ...catalog(brief), close: async () => {} })
+            ? async (_signal, brief) => {
+                const opened = catalog(brief);
+                return {
+                  search: opened.search,
+                  close: opened.close?.bind(opened) ?? (async () => undefined),
+                };
+              }
             : staticCatalog(catalog),
         matcher,
         checkpoints,
