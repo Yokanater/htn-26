@@ -14,6 +14,7 @@ import {
   Store,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { MerchantWorkspace } from './features/merchant';
 import { BriefEditor, type DomainHint } from './features/shopper/brief';
 import { MediaIntake, type MediaSelection } from './features/shopper/media';
 import { StudioArtwork } from './StudioArtwork';
@@ -452,7 +453,7 @@ function ShopperWorkspace({ back }: { back: () => void }) {
   );
 }
 
-function MerchantWorkspace({ back }: { back: () => void }) {
+function MerchantComingSoon({ back }: { back: () => void }) {
   return (
     <main className="workspace-main merchant-workspace">
       <button className="back-button" type="button" onClick={back}>
@@ -587,7 +588,12 @@ export function App() {
         ) : (
           <ShopperWorkspace back={() => setSurface('home')} />
         ))}
-      {surface === 'merchant' && <MerchantWorkspace back={() => setSurface('home')} />}
+      {surface === 'merchant' &&
+        (capabilities.data?.flags?.FEATURE_MERCHANT_OPPORTUNITIES === true ? (
+          <MerchantWorkspace back={() => setSurface('home')} />
+        ) : (
+          <MerchantComingSoon back={() => setSurface('home')} />
+        ))}
       <footer>
         <Brand />
         <span>Personal inspiration. Shared only by choice.</span>

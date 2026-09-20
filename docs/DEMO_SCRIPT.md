@@ -10,9 +10,9 @@ not an assertion of the event's current judging format. Check current rules with
 | 0:45–1:15 | Show real sourced collection, a rejected alternative, missing fact and honest subtotal. |
 | 1:15–1:30 | Explicitly save; show opt-in is separate and optional. |
 | 1:30–1:50 | Switch to a labeled recording of the other domain with the same complete workflow. |
-| 1:50–2:20 | Merchant view: labeled synthetic cohort -> two-store opportunity -> public product proof. |
-| 2:20–2:40 | New merchant maps to unmet intent; show inferred supply fit, not invented historical support. |
-| 2:40–3:00 | Editable collaboration brief; say what remains unknown. Optional owned-store draft only if working. |
+| 1:50–2:20 | Merchant view: open **Synthetic/demo merchant workspace**, paste a seed `.example` URL, show banded cohort counts and public product proof. Never call this ownership. |
+| 2:20–2:40 | New merchant maps to unmet intent; show inferred supply fit, `observedPairSupport` empty, evidence from both catalogs. |
+| 2:40–3:00 | Create a server-generated draft, edit the prose, save with `expectedVersion`. Say what remains unknown. Do not approve or execute. |
 
 Never let one on-stage action appear to establish market demand. Explain sample size and provenance.
 Keep one permitted real-image recording per domain and a fully synthetic offline backup. Replays
@@ -37,6 +37,23 @@ Shortlists last for the current visit; purchasing happens at the merchant. Shipp
 unknown until independently verified, and different currencies are never added together.
 Edit requirements to invalidate the old search, or cancel and retry. Clothing sizes use full labels.
 
-This is a working shopper slice, not a completed S3–S5 release: persisted saves, consented demand
-aggregation, and live merchant opportunities still need integration. Merchant previews remain labeled
-synthetic. Offline S2 checks cover outfit and general-product fixtures, ownership, and revisions.
+This is a working shopper slice plus a fixture-backed merchant workspace: S4 uses labeled synthetic
+cohorts, not live snapshots. Merchant views stay **synthetic/demo** for demand. A live public store
+URL is a human spike behind `MERCHANT_CATALOG_PROVIDER=live` and does **not** make seed bands live
+demand. Offline S2 checks cover outfit and general-product fixtures, ownership, and revisions.
+
+## Merchant workspace (S4 fixtures)
+
+With `MILESTONES=s1,s2,s3,s4`, the merchant surface is a **synthetic/demo workspace**. Seed hosts
+such as `outfit-brand-1.example` and `setup-brand-1.example` profile in memory with no network.
+Observed cards reuse the seed cohort bands (`5–9`, never an exact private count). Default demo
+newcomers `newcomer-outfit.example` (top) and `newcomer-setup.example` (desk) profile through the
+same in-memory merchant catalog: inferred complementary supply fit, public product proof from both
+catalogs, and no inherited pair support. Drafts are versioned prose, not approved actions. Shopper
+Browserbase search, if enabled, does not profile merchants.
+
+Live public catalog profiling is opt-in (`MERCHANT_CATALOG_PROVIDER=live`) and DI-tested with
+injected fetch/DNS. It labels the profile **Live public catalog profile**. Opportunities and drafts
+stay **Synthetic demand opportunity** — seed bands, not observed pair support. Do not present a live
+store URL as live demand. Humans spike real fetch/dns separately; agents never call public internet
+providers.

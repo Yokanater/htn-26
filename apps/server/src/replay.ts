@@ -23,3 +23,56 @@ export function loadSeedOffers(): ProductOffer[] {
       ),
   );
 }
+
+/** Demo newcomers shipped with the default merchant profiler; not mixed into shopper search. */
+const DEMO_NEWCOMERS = [
+  { domain: 'outfit' as const, host: 'newcomer-outfit.example', category: 'top' },
+  { domain: 'setup' as const, host: 'newcomer-setup.example', category: 'desk' },
+];
+
+export function loadDemoNewcomerHosts(): Set<string> {
+  return new Set(DEMO_NEWCOMERS.map((item) => item.host));
+}
+
+export function loadDemoNewcomerOffers(): ProductOffer[] {
+  return loadMerchantCatalogOffers().filter((offer) =>
+    loadDemoNewcomerHosts().has(offer.merchant.domain),
+  );
+}
+
+export function loadMerchantCatalogOffers(): ProductOffer[] {
+  return [
+    ...loadSeedOffers(),
+    ...DEMO_NEWCOMERS.map((item) =>
+      ProductOfferSchema.parse({
+        id: `offer_newcomer_${item.domain}`,
+        merchant: {
+          id: `mer_newcomer_${item.domain}`,
+          name: `Newcomer ${item.domain} shop`,
+          domain: item.host,
+        },
+        productId: `product-${item.category}`,
+        variantId: `variant-${item.category}-1`,
+        title: `Newcomer ${item.category}`,
+        category: item.category,
+        productUrl: `https://${item.host}/products/${item.category}`,
+        imageUrl: null,
+        price: { amount: 12000, currency: 'CAD' },
+        availability: 'available',
+        shipsTo: ['CA'],
+        attributes: {},
+        evidence: [
+          {
+            id: `ev_newcomer_${item.domain}`,
+            field: 'product_record',
+            value: `Synthetic newcomer ${item.category}`,
+            url: `https://${item.host}/products/${item.category}`,
+            capturedAt: '2026-09-19T12:00:00Z',
+            method: 'catalog',
+          },
+        ],
+        sampleOrigin: 'seed',
+      }),
+    ),
+  ];
+}
