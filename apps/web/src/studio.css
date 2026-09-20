@@ -1,22 +1,5 @@
 /* biome-ignore-all lint/style/noDescendingSpecificity: independent component selectors follow the page order. */
 /* Studio presentation. Existing workflow and feature gates remain in their components. */
-footer > .footer-note {
-  display: block;
-  max-width: 460px;
-}
-.footer-note small {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #52655b;
-}
-@media (max-width: 900px) {
-  footer > .footer-note {
-    grid-column: 1 / -1;
-    margin-top: 12px;
-  }
-}
 .brand.rainforest-logo {
   position: relative;
   width: 180px;
@@ -1192,17 +1175,47 @@ h2 em {
 .merchant-principles p {
   font-size: 13px;
 }
-footer {
+.site-footer {
+  width: 100%;
   max-width: 1280px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px 24px;
+  padding: 16px 40px 24px;
+  border: 0;
 }
-footer > span {
-  font:
-    12px ui-sans-serif,
-    system-ui,
-    sans-serif;
+.site-footer > span {
+  display: block;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
 }
-footer small {
-  font-size: 10px;
+.site-footer .footer-wordmark {
+  font-weight: 500;
+  color: var(--dark);
+}
+.site-footer .footer-note {
+  max-width: 460px;
+  text-align: right;
+}
+.site-footer small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .site-footer {
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 20px 20px;
+  }
+  .site-footer .footer-note {
+    text-align: left;
+  }
 }
 @keyframes studio-enter {
   from {

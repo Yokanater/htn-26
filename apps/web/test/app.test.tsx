@@ -99,7 +99,10 @@ it('renders the rainforest brand', () => {
     vi.fn(async () => Response.json({ owner: true })),
   );
   renderApp();
-  expect(screen.getAllByRole('img', { name: 'rainforest' })).toHaveLength(2);
+  expect(screen.getAllByRole('img', { name: 'rainforest' })).toHaveLength(1);
+  const footer = screen.getByRole('contentinfo');
+  expect(footer.querySelector('img')).toBeNull();
+  expect(footer.textContent).toContain('Personal inspiration. Shared only by choice.');
 });
 
 it('keeps the recorded-catalog disclosure without a rehearsal banner or instructions', async () => {

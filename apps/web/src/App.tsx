@@ -513,8 +513,8 @@ export function App() {
         ) : (
           <MerchantComingSoon back={() => setSurface('home')} />
         ))}
-      <footer>
-        <Brand />
+      <footer className="site-footer">
+        <span className="footer-wordmark">rainforest</span>
         <span className="footer-note">
           Personal inspiration. Shared only by choice.
           {demo.data?.enabled && (
